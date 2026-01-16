@@ -1,10 +1,10 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 type Props = {
@@ -20,11 +20,19 @@ const SQUARE = 28;
 const GAP = 6;
 const RADIUS = 6;
 
-// Thickness of the white band around today
+// Today highlight band thickness
 const TODAY_BAND = 3;
 
-// IMPORTANT: outer box size is constant for ALL tiles to keep alignment perfect
+// Constant outer box size for ALL tiles (prevents alignment shift)
 const OUTER = SQUARE + TODAY_BAND * 2;
+
+// Visual hierarchy: dim future days
+const FUTURE_OPACITY = 0.72;
+
+// Halo strength (tweak here)
+const IOS_HALO_OPACITY = 0.6;
+const IOS_HALO_RADIUS = 7;
+const ANDROID_ELEVATION = 4;
 
 export function UserDayGrid({
   days,
@@ -33,10 +41,19 @@ export function UserDayGrid({
   onToggle,
   todayIndex,
 }: Props) {
+  // Minimal "streak" signal: today done AND yesterday done
+  const isTodayStreak = useMemo(() => {
+    if (todayIndex === undefined) return false;
+    if (todayIndex <= 0) return false;
+    return Boolean(days[todayIndex]) && Boolean(days[todayIndex - 1]);
+  }, [days, todayIndex]);
+
   return (
     <View style={styles.grid}>
       {days.map((isDone, dayIndex) => {
         const isToday = todayIndex === dayIndex;
+        const isFuture =
+          todayIndex !== undefined && dayIndex > todayIndex;
 
         return (
           <Pressable
@@ -45,18 +62,41 @@ export function UserDayGrid({
             hitSlop={6}
             style={styles.pressable}
           >
-            {/* constant-size outer wrapper (alignment fix) */}
-            <View style={[styles.outerWrapper, isToday && styles.todayOuterWrapper]}>
-              {/* white band only for today */}
-              <View style={[styles.bandLayer, isToday && styles.bandLayerToday]}>
-                {/* colored tile stays the same size always */}
+            {/* constant-size outer wrapper (alignment-safe) */}
+            <View
+              style={[
+                styles.outerWrapper,
+                isToday && styles.todayOuterWrapper,
+              ]}
+            >
+              {/* white band layer (space) */}
+              <View
+                style={[
+                  styles.bandLayer,
+                  isToday && styles.bandLayerToday,
+                ]}
+              >
+                {/* colored tile */}
                 <View
                   style={[
                     styles.tile,
-                    { backgroundColor: isDone ? colorDark : colorLight },
+                    {
+                      backgroundColor: isDone ? colorDark : colorLight,
+                      opacity: isFuture ? FUTURE_OPACITY : 1,
+                    },
                   ]}
                 >
-                  <Text style={styles.dayNumber}>{dayIndex + 1}</Text>
+                  {/* Subtle "pressed" depth for completed days (no color change needed) */}
+                  {isDone && <View style={styles.doneOverlay} />}
+
+                  {/* tiny streak dot (only for today when streak is active) */}
+                  {isToday && isTodayStreak && (
+                    <View style={styles.streakDot} />
+                  )}
+
+                  <Text style={styles.dayNumber}>
+                    {dayIndex + 1}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -72,15 +112,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: GAP,
-    // use OUTER for width math because every tile now occupies OUTER
     maxWidth: NUM_COLS * (OUTER + GAP),
   },
 
-  pressable: {
-    // no sizing here
-  },
+  pressable: {},
 
-  // Constant-size box for every tile (prevents "today" shifting the layout)
   outerWrapper: {
     width: OUTER,
     height: OUTER,
@@ -88,30 +124,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Stronger halo (still clean, no overlays)
+  // halo only around today
   todayOuterWrapper: {
     ...Platform.select({
       ios: {
         shadowColor: "#FFFFFF",
-        shadowOpacity: 0.6,     // stronger than before
-        shadowRadius: 7,        // stronger blur
+        shadowOpacity: IOS_HALO_OPACITY,
+        shadowRadius: IOS_HALO_RADIUS,
         shadowOffset: { width: 0, height: 0 },
       },
       android: {
-        elevation: 4,           // stronger lift
+        elevation: ANDROID_ELEVATION,
       },
       default: {},
     }),
   },
 
-  // Layer that creates the white band via padding
   bandLayer: {
     width: OUTER,
     height: OUTER,
     borderRadius: RADIUS + TODAY_BAND,
     alignItems: "center",
     justifyContent: "center",
-    padding: TODAY_BAND,        // reserve band space even when transparent
+    padding: TODAY_BAND,          // reserve band space for all tiles
     backgroundColor: "transparent",
   },
 
@@ -119,18 +154,39 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  // Inner colored tile (constant size)
   tile: {
     width: SQUARE,
     height: SQUARE,
     borderRadius: RADIUS,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",           // makes overlays clean with rounded corners
   },
 
   dayNumber: {
     fontSize: 11,
     fontWeight: "600",
     color: "#111",
+    zIndex: 2,
+  },
+
+  // Very subtle overlay to make done tiles read slightly deeper/richer
+  doneOverlay: {
+    position: "absolute",
+    inset: 0,
+    backgroundColor: "rgba(0,0,0,0.08)",
+    zIndex: 1,
+  },
+
+  // Minimal streak signal (tiny dot)
+  streakDot: {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.75)",
+    zIndex: 2,
   },
 });

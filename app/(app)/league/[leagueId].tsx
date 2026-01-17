@@ -1,11 +1,12 @@
-import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { getLeagueMembers } from "@/features/leagues/api";
 import { supabase } from "@/lib/supabase";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const DAYS_IN_MONTH = 31;
 
@@ -26,14 +27,16 @@ function activeDaysCount(days: boolean[]) {
   return days.reduce((acc, v) => acc + (v ? 1 : 0), 0);
 }
 
-function sortMembers(members: Member[], myId: string, leagueViewOn: boolean) {
-  if (!leagueViewOn) {
+function sortMembers(members: Member[], myId: string, rankingOn: boolean) {
+  // My View = pin me on top
+  if (!rankingOn) {
     const idx = members.findIndex((m) => m.id === myId);
     if (idx <= 0) return members;
     const me = members[idx];
     return [me, ...members.slice(0, idx), ...members.slice(idx + 1)];
   }
 
+  // Ranking = sort by active days desc, then name
   return [...members].sort((a, b) => {
     const ad = activeDaysCount(a.days);
     const bd = activeDaysCount(b.days);
@@ -42,7 +45,7 @@ function sortMembers(members: Member[], myId: string, leagueViewOn: boolean) {
   });
 }
 
-// palette
+// palette (still used per-user; you can later unify to purple-only if desired)
 const PALETTE = [
   { colorLight: "#9AE6B4", colorDark: "#2F855A", accentActive: "#00C853" }, // green
   { colorLight: "#B794F4", colorDark: "#6B46C1", accentActive: "#7C3AED" }, // purple
@@ -64,14 +67,63 @@ function toHandle(s?: string | null) {
   return v;
 }
 
+// --- local theme for THIS screen (match mock) ---
+const theme = {
+  bg: "#0B0615",
+  text: "#EDE7FF",
+  muted: "rgba(237,231,255,0.65)",
+  purple: "#A259FF",
+};
+
+function PillButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void | Promise<void>;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.pillBtn}>
+      <Text style={styles.pillBtnText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function Segmented({
+  value,
+  onChange,
+}: {
+  value: "My View" | "Ranking";
+  onChange: (v: "My View" | "Ranking") => void;
+}) {
+  return (
+    <View style={styles.segmentWrap}>
+      {(["My View", "Ranking"] as const).map((k) => {
+        const active = value === k;
+        return (
+          <Pressable
+            key={k}
+            onPress={() => onChange(k)}
+            style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+          >
+            <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{k}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function LeagueDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
   const params = useLocalSearchParams<{ leagueId: string }>();
   const leagueId = typeof params.leagueId === "string" ? params.leagueId : "";
 
   const todayIndex = new Date().getDate() - 1;
 
-  const [leagueViewOn, setLeagueViewOn] = useState(false);
+  const [viewMode, setViewMode] = useState<"My View" | "Ranking">("My View");
 
   const [myId, setMyId] = useState<string>("");
   const [members, setMembers] = useState<Member[]>([]);
@@ -103,7 +155,7 @@ export default function LeagueDetailScreen() {
       }
       setMyId(user.id);
 
-      // fetch league meta so header shows name + activity
+      // fetch league meta
       const { data: leagueRow, error: leagueErr } = await supabase
         .from("leagues")
         .select("id,name,activity")
@@ -161,8 +213,9 @@ export default function LeagueDetailScreen() {
 
   const orderedMembers = useMemo(() => {
     if (!myId) return members;
-    return sortMembers(members, myId, leagueViewOn);
-  }, [members, myId, leagueViewOn]);
+    const rankingOn = viewMode === "Ranking";
+    return sortMembers(members, myId, rankingOn);
+  }, [members, myId, viewMode]);
 
   // only allow toggling MY squares
   const toggleDayForMember = useCallback(
@@ -185,21 +238,23 @@ export default function LeagueDetailScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* B) Native header: add Sign out to headerRight */}
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: leagueName ? `League: ${leagueName}` : "League",
-          headerTitleStyle: { fontSize: 18 },
-          headerTitleAlign: "left",
-          headerBackTitle: "Back",
-          headerRight: () => (
-            <Pressable onPress={onSignOut} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-              <Text style={{ fontSize: 16 }}>Sign out</Text>
-            </Pressable>
-          ),
-        }}
-      />
+      {/* Custom gradient header to match mock + safe area */}
+      <LinearGradient
+        colors={["#07030F", "#160A2D"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.header, { paddingTop: insets.top + 18 }]}
+      >
+        <View style={styles.headerRow}>
+          <PillButton label="Back" onPress={() => router.back()} />
+
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {leagueName ? `League: ${leagueName}` : "League"}
+          </Text>
+
+          <PillButton label="Sign out" onPress={onSignOut} />
+        </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scroll}
@@ -207,26 +262,27 @@ export default function LeagueDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* C) Removed in-page Sign out; keep only activity + toggle */}
-        <View style={styles.headerRow}>
+        {/* Activity + segmented toggle row */}
+        <View style={styles.topBar}>
           <View style={{ flex: 1 }}>
             {leagueActivity ? (
-              <ThemedText style={{ opacity: 0.7 }} numberOfLines={1}>
+              <Text style={styles.activityText} numberOfLines={1}>
                 {leagueActivity}
-              </ThemedText>
-            ) : null}
+              </Text>
+            ) : (
+              <Text style={styles.activityText} numberOfLines={1}>
+                {" "}
+              </Text>
+            )}
           </View>
 
-          <View style={styles.toggleWrap}>
-            <ThemedText style={styles.toggleLabel}>{leagueViewOn ? "League" : "My"}</ThemedText>
-            <Switch value={leagueViewOn} onValueChange={setLeagueViewOn} />
-          </View>
+          <Segmented value={viewMode} onChange={setViewMode} />
         </View>
 
-        {error ? <ThemedText style={{ opacity: 0.8 }}>{error}</ThemedText> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {loading ? (
-          <View style={{ paddingTop: 16 }}>
+          <View style={{ paddingTop: 18 }}>
             <ActivityIndicator />
           </View>
         ) : (
@@ -250,27 +306,93 @@ export default function LeagueDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scroll: { flex: 1 },
-  scrollContent: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 32,
+  container: {
+    flex: 1,
+    backgroundColor: theme.bg,
+  },
+
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 12,
-    paddingTop: 4,
   },
-  toggleWrap: {
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    color: theme.text,
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+
+  pillBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(162,89,255,0.65)",
+    backgroundColor: "rgba(162,89,255,0.10)",
+  },
+  pillBtnText: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  scroll: { flex: 1 },
+  scrollContent: {
+    padding: 16,
+    gap: 14,
+    paddingBottom: 32,
+  },
+
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "space-between",
+    gap: 12,
+    paddingTop: 2,
   },
-  toggleLabel: {
-    fontSize: 12,
-    opacity: 0.8,
+  activityText: {
+    color: theme.muted,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  segmentWrap: {
+    flexDirection: "row",
+    borderRadius: 999,
+    padding: 3,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+  segmentBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+  },
+  segmentBtnActive: {
+    backgroundColor: "rgba(162,89,255,0.35)",
+  },
+  segmentText: {
+    color: "rgba(237,231,255,0.65)",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  segmentTextActive: {
+    color: theme.text,
+  },
+
+  errorText: {
+    color: "rgba(255,120,120,0.9)",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

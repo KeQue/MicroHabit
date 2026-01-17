@@ -1,5 +1,7 @@
 import { ThemedText } from "@/components/themed-text";
 import { UserDayGrid } from "@/components/UserDayGrid";
+import { LinearGradient } from "expo-linear-gradient";
+import React from "react";
 import { StyleSheet, View } from "react-native";
 
 type Props = {
@@ -16,11 +18,15 @@ type Props = {
   disabled?: boolean;
 };
 
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
 export function UserCard({
   name,
   subtitle,
   days,
-  colorDark,
+  colorDark, // not used, keep for compatibility
   accentActive,
   onToggle,
   todayIndex,
@@ -28,15 +34,22 @@ export function UserCard({
 }: Props) {
   const activeDays = days.filter(Boolean).length;
   const totalDays = days.length;
+
   const pct = totalDays === 0 ? 0 : activeDays / totalDays;
+  const fillFlex = clamp01(pct);
+
+  // Gradient like the mock. Uses per-user accent as the start.
+  const gradStart = accentActive;
+  const gradEnd = "#A259FF";
 
   return (
-    <View style={[styles.card, disabled && styles.cardDisabled]}>
+    <View style={[styles.section, disabled && styles.sectionDisabled]}>
       {/* Header */}
       <View style={styles.headerRow}>
-        <ThemedText type="subtitle">{name}</ThemedText>
+        <ThemedText style={[styles.name, disabled && styles.nameDisabled]} numberOfLines={1}>
+          {name}
+        </ThemedText>
 
-        {/* ✅ only numbers, no "Active Days" label */}
         <ThemedText style={styles.count}>
           {activeDays}/{totalDays}
         </ThemedText>
@@ -44,16 +57,23 @@ export function UserCard({
 
       {/* Progress bar */}
       <View style={styles.progressTrack}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${pct * 100}%`, backgroundColor: accentActive },
-          ]}
-        />
+        <View style={[styles.progressFillWrap, { flex: fillFlex }]}>
+          <LinearGradient
+            colors={[gradStart, gradEnd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.progressFill}
+          />
+        </View>
+        <View style={{ flex: 1 - fillFlex }} />
       </View>
 
-      {/* Optional: league activity */}
-      {subtitle ? <ThemedText style={styles.sub}>{subtitle}</ThemedText> : null}
+      {/* Subtitle (activity) */}
+      {subtitle ? (
+        <ThemedText style={styles.sub} numberOfLines={1}>
+          {subtitle}
+        </ThemedText>
+      ) : null}
 
       {/* Grid */}
       <View style={disabled && styles.gridDisabled}>
@@ -67,42 +87,80 @@ export function UserCard({
           todayIndex={todayIndex}
         />
       </View>
+
+      {/* Subtle divider like the mock */}
+      <View style={styles.divider} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    padding: 12,
-    borderRadius: 16,
+  // This is the "user block" spacing. Your mock has generous separation.
+  section: {
+    paddingTop: 18,
+    paddingBottom: 18,
     gap: 10,
   },
-  cardDisabled: {
+  sectionDisabled: {
     opacity: 0.78,
   },
+
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "baseline",
+    gap: 12,
   },
 
-  // ✅ replaces "Active Days" label + value
-  count: { fontSize: 12, fontWeight: "800", opacity: 0.9 },
+  // stronger hierarchy like screenshot
+  name: {
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+  nameDisabled: {
+    opacity: 0.85,
+  },
+
+  count: {
+    fontSize: 14,
+    fontWeight: "800",
+    opacity: 0.75,
+  },
 
   progressTrack: {
-    height: 10,
+    height: 12,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     overflow: "hidden",
+    flexDirection: "row",
+  },
+
+  // Wrap used so gradient stays clipped properly.
+  progressFillWrap: {
+    height: "100%",
+    overflow: "hidden",
+    borderRadius: 999,
   },
   progressFill: {
     height: "100%",
+    width: "100%",
     borderRadius: 999,
   },
 
-  sub: { opacity: 0.7, fontSize: 12 },
+  sub: {
+    opacity: 0.65,
+    fontSize: 16,
+    fontWeight: "600",
+  },
 
   gridDisabled: {
     opacity: 0.6,
+  },
+
+  divider: {
+    height: 1,
+    marginTop: 10,
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
 });

@@ -1,12 +1,11 @@
 import { ThemedText } from "@/components/themed-text";
 import { UserDayGrid } from "@/components/UserDayGrid";
-import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
 type Props = {
   name: string;
-  subtitle?: string; // use for league activity (optional)
+  subtitle?: string; // league activity
   days: boolean[];
 
   colorDark: string; // kept for compatibility (not used)
@@ -38,33 +37,28 @@ export function UserCard({
   const pct = totalDays === 0 ? 0 : activeDays / totalDays;
   const fillFlex = clamp01(pct);
 
-  // Gradient like the mock. Uses per-user accent as the start.
-  const gradStart = accentActive;
-  const gradEnd = "#A259FF";
+  // IMPORTANT:
+  // We do NOT fade other users. We only block touches.
+  // If you want a subtle cue, we only slightly mute the name/count.
+  const nameStyle = disabled ? styles.nameMuted : styles.name;
+  const countStyle = disabled ? styles.countMuted : styles.count;
 
   return (
-    <View style={[styles.section, disabled && styles.sectionDisabled]}>
+    <View style={styles.section}>
       {/* Header */}
       <View style={styles.headerRow}>
-        <ThemedText style={[styles.name, disabled && styles.nameDisabled]} numberOfLines={1}>
+        <ThemedText style={nameStyle} numberOfLines={1}>
           {name}
         </ThemedText>
 
-        <ThemedText style={styles.count}>
+        <ThemedText style={countStyle}>
           {activeDays}/{totalDays}
         </ThemedText>
       </View>
 
-      {/* Progress bar */}
+      {/* Progress bar (flat color, matches squares) */}
       <View style={styles.progressTrack}>
-        <View style={[styles.progressFillWrap, { flex: fillFlex }]}>
-          <LinearGradient
-            colors={[gradStart, gradEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.progressFill}
-          />
-        </View>
+        <View style={[styles.progressFill, { flex: fillFlex, backgroundColor: accentActive }]} />
         <View style={{ flex: 1 - fillFlex }} />
       </View>
 
@@ -75,34 +69,29 @@ export function UserCard({
         </ThemedText>
       ) : null}
 
-      {/* Grid */}
-      <View style={disabled && styles.gridDisabled}>
+      {/* Grid
+          Block touches for other users WITHOUT fading.
+      */}
+      <View pointerEvents={disabled ? "none" : "auto"}>
         <UserDayGrid
           days={days}
           accentActive={accentActive}
-          onToggle={(dayIndex) => {
-            if (disabled) return;
-            onToggle(dayIndex);
-          }}
+          onToggle={(dayIndex) => onToggle(dayIndex)}
           todayIndex={todayIndex}
         />
       </View>
 
-      {/* Subtle divider like the mock */}
+      {/* Divider */}
       <View style={styles.divider} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // This is the "user block" spacing. Your mock has generous separation.
   section: {
     paddingTop: 18,
     paddingBottom: 18,
     gap: 10,
-  },
-  sectionDisabled: {
-    opacity: 0.78,
   },
 
   headerRow: {
@@ -112,20 +101,27 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
-  // stronger hierarchy like screenshot
   name: {
     fontSize: 26,
     fontWeight: "800",
     letterSpacing: 0.2,
   },
-  nameDisabled: {
-    opacity: 0.85,
+  nameMuted: {
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+    opacity: 0.92, // subtle only (no washed-out)
   },
 
   count: {
     fontSize: 14,
     fontWeight: "800",
     opacity: 0.75,
+  },
+  countMuted: {
+    fontSize: 14,
+    fontWeight: "800",
+    opacity: 0.65,
   },
 
   progressTrack: {
@@ -136,15 +132,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
 
-  // Wrap used so gradient stays clipped properly.
-  progressFillWrap: {
-    height: "100%",
-    overflow: "hidden",
-    borderRadius: 999,
-  },
   progressFill: {
     height: "100%",
-    width: "100%",
     borderRadius: 999,
   },
 
@@ -152,10 +141,6 @@ const styles = StyleSheet.create({
     opacity: 0.65,
     fontSize: 16,
     fontWeight: "600",
-  },
-
-  gridDisabled: {
-    opacity: 0.6,
   },
 
   divider: {

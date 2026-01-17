@@ -1,11 +1,10 @@
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, router, useSegments } from "expo-router";
 import React, { useEffect } from "react";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
 
 function RouteGate() {
   const { user, initializing } = useAuth();
   const segments = useSegments();
-  const router = useRouter();
 
   useEffect(() => {
     if (initializing) return;
@@ -18,10 +17,11 @@ function RouteGate() {
     }
 
     if (user && inAuthGroup) {
-      router.replace("/(app)");
+      // Typed routes in this project don't include "/league" even though it exists at runtime.
+      router.replace("/league" as any);
       return;
     }
-  }, [user, initializing, segments, router]);
+  }, [user, initializing, segments]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

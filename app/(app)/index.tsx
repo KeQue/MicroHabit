@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,12 +8,13 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useAuth } from "../../features/auth/useAuth";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
+import { supabase } from "../../lib/supabase";
 
 export default function LeaguesScreen() {
   const router = useRouter();
-  const { user, initializing } = useAuth();
+
+  const [userId, setUserId] = useState<string | null>(null);
 
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,18 +23,24 @@ export default function LeaguesScreen() {
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newActivity, setNewActivity] = useState("");
 
-  const canCreate = useMemo(() => {
-    return !creating && newName.trim().length > 0;
-  }, [creating, newName]);
+  async function resolveUser() {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    const u = data.user;
+    if (!u) throw new Error("Not authenticated");
+    setUserId(u.id);
+    return u.id;
+  }
 
   async function load() {
-    if (!user?.id) return;
-
     try {
       setError(null);
       setLoading(true);
-      const data = await getMyLeagues(user.id);
+
+      const uid = userId ?? (await resolveUser());
+      const data = await getMyLeagues(uid);
       setLeagues(data);
     } catch (e: any) {
       setError(e?.message ?? "Failed to load leagues");
@@ -43,32 +50,22 @@ export default function LeaguesScreen() {
   }
 
   useEffect(() => {
-    // Wait for auth to resolve
-    if (initializing) return;
-    if (!user?.id) return;
-
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initializing, user?.id]);
+  }, []);
 
   async function onCreate() {
-    if (!newName.trim()) {
-      setError("League name is required");
-      return;
-    }
-
     try {
       setError(null);
       setCreating(true);
 
-      const league = await createLeague(newName);
+      const league = await createLeague(newName, newActivity);
 
       setNewName("");
+      setNewActivity("");
       setShowCreate(false);
 
-      // Update UI immediately (no extra network call needed)
-      setLeagues((prev) => [league, ...prev]);
-
+      await load();
       router.push(`/league/${league.id}`);
     } catch (e: any) {
       setError(e?.message ?? "Failed to create league");
@@ -77,9 +74,21 @@ export default function LeaguesScreen() {
     }
   }
 
+  async function onSignOut() {
+    await supabase.auth.signOut();
+    // if your auth routing is correct, this should redirect automatically
+    router.replace("/sign-in");
+  }
+
   return (
     <View style={{ flex: 1, padding: 20, paddingTop: 70, backgroundColor: "#0B0F14" }}>
-      <Text style={{ fontSize: 28, fontWeight: "700", color: "white" }}>Leagues</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={{ fontSize: 28, fontWeight: "700", color: "white" }}>Leagues</Text>
+
+        <Pressable onPress={onSignOut} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+          <Text style={{ color: "#A7B0BC" }}>Sign out</Text>
+        </Pressable>
+      </View>
 
       <Text style={{ marginTop: 8, fontSize: 16, color: "#A7B0BC" }}>
         Create or join a league.
@@ -105,7 +114,24 @@ export default function LeaguesScreen() {
               placeholder="e.g. January Push"
               placeholderTextColor="#6B7280"
               autoCapitalize="sentences"
-              editable={!creating}
+              style={{
+                borderWidth: 1,
+                borderColor: "#1F2937",
+                padding: 12,
+                borderRadius: 12,
+                color: "white",
+              }}
+            />
+
+            <Text style={{ color: "#A7B0BC", marginTop: 6 }}>
+              Activity (max 40 chars) — {newActivity.length}/40
+            </Text>
+            <TextInput
+              value={newActivity}
+              onChangeText={(t) => setNewActivity(t.slice(0, 40))}
+              placeholder="e.g. Gym / Run / Reading"
+              placeholderTextColor="#6B7280"
+              autoCapitalize="sentences"
               style={{
                 borderWidth: 1,
                 borderColor: "#1F2937",
@@ -117,14 +143,13 @@ export default function LeaguesScreen() {
 
             <Pressable
               onPress={onCreate}
-              disabled={!canCreate}
+              disabled={creating}
               style={{
                 padding: 14,
                 borderRadius: 12,
-                backgroundColor: canCreate ? "#1A2430" : "#0F172A",
+                backgroundColor: creating ? "#0F172A" : "#1A2430",
                 borderWidth: 1,
                 borderColor: "#1F2937",
-                opacity: canCreate ? 1 : 0.6,
               }}
             >
               <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
@@ -136,8 +161,8 @@ export default function LeaguesScreen() {
               onPress={() => {
                 setShowCreate(false);
                 setNewName("");
+                setNewActivity("");
               }}
-              disabled={creating}
             >
               <Text style={{ color: "#A7B0BC", textAlign: "center" }}>Cancel</Text>
             </Pressable>
@@ -145,7 +170,7 @@ export default function LeaguesScreen() {
         ) : null}
 
         <Pressable
-          onPress={() => router.push("/league/join")}
+          onPress={() => router.push("/join")}
           style={{ padding: 16, borderRadius: 14, backgroundColor: "#1A2430" }}
         >
           <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
@@ -153,7 +178,7 @@ export default function LeaguesScreen() {
           </Text>
         </Pressable>
 
-        <Pressable onPress={load} disabled={loading || creating || !user?.id}>
+        <Pressable onPress={load}>
           <Text style={{ color: "#A7B0BC" }}>Refresh</Text>
         </Pressable>
       </View>
@@ -162,11 +187,7 @@ export default function LeaguesScreen() {
 
       {/* Data */}
       <View style={{ marginTop: 18, flex: 1 }}>
-        {initializing ? (
-          <View style={{ marginTop: 20 }}>
-            <ActivityIndicator />
-          </View>
-        ) : loading ? (
+        {loading ? (
           <View style={{ marginTop: 20 }}>
             <ActivityIndicator />
           </View>
@@ -191,6 +212,13 @@ export default function LeaguesScreen() {
                 <Text style={{ color: "white", fontSize: 16, fontWeight: "700" }}>
                   {item.name ?? "Untitled league"}
                 </Text>
+
+                {item.activity ? (
+                  <Text style={{ marginTop: 6, color: "#A7B0BC" }}>
+                    {item.activity}
+                  </Text>
+                ) : null}
+
                 {item.created_at ? (
                   <Text style={{ marginTop: 6, color: "#A7B0BC" }}>
                     Created: {new Date(item.created_at).toLocaleDateString()}

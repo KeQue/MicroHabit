@@ -3,19 +3,19 @@ import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { getLeagueMembers } from "@/features/leagues/api";
 import { supabase } from "@/lib/supabase";
-import { useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 
 const DAYS_IN_MONTH = 31;
 
 type Member = {
-  id: string;            // user_id
-  name: string;          // profile name/email
-  subtitle: string;      // role
+  id: string; // user_id
+  name: string; // username (short)
+  subtitle: string; // activity (same for all)
   colorLight: string;
-  colorDark: string;     // progress bar / theme
-  accentActive: string;  // active squares
+  colorDark: string;
+  accentActive: string;
   days: boolean[];
 };
 
@@ -27,16 +27,13 @@ function activeDaysCount(days: boolean[]) {
 }
 
 function sortMembers(members: Member[], myId: string, leagueViewOn: boolean) {
-  // OFF = My view: keep original order, only move me to top
   if (!leagueViewOn) {
     const idx = members.findIndex((m) => m.id === myId);
     if (idx <= 0) return members;
-
     const me = members[idx];
     return [me, ...members.slice(0, idx), ...members.slice(idx + 1)];
   }
 
-  // ON = League view: rank by active days
   return [...members].sort((a, b) => {
     const ad = activeDaysCount(a.days);
     const bd = activeDaysCount(b.days);
@@ -45,7 +42,7 @@ function sortMembers(members: Member[], myId: string, leagueViewOn: boolean) {
   });
 }
 
-// Simple palette (deterministic by index)
+// palette
 const PALETTE = [
   { colorLight: "#9AE6B4", colorDark: "#2F855A", accentActive: "#00C853" }, // green
   { colorLight: "#B794F4", colorDark: "#6B46C1", accentActive: "#7C3AED" }, // purple
@@ -58,11 +55,17 @@ function colorsForIndex(i: number) {
   return PALETTE[i % PALETTE.length];
 }
 
-function roleRank(role?: string) {
-  return role === "owner" ? 0 : role === "admin" ? 1 : 2;
+// email -> short handle
+function toHandle(s?: string | null) {
+  if (!s) return "user";
+  const v = String(s).trim();
+  const at = v.indexOf("@");
+  if (at > 0) return v.slice(0, at);
+  return v;
 }
 
 export default function LeagueDetailScreen() {
+  const router = useRouter();
   const params = useLocalSearchParams<{ leagueId: string }>();
   const leagueId = typeof params.leagueId === "string" ? params.leagueId : "";
 
@@ -75,6 +78,14 @@ export default function LeagueDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [leagueName, setLeagueName] = useState<string>("League");
+  const [leagueActivity, setLeagueActivity] = useState<string>("");
+
+  async function onSignOut() {
+    await supabase.auth.signOut();
+    router.replace("/(auth)/sign-in");
+  }
+
   async function load() {
     if (!leagueId) return;
 
@@ -82,26 +93,40 @@ export default function LeagueDetailScreen() {
       setError(null);
       setLoading(true);
 
+      // auth
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
       const user = userRes.user;
-      if (!user) throw new Error("Not authenticated");
+      if (!user) {
+        router.replace("/(auth)/sign-in");
+        return;
+      }
       setMyId(user.id);
 
+      // fetch league meta so header shows name + activity
+      const { data: leagueRow, error: leagueErr } = await supabase
+        .from("leagues")
+        .select("id,name,activity")
+        .eq("id", leagueId)
+        .single();
+
+      if (leagueErr) throw leagueErr;
+
+      setLeagueName(leagueRow?.name ?? "League");
+      setLeagueActivity(leagueRow?.activity ?? "");
+
+      // members
       const rows = await getLeagueMembers(leagueId);
 
-      // Stable ordering: owner/admin first, then name/email
-      const normalized = rows
-        .map((r) => {
-          const display =
-            r.profile?.name ||
-            r.profile?.email ||
-            "member";
+      const roleRank = (role?: string) => (role === "owner" ? 0 : role === "admin" ? 1 : 2);
 
+      const normalized = rows
+        .map((r: any) => {
+          const raw = r.profile?.username || r.profile?.name || r.profile?.email || "user";
           return {
             user_id: r.user_id,
             role: r.role,
-            display: String(display),
+            display: toHandle(raw),
           };
         })
         .sort((a, b) => {
@@ -115,15 +140,15 @@ export default function LeagueDetailScreen() {
         return {
           id: r.user_id,
           name: r.display,
-          subtitle: r.role ? r.role : "member",
+          subtitle: leagueRow?.activity ?? "",
           ...c,
-          days: makeDays(), // Step 4 will load real days from daily_logs
+          days: makeDays(), // later: replace with real daily_logs
         };
       });
 
       setMembers(nextMembers);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load league members");
+      setError(e?.message ?? "Failed to load league");
     } finally {
       setLoading(false);
     }
@@ -139,7 +164,7 @@ export default function LeagueDetailScreen() {
     return sortMembers(members, myId, leagueViewOn);
   }, [members, myId, leagueViewOn]);
 
-  // Only allow toggling MY squares
+  // only allow toggling MY squares
   const toggleDayForMember = useCallback(
     (memberId: string, dayIndex: number) => {
       if (!myId || memberId !== myId) return;
@@ -160,21 +185,40 @@ export default function LeagueDetailScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      {/* B) Native header: add Sign out to headerRight */}
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: leagueName ? `League: ${leagueName}` : "League",
+          headerTitleStyle: { fontSize: 18 },
+          headerTitleAlign: "left",
+          headerBackTitle: "Back",
+          headerRight: () => (
+            <Pressable onPress={onSignOut} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+              <Text style={{ fontSize: 16 }}>Sign out</Text>
+            </Pressable>
+          ),
+        }}
+      />
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* C) Removed in-page Sign out; keep only activity + toggle */}
         <View style={styles.headerRow}>
-          <ThemedText type="title" style={{ flex: 1 }}>
-            League: {leagueId}
-          </ThemedText>
+          <View style={{ flex: 1 }}>
+            {leagueActivity ? (
+              <ThemedText style={{ opacity: 0.7 }} numberOfLines={1}>
+                {leagueActivity}
+              </ThemedText>
+            ) : null}
+          </View>
 
           <View style={styles.toggleWrap}>
-            <ThemedText style={styles.toggleLabel}>
-              {leagueViewOn ? "League view" : "My view"}
-            </ThemedText>
+            <ThemedText style={styles.toggleLabel}>{leagueViewOn ? "League" : "My"}</ThemedText>
             <Switch value={leagueViewOn} onValueChange={setLeagueViewOn} />
           </View>
         </View>
@@ -195,6 +239,7 @@ export default function LeagueDetailScreen() {
               colorDark={m.colorDark}
               accentActive={m.accentActive}
               todayIndex={todayIndex}
+              disabled={m.id !== myId}
               onToggle={(dayIndex) => toggleDayForMember(m.id, dayIndex)}
             />
           ))
@@ -217,6 +262,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    paddingTop: 4,
   },
   toggleWrap: {
     flexDirection: "row",

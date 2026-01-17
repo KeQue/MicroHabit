@@ -4,14 +4,16 @@ import { StyleSheet, View } from "react-native";
 
 type Props = {
   name: string;
-  subtitle?: string;
+  subtitle?: string; // use for league activity (optional)
   days: boolean[];
 
-  colorDark: string;        // ✅ progress bar color
-  accentActive: string;     // ✅ grid active color
+  colorDark: string; // kept for compatibility (not used)
+  accentActive: string;
 
   onToggle: (dayIndex: number) => void;
   todayIndex?: number;
+
+  disabled?: boolean;
 };
 
 export function UserCard({
@@ -22,23 +24,22 @@ export function UserCard({
   accentActive,
   onToggle,
   todayIndex,
+  disabled = false,
 }: Props) {
   const activeDays = days.filter(Boolean).length;
   const totalDays = days.length;
   const pct = totalDays === 0 ? 0 : activeDays / totalDays;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, disabled && styles.cardDisabled]}>
       {/* Header */}
       <View style={styles.headerRow}>
         <ThemedText type="subtitle">{name}</ThemedText>
 
-        <View style={styles.activeDaysInline}>
-          <ThemedText style={styles.activeLabel}>Active Days</ThemedText>
-          <ThemedText style={styles.activeValue}>
-            {activeDays}/{totalDays}
-          </ThemedText>
-        </View>
+        {/* ✅ only numbers, no "Active Days" label */}
+        <ThemedText style={styles.count}>
+          {activeDays}/{totalDays}
+        </ThemedText>
       </View>
 
       {/* Progress bar */}
@@ -51,15 +52,21 @@ export function UserCard({
         />
       </View>
 
+      {/* Optional: league activity */}
       {subtitle ? <ThemedText style={styles.sub}>{subtitle}</ThemedText> : null}
 
       {/* Grid */}
-      <UserDayGrid
-        days={days}
-        accentActive={accentActive}   // ✅ ONLY this controls square color
-        onToggle={onToggle}
-        todayIndex={todayIndex}
-      />
+      <View style={disabled && styles.gridDisabled}>
+        <UserDayGrid
+          days={days}
+          accentActive={accentActive}
+          onToggle={(dayIndex) => {
+            if (disabled) return;
+            onToggle(dayIndex);
+          }}
+          todayIndex={todayIndex}
+        />
+      </View>
     </View>
   );
 }
@@ -70,17 +77,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 10,
   },
+  cardDisabled: {
+    opacity: 0.78,
+  },
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-  },
-  activeDaysInline: {
-    flexDirection: "row",
-    gap: 6,
     alignItems: "baseline",
   },
-  activeLabel: { opacity: 0.75, fontSize: 12 },
-  activeValue: { fontSize: 12, fontWeight: "800" },
+
+  // ✅ replaces "Active Days" label + value
+  count: { fontSize: 12, fontWeight: "800", opacity: 0.9 },
 
   progressTrack: {
     height: 10,
@@ -92,5 +99,10 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 999,
   },
+
   sub: { opacity: 0.7, fontSize: 12 },
+
+  gridDisabled: {
+    opacity: 0.6,
+  },
 });

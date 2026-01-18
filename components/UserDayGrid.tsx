@@ -6,7 +6,7 @@ type Props = {
   onToggle: (dayIndex: number) => void;
   todayIndex?: number;
 
-  // NEW: per-user active accent (square fill when done)
+  // per-user active accent (square fill when done)
   accentActive: string;
 
   // still accepted if you want to keep API compatibility elsewhere
@@ -15,29 +15,33 @@ type Props = {
 };
 
 const NUM_COLS = 13;
+
+// keep size as-is (do not change number font visuals)
 const SQUARE = 28;
-const GAP = 6;
-const RADIUS = 6;
 
-const TODAY_BAND = 3;
-const OUTER = SQUARE + TODAY_BAND * 2;
+// spacing increase (requested)
+const GAP = 8;
 
-const IOS_HALO_OPACITY = 0.6;
-const IOS_HALO_RADIUS = 7;
-const ANDROID_ELEVATION = 4;
+// slightly rounder (subtle)
+const RADIUS = 7;
+
+// Today highlight: white border only + glow
+const TODAY_BORDER = 2;
 
 // Past inactive
-const INACTIVE_BG = "#3A3A3A";
-const INACTIVE_TEXT = "rgba(255,255,255,0.65)";
+const INACTIVE_BG = "#2B2B33";
+const INACTIVE_TEXT = "rgba(255,255,255,0.55)";
 
 // Future
-const FUTURE_BG = "#000000";
-const FUTURE_TEXT = "rgba(255,255,255,0.28)";
+const FUTURE_BG = "#0B0B10";
+const FUTURE_TEXT = "rgba(255,255,255,0.22)";
 
 type DayVisual = {
   bg: string;
   text: string;
   fontWeight: "600" | "700";
+  doneDepth: boolean;
+  isFuture: boolean;
 };
 
 // --- safe helpers (never crash) ---
@@ -120,8 +124,8 @@ function boostActiveColor(hex?: string) {
 
   const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
 
-  const SAT_MULT = 1.6;
-  const LIGHT_ADD = 0.07;
+  const SAT_MULT = 1.5;
+  const LIGHT_ADD = 0.06;
 
   const s2 = clamp01(s * SAT_MULT);
   const l2 = clamp01(l + LIGHT_ADD);
@@ -145,18 +149,38 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive }: Props)
         bg: isDone ? activeBg : INACTIVE_BG,
         text: isDone ? "#FFFFFF" : INACTIVE_TEXT,
         fontWeight: isDone ? "700" : "600",
+        doneDepth: isDone,
+        isFuture: false,
       };
     }
 
     if (dayIndex > todayIndex) {
-      return { bg: FUTURE_BG, text: FUTURE_TEXT, fontWeight: "600" };
+      return {
+        bg: FUTURE_BG,
+        text: FUTURE_TEXT,
+        fontWeight: "600",
+        doneDepth: false,
+        isFuture: true,
+      };
     }
 
     if (isDone) {
-      return { bg: activeBg, text: "#FFFFFF", fontWeight: "700" };
+      return {
+        bg: activeBg,
+        text: "#FFFFFF",
+        fontWeight: "700",
+        doneDepth: true,
+        isFuture: false,
+      };
     }
 
-    return { bg: INACTIVE_BG, text: INACTIVE_TEXT, fontWeight: "600" };
+    return {
+      bg: INACTIVE_BG,
+      text: INACTIVE_TEXT,
+      fontWeight: "600",
+      doneDepth: false,
+      isFuture: false,
+    };
   };
 
   return (
@@ -165,27 +189,33 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive }: Props)
         const isToday = todayIndex === dayIndex;
         const visual = resolveVisual(dayIndex, isDone);
 
+        // ✅ UI reinforcement: future tiles are not tappable
+        const isFuture = todayIndex !== undefined && dayIndex > todayIndex;
+
         return (
           <Pressable
             key={dayIndex}
-            onPress={() => onToggle(dayIndex)}
+            onPress={isFuture ? undefined : () => onToggle(dayIndex)}
             hitSlop={0}
-            style={styles.pressable}
+            // polish: don't dim future days on press (they already look disabled-ish)
+            style={({ pressed }) => [
+              styles.pressable,
+              pressed && !isToday && !isFuture && { opacity: 0.92 },
+            ]}
           >
-            <View style={[styles.outer, isToday && styles.todayOuter]}>
-              <View style={[styles.bandLayer, isToday && styles.bandLayerToday]}>
-                <View style={[styles.tile, { backgroundColor: visual.bg }]}>
-                  {isToday && isTodayStreak && <View style={styles.streakDot} />}
-                  <Text
-                    style={[
-                      styles.dayNumber,
-                      { color: visual.text, fontWeight: visual.fontWeight },
-                    ]}
-                  >
-                    {dayIndex + 1}
-                  </Text>
-                </View>
-              </View>
+            <View
+              style={[
+                styles.tile,
+                { backgroundColor: visual.bg },
+                visual.doneDepth && styles.doneDepth,
+                isToday && styles.todayTile,
+              ]}
+            >
+              {isToday && isTodayStreak && <View style={styles.streakDot} />}
+
+              <Text style={[styles.dayNumber, { color: visual.text, fontWeight: visual.fontWeight }]}>
+                {dayIndex + 1}
+              </Text>
             </View>
           </Pressable>
         );
@@ -199,42 +229,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: GAP,
-    maxWidth: NUM_COLS * (OUTER + GAP),
+    maxWidth: NUM_COLS * (SQUARE + GAP),
   },
+
   pressable: {
-    width: OUTER,
-    height: OUTER,
+    width: SQUARE,
+    height: SQUARE,
   },
-  outer: {
-    width: OUTER,
-    height: OUTER,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  todayOuter: {
-    ...Platform.select({
-      ios: {
-        shadowColor: "#FFFFFF",
-        shadowOpacity: IOS_HALO_OPACITY,
-        shadowRadius: IOS_HALO_RADIUS,
-        shadowOffset: { width: 0, height: 0 },
-      },
-      android: { elevation: ANDROID_ELEVATION },
-      default: {},
-    }),
-  },
-  bandLayer: {
-    width: OUTER,
-    height: OUTER,
-    borderRadius: RADIUS + TODAY_BAND,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: TODAY_BAND,
-    backgroundColor: "transparent",
-  },
-  bandLayerToday: {
-    backgroundColor: "#FFFFFF",
-  },
+
   tile: {
     width: SQUARE,
     height: SQUARE,
@@ -242,11 +244,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    backgroundColor: INACTIVE_BG,
   },
+
+  // subtle depth only for DONE tiles
+  doneDepth: {
+    ...Platform.select({
+      ios: {
+        shadowColor: "rgba(0,0,0,0.9)",
+        shadowOpacity: 0.35,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+      },
+      android: { elevation: 3 },
+      default: {},
+    }),
+  },
+
+  // Today: ONLY white border + soft glow (no fog / no extra layers)
+  // polish: keep border crisp + consistent rounding
+  todayTile: {
+    borderWidth: TODAY_BORDER,
+    borderColor: "rgba(255,255,255,0.85)",
+    borderRadius: RADIUS, // keep consistent rounding with border
+    ...Platform.select({
+      ios: {
+        shadowColor: "rgba(255,255,255,0.25)",
+        shadowOpacity: 1,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
+      },
+      android: { elevation: 8 },
+      default: {},
+    }),
+  },
+
   dayNumber: {
-    fontSize: 11,
+    fontSize: 11, // keep same
     zIndex: 2,
   },
+
   streakDot: {
     position: "absolute",
     top: 4,

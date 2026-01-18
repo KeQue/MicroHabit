@@ -18,6 +18,27 @@ type Member = {
   days: boolean[];
 };
 
+// ---------- UI THEME (local to this screen) ----------
+const UI = {
+  bgTop: "#07030F",
+  bgBottom: "#160A2D",
+
+  text: "#EDE7FF",
+  muted: "rgba(237,231,255,0.65)",
+  border: "rgba(255,255,255,0.08)",
+
+  pillBorder: "rgba(162,89,255,0.55)",
+  pillBg: "rgba(162,89,255,0.10)",
+  pillBgActive: "rgba(162,89,255,0.18)",
+
+  segmentBg: "rgba(255,255,255,0.06)",
+  segmentBorder: "rgba(255,255,255,0.10)",
+  segmentActiveBg: "rgba(162,89,255,0.22)",
+  segmentActiveBorder: "rgba(162,89,255,0.55)",
+
+  error: "rgba(255,120,120,0.9)",
+};
+
 // palette (still used per-user)
 const PALETTE = [
   { colorLight: "#9AE6B4", colorDark: "#2F855A", accentActive: "#00C853" }, // green
@@ -69,20 +90,27 @@ function startOfMonth(d: Date) {
 function endOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
-function daysInMonth(d: Date) {
-  return endOfMonth(d).getDate();
-}
 
-const theme = {
-  bg: "#0B0615",
-  text: "#EDE7FF",
-  muted: "rgba(237,231,255,0.65)",
-};
-
-function PillButton({ label, onPress }: { label: string; onPress: () => void | Promise<void> }) {
+function PillButton({
+  label,
+  onPress,
+  size = "md",
+}: {
+  label: string;
+  onPress: () => void | Promise<void>;
+  size?: "md" | "sm";
+}) {
   return (
-    <Pressable onPress={onPress} style={styles.pillBtn}>
-      <Text style={styles.pillBtnText}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.pillBtn,
+        size === "sm" && styles.pillBtnSm,
+        pressed && { backgroundColor: UI.pillBgActive },
+      ]}
+      hitSlop={8}
+    >
+      <Text style={[styles.pillBtnText, size === "sm" && styles.pillBtnTextSm]}>{label}</Text>
     </Pressable>
   );
 }
@@ -102,7 +130,12 @@ function Segmented({
           <Pressable
             key={k}
             onPress={() => onChange(k)}
-            style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+            style={({ pressed }) => [
+              styles.segmentBtn,
+              active && styles.segmentBtnActive,
+              pressed && !active && { opacity: 0.9 },
+            ]}
+            hitSlop={6}
           >
             <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{k}</Text>
           </Pressable>
@@ -296,6 +329,9 @@ export default function LeagueDetailScreen() {
       if (!myId || memberId !== myId) return;
       if (dayIndex < 0 || dayIndex >= monthDays) return;
 
+        // ✅ block future days
+    if (todayIndex !== undefined && dayIndex > todayIndex) return;
+
       // Build the date for this dayIndex in current month (stable year/month)
       const d = new Date(year, month, dayIndex + 1);
       const log_date = toDateOnlyLocal(d);
@@ -347,111 +383,129 @@ export default function LeagueDetailScreen() {
   return (
     <ThemedView style={styles.container}>
       <LinearGradient
-        colors={["#07030F", "#160A2D"]}
+        colors={[UI.bgTop, UI.bgBottom]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 18 }]}
+        style={styles.bg}
       >
-        <View style={styles.headerRow}>
-          <PillButton label="Back" onPress={() => router.back()} />
+        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+          <View style={styles.headerRow}>
+            <PillButton label="Back" onPress={() => router.back()} />
 
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {leagueName ? `League: ${leagueName}` : "League"}
-          </Text>
-
-          <PillButton label="Sign out" onPress={onSignOut} />
-        </View>
-      </LinearGradient>
-
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.topBar}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.activityText} numberOfLines={1}>
-              {leagueActivity || " "}
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {leagueName ? `League: ${leagueName}` : "League"}
             </Text>
-          </View>
 
-          <Segmented value={viewMode} onChange={setViewMode} />
+            {/* smaller per request */}
+            <PillButton label="Sign out" size="sm" onPress={onSignOut} />
+          </View>
         </View>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.topBar}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.activityText} numberOfLines={1}>
+                {leagueActivity || " "}
+              </Text>
+            </View>
 
-        {loading ? (
-          <View style={{ paddingTop: 18 }}>
-            <ActivityIndicator />
+            <Segmented value={viewMode} onChange={setViewMode} />
           </View>
-        ) : (
-          orderedMembers.map((m) => (
-            <UserCard
-              key={m.id}
-              name={m.name}
-              subtitle={m.subtitle}
-              days={m.days}
-              colorDark={m.colorDark}
-              accentActive={m.accentActive}
-              todayIndex={todayIndex}
-              disabled={!!myId && m.id !== myId}
-              onToggle={(dayIndex) => toggleDayForMember(m.id, dayIndex)}
-            />
-          ))
-        )}
-      </ScrollView>
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          {loading ? (
+            <View style={{ paddingTop: 18 }}>
+              <ActivityIndicator />
+            </View>
+          ) : (
+            orderedMembers.map((m, idx) => (
+  <UserCard
+    key={m.id}
+    name={m.name}
+    subtitle={m.subtitle}
+    days={m.days}
+    colorDark={m.colorDark}
+    accentActive={m.accentActive}
+    todayIndex={todayIndex}
+    disabled={!!myId && m.id !== myId}
+    onToggle={(dayIndex) => toggleDayForMember(m.id, dayIndex)}
+
+    // ✅ NEW
+    showRank={viewMode === "Ranking"}
+    rank={idx + 1}
+  />
+))
+
+          )}
+        </ScrollView>
+      </LinearGradient>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.bg },
+  container: { flex: 1, backgroundColor: "transparent" },
+  bg: { flex: 1 },
 
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: UI.border,
   },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   headerTitle: {
     flex: 1,
     textAlign: "center",
-    color: theme.text,
-    fontSize: 20,
+    color: UI.text,
+    fontSize: 22,
     fontWeight: "800",
     letterSpacing: 0.2,
   },
 
   pillBtn: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(162,89,255,0.65)",
-    backgroundColor: "rgba(162,89,255,0.10)",
+    borderColor: UI.pillBorder,
+    backgroundColor: UI.pillBg,
   },
-  pillBtnText: { color: theme.text, fontSize: 16, fontWeight: "700" },
+  pillBtnSm: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  pillBtnText: { color: UI.text, fontSize: 16, fontWeight: "700" },
+  pillBtnTextSm: { fontSize: 14 },
 
   scroll: { flex: 1 },
   scrollContent: { padding: 16, gap: 14, paddingBottom: 32 },
 
   topBar: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 2 },
-  activityText: { color: theme.muted, fontSize: 16, fontWeight: "600" },
+  activityText: { color: UI.muted, fontSize: 16, fontWeight: "600" },
 
   segmentWrap: {
     flexDirection: "row",
     borderRadius: 999,
     padding: 3,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    backgroundColor: UI.segmentBg,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: UI.segmentBorder,
   },
-  segmentBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999 },
-  segmentBtnActive: { backgroundColor: "rgba(162,89,255,0.35)" },
-  segmentText: { color: "rgba(237,231,255,0.65)", fontWeight: "700", fontSize: 14 },
-  segmentTextActive: { color: theme.text },
+  segmentBtn: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999 },
+  segmentBtnActive: {
+    backgroundColor: UI.segmentActiveBg,
+    borderWidth: 1,
+    borderColor: UI.segmentActiveBorder,
+  },
+  segmentText: { color: UI.muted, fontWeight: "700", fontSize: 14 },
+  segmentTextActive: { color: UI.text },
 
-  errorText: { color: "rgba(255,120,120,0.9)", fontSize: 14, fontWeight: "600" },
+  errorText: { color: UI.error, fontSize: 14, fontWeight: "600" },
 });

@@ -59,24 +59,6 @@ function toHandle(s?: string | null) {
   return v;
 }
 
-function activeDaysCount(days: boolean[]) {
-  return days.reduce((acc, v) => acc + (v ? 1 : 0), 0);
-}
-function sortMembers(members: Member[], myId: string, rankingOn: boolean) {
-  if (!rankingOn) {
-    const idx = members.findIndex((m) => m.id === myId);
-    if (idx <= 0) return members;
-    const me = members[idx];
-    return [me, ...members.slice(0, idx), ...members.slice(idx + 1)];
-  }
-  return [...members].sort((a, b) => {
-    const ad = activeDaysCount(a.days);
-    const bd = activeDaysCount(b.days);
-    if (bd !== ad) return bd - ad;
-    return a.name.localeCompare(b.name);
-  });
-}
-
 // Date helpers (LOCAL, no timezone bugs)
 function pad2(n: number) {
   return n < 10 ? `0${n}` : `${n}`;
@@ -89,6 +71,12 @@ function startOfMonth(d: Date) {
 }
 function endOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+// ✅ EXACT same scoring logic as UserCard UI count
+// IMPORTANT: count ONLY boolean true (avoids weird truthy values breaking ranking)
+function scoreDays(days: boolean[]) {
+  return (days ?? []).reduce((acc, v) => acc + (v === true ? 1 : 0), 0);
 }
 
 function PillButton({
@@ -151,7 +139,7 @@ export default function LeagueDetailScreen() {
   const params = useLocalSearchParams<{ leagueId: string }>();
   const leagueId = typeof params.leagueId === "string" ? params.leagueId : "";
 
-  // ✅ stable month primitives (avoid realtime re-subscribe loops)
+  // ✅ stable month primitives
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
@@ -277,7 +265,7 @@ export default function LeagueDetailScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId]);
 
-  // ✅ Realtime: apply updates WITHOUT calling load() (prevents "refresh" on every tap)
+  // ✅ Realtime: apply updates (including mine), but skip exact no-ops
   useEffect(() => {
     if (!leagueId) return;
 
@@ -290,9 +278,6 @@ export default function LeagueDetailScreen() {
           const row = payload?.new ?? payload?.old;
           if (!row) return;
 
-          // Ignore my own writes (this phone already updates optimistically)
-          if (myId && row.user_id === myId) return;
-
           const d = new Date(row.log_date + "T00:00:00");
           if (d.getFullYear() !== year || d.getMonth() !== month) return;
 
@@ -304,6 +289,7 @@ export default function LeagueDetailScreen() {
           setMembers((prev) =>
             prev.map((m) => {
               if (m.id !== row.user_id) return m;
+              if (m.days[idx] === value) return m; // ✅ no-op guard
               const nextDays = m.days.slice();
               nextDays[idx] = value;
               return { ...m, days: nextDays };
@@ -316,12 +302,29 @@ export default function LeagueDetailScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [leagueId, myId, year, month, monthDays]);
+  }, [leagueId, year, month, monthDays]);
 
-  const orderedMembers = useMemo(() => {
+  // ✅ SINGLE source of truth for render order
+  const membersToRender = useMemo((): Member[] => {
+    if (viewMode === "Ranking") {
+      // sort using same count logic as the UI
+      return [...members]
+        .map((m) => ({ m, s: scoreDays(m.days) }))
+        .sort((a, b) => {
+          if (b.s !== a.s) return b.s - a.s;
+          const n = a.m.name.localeCompare(b.m.name);
+          if (n !== 0) return n;
+          return a.m.id.localeCompare(b.m.id);
+        })
+        .map((x) => x.m);
+    }
+
+    // My View: pin me on top (only if myId exists)
     if (!myId) return members;
-    const rankingOn = viewMode === "Ranking";
-    return sortMembers(members, myId, rankingOn);
+    const i = members.findIndex((m) => m.id === myId);
+    if (i <= 0) return members;
+    const me = members[i];
+    return [me, ...members.slice(0, i), ...members.slice(i + 1)];
   }, [members, myId, viewMode]);
 
   const toggleDayForMember = useCallback(
@@ -329,14 +332,12 @@ export default function LeagueDetailScreen() {
       if (!myId || memberId !== myId) return;
       if (dayIndex < 0 || dayIndex >= monthDays) return;
 
-        // ✅ block future days
-    if (todayIndex !== undefined && dayIndex > todayIndex) return;
+      // ✅ block future days
+      if (todayIndex !== undefined && dayIndex > todayIndex) return;
 
-      // Build the date for this dayIndex in current month (stable year/month)
       const d = new Date(year, month, dayIndex + 1);
       const log_date = toDateOnlyLocal(d);
 
-      // Next value based on current state
       const current = members.find((m) => m.id === myId)?.days?.[dayIndex] ?? false;
       const next = !current;
 
@@ -377,7 +378,7 @@ export default function LeagueDetailScreen() {
         );
       }
     },
-    [leagueId, members, monthDays, myId, year, month]
+    [leagueId, members, monthDays, myId, year, month, todayIndex]
   );
 
   return (
@@ -396,7 +397,6 @@ export default function LeagueDetailScreen() {
               {leagueName ? `League: ${leagueName}` : "League"}
             </Text>
 
-            {/* smaller per request */}
             <PillButton label="Sign out" size="sm" onPress={onSignOut} />
           </View>
         </View>
@@ -424,24 +424,21 @@ export default function LeagueDetailScreen() {
               <ActivityIndicator />
             </View>
           ) : (
-            orderedMembers.map((m, idx) => (
-  <UserCard
-    key={m.id}
-    name={m.name}
-    subtitle={m.subtitle}
-    days={m.days}
-    colorDark={m.colorDark}
-    accentActive={m.accentActive}
-    todayIndex={todayIndex}
-    disabled={!!myId && m.id !== myId}
-    onToggle={(dayIndex) => toggleDayForMember(m.id, dayIndex)}
-
-    // ✅ NEW
-    showRank={viewMode === "Ranking"}
-    rank={idx + 1}
-  />
-))
-
+            membersToRender.map((m, idx) => (
+              <UserCard
+                key={m.id}
+                name={m.name}
+                subtitle={m.subtitle}
+                days={m.days}
+                colorDark={m.colorDark}
+                accentActive={m.accentActive}
+                todayIndex={todayIndex}
+                disabled={!!myId && m.id !== myId}
+                onToggle={(dayIndex) => toggleDayForMember(m.id, dayIndex)}
+                showRank={viewMode === "Ranking"}
+                rank={idx + 1}
+              />
+            ))
           )}
         </ScrollView>
       </LinearGradient>

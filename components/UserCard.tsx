@@ -27,10 +27,20 @@ function clamp01(n: number) {
 
 function computeStreak(days: boolean[], todayIndex?: number) {
   if (!days?.length) return 0;
-  const end =
-    typeof todayIndex === "number"
-      ? Math.min(todayIndex, days.length - 1)
-      : days.length - 1;
+
+  // Default: end at last day in array
+  let end = days.length - 1;
+
+  // If we know "today", end at today if done, otherwise end at yesterday
+  if (typeof todayIndex === "number") {
+    if (days[todayIndex]) {
+      end = Math.min(todayIndex, days.length - 1);
+    } else {
+      end = Math.min(todayIndex - 1, days.length - 1);
+    }
+  }
+
+  if (end < 0) return 0;
 
   let s = 0;
   for (let i = end; i >= 0; i--) {
@@ -55,9 +65,15 @@ function safeHexToRgb01(hex?: string) {
 }
 
 function rgb01ToHex(r: number, g: number, b: number) {
-  const rr = Math.round(clamp01(r) * 255).toString(16).padStart(2, "0");
-  const gg = Math.round(clamp01(g) * 255).toString(16).padStart(2, "0");
-  const bb = Math.round(clamp01(b) * 255).toString(16).padStart(2, "0");
+  const rr = Math.round(clamp01(r) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  const gg = Math.round(clamp01(g) * 255)
+    .toString(16)
+    .padStart(2, "0");
+  const bb = Math.round(clamp01(b) * 255)
+    .toString(16)
+    .padStart(2, "0");
   return `#${rr}${gg}${bb}`;
 }
 
@@ -109,15 +125,16 @@ function hslToRgb(h: number, s: number, l: number) {
   return { r: r1 + m, g: g1 + m, b: b1 + m };
 }
 
-/* 🔥 STRONGER ACCENT (change #1) */
+/* 🔥 STRONGER ACCENT */
 function strongerAccent(hex: string) {
   const rgb = safeHexToRgb01(hex);
   if (!rgb) return hex;
 
   const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
 
-  const s2 = clamp01(s * 2.2);
-  const l2 = clamp01(l + 0.14);
+  // More punch than before, without blowing out to neon white
+  const s2 = clamp01(s * 2.4);
+  const l2 = clamp01(l + 0.12);
 
   const out = hslToRgb(h, s2, l2);
   return rgb01ToHex(out.r, out.g, out.b);
@@ -135,22 +152,23 @@ export function UserCard({
   showRank = false,
   rank,
 }: Props) {
- const totalDays = days.length;
+  const totalDays = days.length;
 
-// ✅ only count up to today (ignore future days that were previously checked)
-const cutoff = typeof todayIndex === "number" ? Math.min(todayIndex + 1, totalDays) : totalDays;
-const activeDays = days.slice(0, cutoff).filter(Boolean).length;
+  // ✅ IMPORTANT: must match Ranking logic exactly (count ALL true values)
+  const activeDays = useMemo(() => (days ?? []).filter(Boolean).length, [days]);
 
-const pct = totalDays === 0 ? 0 : activeDays / totalDays;
-
+  const pct = totalDays === 0 ? 0 : activeDays / totalDays;
   const fillPct = clamp01(pct);
+
   const streak = useMemo(() => computeStreak(days, todayIndex), [days, todayIndex]);
 
   const nameStyle = disabled ? styles.nameMuted : styles.name;
   const countStyle = disabled ? styles.countMuted : styles.count;
 
   const isLeader = showRank && rank === 1;
+
   const gradientEnd = strongerAccent(accentActive);
+  const glowColor = gradientEnd;
 
   return (
     <View style={[styles.card, isLeader && styles.leaderCard]}>
@@ -174,6 +192,8 @@ const pct = totalDays === 0 ? 0 : activeDays / totalDays;
           end={{ x: 1, y: 0 }}
           style={[
             styles.progressFill,
+            styles.progressGlow,
+            { shadowColor: glowColor },
             { width: activeDays === 0 ? 0 : `${Math.max(2, fillPct * 100)}%` },
           ]}
         />
@@ -186,12 +206,7 @@ const pct = totalDays === 0 ? 0 : activeDays / totalDays;
       )}
 
       <View pointerEvents={disabled ? "none" : "auto"}>
-        <UserDayGrid
-          days={days}
-          accentActive={accentActive}
-          onToggle={onToggle}
-          todayIndex={todayIndex}
-        />
+        <UserDayGrid days={days} accentActive={accentActive} onToggle={onToggle} todayIndex={todayIndex} />
       </View>
 
       <View style={styles.streakRow}>
@@ -238,21 +253,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  /* 🔧 CLIPPING FIX (change #2) */
+  // ✅ Fix username top clipping (give it real vertical breathing room)
   name: {
     fontSize: 30,
     fontWeight: "800",
     letterSpacing: 0.2,
-    lineHeight: 38,
-    paddingTop: 3,
+    lineHeight: 40,
+    paddingTop: 6,
+    paddingBottom: 2,
     flexShrink: 1,
   },
   nameMuted: {
     fontSize: 30,
     fontWeight: "800",
     letterSpacing: 0.2,
-    lineHeight: 38,
-    paddingTop: 3,
+    lineHeight: 40,
+    paddingTop: 6,
+    paddingBottom: 2,
     opacity: 0.92,
     flexShrink: 1,
   },
@@ -277,6 +294,15 @@ const styles = StyleSheet.create({
   progressFill: {
     height: "100%",
     borderRadius: 999,
+  },
+
+  // ✅ More “impressive” bar without changing layout:
+  // subtle glow + slight elevation (Android)
+  progressGlow: {
+    shadowOpacity: 0.38,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 2,
   },
 
   sub: {

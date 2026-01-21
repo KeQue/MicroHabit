@@ -429,7 +429,8 @@ Open MicroHabit → Join → Paste the code`;
     [leagueId, members, monthDays, myId, year, month, todayIndex]
   );
 
-  const showInvite = myRole === "owner";
+  const showInvite = myRole === "owner" || myRole === "admin" || myRole === "member";
+
 
   const inviteMessage = inviteCode ? buildInviteMessage(inviteCode) : "";
 

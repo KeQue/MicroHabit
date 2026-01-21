@@ -12,6 +12,7 @@ import { createLeague, getMyLeagues, type League } from "../../features/leagues/
 import { supabase } from "../../lib/supabase";
 
 type PlanTier = "A" | "B" | "C";
+type UserTier = "free" | "A" | "B" | "C";
 
 const getMonthKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -64,6 +65,20 @@ export default function LeaguesScreen() {
     return u.id;
   }
 
+  async function getMyTier(uid: string): Promise<UserTier> {
+    const { data, error, status } = await supabase
+      .from("profiles")
+      .select("plan_tier")
+      .eq("id", uid)
+      .single();
+
+    // If profile row missing, treat as free (PostgREST often returns 406)
+    if (error && status !== 406) throw error;
+
+    const t = (data?.plan_tier ?? "free") as UserTier;
+    return t || "free";
+  }
+
   async function load() {
     try {
       setError(null);
@@ -84,6 +99,7 @@ export default function LeaguesScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Consume plan selection params once and open the create form
   useEffect(() => {
     if (params.isFree == null && params.planTier == null) return;
 
@@ -111,16 +127,24 @@ export default function LeaguesScreen() {
       setCreating(true);
       creatingRef.current = true;
 
+      // ✅ Validate selection BEFORE any DB/RPC work
       if (!isFreeSelected && !selectedPlanTier) {
         throw new Error("Please choose a plan first");
       }
 
+      const uid = userId ?? (await resolveUser());
+
+      // ✅ Paid league: require a paid tier stored in profiles
       if (!isFreeSelected) {
-        router.push({
-          pathname: "/(app)/paywall",
-          params: { reason: "paid_not_available" },
-        });
-        return;
+        const myTier = await getMyTier(uid);
+
+        if (myTier === "free") {
+          router.push({
+            pathname: "/(app)/paywall",
+            params: { reason: "upgrade_required", next: "/(app)" },
+          });
+          return;
+        }
       }
 
       if (!newName.trim()) throw new Error("League name is required");
@@ -135,8 +159,8 @@ export default function LeaguesScreen() {
         createLeague({
           name: newName,
           activity: newActivity,
-          isFree: true,
-          planTier: null,
+          isFree: isFreeSelected,
+          planTier: isFreeSelected ? null : selectedPlanTier, // "A" | "B" | "C"
           monthKey: getMonthKey(),
         }),
         timeout,
@@ -149,26 +173,18 @@ export default function LeaguesScreen() {
       setIsFreeSelected(false);
 
       await load();
-      router.push(`/league/${league.id}`);
+
+      // ✅ IMPORTANT: correct absolute route to app/(app)/league/[leagueId].tsx
+      router.push(`/(app)/league/${league.id}`);
     } catch (e: any) {
       const msg = normalizeErr(e);
       console.log("Create league error:", e);
 
-      if (msg.toLowerCase().includes("free league already used")) {
-        router.push({
-          pathname: "/(app)/paywall",
-          params: {
-            reason: "free_used",
-            monthKey: getMonthKey(),
-          },
-        });
-        return;
-      }
-
+      // ✅ If backend still blocks paid creation, route to paywall instead of just showing red error
       if (msg.toLowerCase().includes("payment required")) {
         router.push({
           pathname: "/(app)/paywall",
-          params: { reason: "paid_not_available" },
+          params: { reason: "upgrade_required", next: "/(app)" },
         });
         return;
       }
@@ -180,15 +196,14 @@ export default function LeaguesScreen() {
     }
   }
 
-async function onSignOut() {
-  await supabase.auth.signOut();
-  router.replace("/(auth)/sign-in"); // ✅ correct
-}
-
+  async function onSignOut() {
+    await supabase.auth.signOut();
+    router.replace("/(auth)/sign-in");
+  }
 
   function onStartCreate() {
     setError(null);
-    router.push("/league/choose-plan");
+    router.push("/(app)/league/choose-plan");
   }
 
   return (
@@ -204,7 +219,6 @@ async function onSignOut() {
       <Text style={{ marginTop: 8, fontSize: 16, color: "#A7B0BC" }}>
         Create or join a league.
       </Text>
-
 
       {error ? (
         <View
@@ -312,8 +326,7 @@ async function onSignOut() {
           </View>
         ) : null}
 
-        {/* FIXED: points to app/(app)/league/join.tsx */}
-        <Link href="/league/join" asChild>
+        <Link href="/(app)/league/join" asChild>
           <Pressable style={{ padding: 16, borderRadius: 14, backgroundColor: "#1A2430" }}>
             <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
               🔑 Join with code
@@ -340,7 +353,7 @@ async function onSignOut() {
             contentContainerStyle={{ gap: 12 }}
             renderItem={({ item }) => (
               <Pressable
-                onPress={() => router.push(`/league/${item.id}`)}
+                onPress={() => router.push(`/(app)/league/${item.id}`)}
                 style={{
                   padding: 16,
                   borderRadius: 14,
@@ -356,48 +369,6 @@ async function onSignOut() {
                 {item.activity ? (
                   <Text style={{ marginTop: 6, color: "#A7B0BC" }}>
                     {item.activity}
-                  </Text>
-                ) : null}
-
-                <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-                  {item.is_free ? (
-                    <View
-                      style={{
-                        paddingVertical: 4,
-                        paddingHorizontal: 10,
-                        borderRadius: 999,
-                        backgroundColor: "#0B3B2E",
-                        borderWidth: 1,
-                        borderColor: "#14532D",
-                      }}
-                    >
-                      <Text style={{ color: "#86EFAC", fontWeight: "700", fontSize: 12 }}>
-                        FREE
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {item.status === "payment_required" ? (
-                    <View
-                      style={{
-                        paddingVertical: 4,
-                        paddingHorizontal: 10,
-                        borderRadius: 999,
-                        backgroundColor: "#2A0E0E",
-                        borderWidth: 1,
-                        borderColor: "#7F1D1D",
-                      }}
-                    >
-                      <Text style={{ color: "#FCA5A5", fontWeight: "700", fontSize: 12 }}>
-                        Payment required
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                {item.created_at ? (
-                  <Text style={{ marginTop: 6, color: "#A7B0BC" }}>
-                    Created: {new Date(item.created_at).toLocaleDateString()}
                   </Text>
                 ) : null}
               </Pressable>

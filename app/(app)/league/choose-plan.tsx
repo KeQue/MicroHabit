@@ -1,167 +1,129 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { useAuth } from "../../../features/auth/useAuth";
 import { supabase } from "../../../lib/supabase";
 
-type PaidPlanTier = "A" | "B" | "C";
-type PlanChoice =
-  | { key: "FREE"; label: "Free"; isFree: true; planTier: null }
-  | { key: PaidPlanTier; label: `Plan ${PaidPlanTier}`; isFree: false; planTier: PaidPlanTier };
+type Tier = "free" | "A" | "B" | "C";
 
-const PLAN_CHOICES: PlanChoice[] = [
-  { key: "FREE", label: "Free", isFree: true, planTier: null },
-  { key: "A", label: "Plan A", isFree: false, planTier: "A" },
-  { key: "B", label: "Plan B", isFree: false, planTier: "B" },
-  { key: "C", label: "Plan C", isFree: false, planTier: "C" },
-];
-
-const getMonthKey = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-
-export default function ChoosePlan() {
+export default function ChoosePlanScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const { user } = useAuth();
+  const uid = user?.id;
 
-  const [loading, setLoading] = useState(true);
-  const [freeUsedAt, setFreeUsedAt] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // DB rule: one free ever (free_used_at not null => used)
-  const freeAvailable = useMemo(() => freeUsedAt == null, [freeUsedAt]);
+  const returnTo = (params.returnTo as string | undefined) ?? undefined;
 
-  // After free is used, DO NOT show the Free option at all
-  const visibleChoices = useMemo(() => {
-    return freeAvailable ? PLAN_CHOICES : PLAN_CHOICES.filter((c) => c.key !== "FREE");
-  }, [freeAvailable]);
+  async function setPlan(tier: Tier) {
+    if (!uid) return;
 
-  useEffect(() => {
-    let alive = true;
+    try {
+      setError(null);
+      setSaving(true);
 
-    (async () => {
-      try {
-        setLoading(true);
+      // ✅ Upsert ensures the row exists; select() verifies what was saved
+      const { data, error: e } = await supabase
+        .from("profiles")
+        .upsert({ id: uid, plan_tier: tier }, { onConflict: "id" })
+        .select("plan_tier")
+        .single();
 
-        const { data: authData, error: authErr } = await supabase.auth.getUser();
-        if (authErr) throw authErr;
-        const uid = authData.user?.id;
-        if (!uid) throw new Error("Not authenticated");
+      if (e) throw e;
 
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("free_used_at")
-          .eq("id", uid)
-          .single();
+      const saved = (data?.plan_tier ?? "free") as Tier;
 
-        if (error) throw error;
-        if (!alive) return;
-
-        setFreeUsedAt(data?.free_used_at ?? null);
-      } catch {
-        // If profile fetch fails, be conservative: treat free as unavailable
-        if (!alive) return;
-        setFreeUsedAt("unknown");
-      } finally {
-        if (!alive) return;
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const pick = (choice: PlanChoice) => {
-    // Free selected (this should only be possible when freeAvailable is true)
-    if (choice.isFree) {
-      if (!freeAvailable) {
-        router.replace({
-          pathname: "/(app)/paywall",
-          params: { reason: "free_used", monthKey: getMonthKey() },
-        });
+      // If opened from paywall, go back (paywall should refetch on focus and exit if paid)
+      if (returnTo === "paywall") {
+        router.back();
         return;
       }
 
-      router.replace({
-        pathname: "/",
-        params: { isFree: "1", planTier: "" },
-      });
-      return;
+      // ✅ If opened from Create flow, return to leagues WITH params so it opens the form
+      if (saved === "free") {
+        router.replace({ pathname: "/(app)", params: { isFree: "1" } });
+      } else {
+        router.replace({ pathname: "/(app)", params: { planTier: saved } });
+      }
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to update plan");
+    } finally {
+      setSaving(false);
     }
-
-    // Paid selected (locked until Stripe)
-    router.replace({
-      pathname: "/(app)/paywall",
-      params: { reason: "paid_not_available", planTier: choice.planTier },
-    });
-  };
+  }
 
   return (
     <View style={{ flex: 1, padding: 20, paddingTop: 70, backgroundColor: "#0B0F14" }}>
-      <Text style={{ color: "white", fontSize: 28, fontWeight: "800" }}>Choose a plan</Text>
-
-      <Text style={{ marginTop: 8, color: "#A7B0BC", fontSize: 16 }}>
-        {freeAvailable
-          ? "Select your Free plan (one-time) or a paid plan (locked until payment is enabled)."
-          : "Free already used. Paid plans are available (payment not enabled yet)."}
+      <Text style={{ fontSize: 34, fontWeight: "900", color: "white" }}>Choose a plan</Text>
+      <Text style={{ marginTop: 10, fontSize: 16, color: "#A7B0BC" }}>
+        Select Free or a paid plan (no payment yet; unlock via stored tier).
       </Text>
 
-      {loading ? (
-        <View style={{ marginTop: 18 }}>
+      {error ? <Text style={{ marginTop: 12, color: "#FCA5A5" }}>{error}</Text> : null}
+
+      {saving ? (
+        <View style={{ marginTop: 24, alignItems: "center" }}>
           <ActivityIndicator />
+          <Text style={{ marginTop: 10, color: "#A7B0BC" }}>Saving...</Text>
         </View>
-      ) : null}
+      ) : (
+        <View style={{ marginTop: 24, gap: 14 }}>
+          <PlanCard title="Free" subtitle="One free league total." badge="FREE" onPress={() => setPlan("free")} />
+          <PlanCard title="Plan A" subtitle="Unlocked for MVP testing." onPress={() => setPlan("A")} />
+          <PlanCard title="Plan B" subtitle="Unlocked for MVP testing." onPress={() => setPlan("B")} />
+          <PlanCard title="Plan C" subtitle="Unlocked for MVP testing." onPress={() => setPlan("C")} />
+        </View>
+      )}
 
-      <View style={{ marginTop: 18, gap: 12 }}>
-        {visibleChoices.map((choice) => (
-          <Pressable
-            key={choice.key}
-            onPress={() => pick(choice)}
-            style={{
-              padding: 16,
-              borderRadius: 16,
-              backgroundColor: "#111827",
-              borderWidth: 1,
-              borderColor: choice.key === "FREE" ? "#2DD4BF" : "#1F2937",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <Text style={{ color: "white", fontSize: 18, fontWeight: "800" }}>
-                {choice.label}
-              </Text>
-
-              {choice.key === "FREE" ? (
-                <View
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 999,
-                    backgroundColor: "rgba(45, 212, 191, 0.18)",
-                    borderWidth: 1,
-                    borderColor: "rgba(45, 212, 191, 0.45)",
-                  }}
-                >
-                  <Text style={{ color: "white", fontWeight: "800", fontSize: 12 }}>FREE</Text>
-                </View>
-              ) : null}
-            </View>
-
-            <Text style={{ marginTop: 6, color: "#A7B0BC" }}>
-              {choice.key === "FREE"
-                ? "One free league total."
-                : "Payment required (not enabled yet)."}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <Pressable onPress={() => router.back()} style={{ marginTop: 16, padding: 12 }}>
-        <Text style={{ color: "#A7B0BC", textAlign: "center" }}>Cancel</Text>
+      <Pressable onPress={() => router.back()} style={{ marginTop: 22, padding: 10 }}>
+        <Text style={{ textAlign: "center", color: "#A7B0BC" }}>Cancel</Text>
       </Pressable>
     </View>
+  );
+}
+
+function PlanCard({
+  title,
+  subtitle,
+  badge,
+  onPress,
+}: {
+  title: string;
+  subtitle: string;
+  badge?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        backgroundColor: "#101826",
+        borderRadius: 18,
+        padding: 18,
+        borderWidth: 1,
+        borderColor: "#0F172A",
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={{ color: "white", fontSize: 22, fontWeight: "900" }}>{title}</Text>
+        {badge ? (
+          <View
+            style={{
+              paddingVertical: 6,
+              paddingHorizontal: 10,
+              borderRadius: 999,
+              backgroundColor: "#0B2B2B",
+              borderWidth: 1,
+              borderColor: "#1AAE9A",
+            }}
+          >
+            <Text style={{ color: "#7FF3E1", fontWeight: "900" }}>{badge}</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={{ marginTop: 8, color: "#A7B0BC", fontSize: 14 }}>{subtitle}</Text>
+    </Pressable>
   );
 }

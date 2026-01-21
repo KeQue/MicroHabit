@@ -3,10 +3,25 @@ import { supabase } from "../../lib/supabase";
 /**
  * Data types
  */
+export type PlanTier = "A" | "B" | "C";
+
+export type LeagueStatus = "active" | "payment_required" | "completed" | string;
+
 export type League = {
   id: string;
   name: string | null;
   activity: string | null;
+
+  plan_tier?: PlanTier | null;
+  month_key?: string | null;
+
+  // NEW
+  is_free?: boolean | null;
+  status?: LeagueStatus | null;
+
+  // Invite code (NEW)
+  invite_code?: string | null;
+
   created_at?: string | null;
 };
 
@@ -50,7 +65,9 @@ function displayNameFromProfile(p: Profile | null) {
 export async function getMyLeagues(userId: string): Promise<League[]> {
   const { data, error } = await supabase
     .from("league_members")
-    .select("league:leagues(id,name,activity,created_at)")
+    .select(
+      "league:leagues(id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at)"
+    )
     .eq("user_id", userId);
 
   if (error) throw error;
@@ -62,22 +79,47 @@ export async function getMyLeagues(userId: string): Promise<League[]> {
 /**
  * Creates a league AND adds current user as owner in one atomic RPC.
  * Expects SQL:
- *   create_league_and_join(p_name text, p_activity text) returns uuid
+ *   create_league_and_join(p_name text, p_activity text, p_plan_tier text, p_month_key text, p_is_free boolean) returns uuid
  */
-export async function createLeague(
-  name: string,
-  activity: string
-): Promise<League> {
+export async function createLeague({
+  name,
+  activity,
+  planTier,
+  monthKey,
+  isFree = false,
+}: {
+  name: string;
+  activity: string;
+  planTier: PlanTier | null; // null for Free
+  monthKey: string;
+  isFree?: boolean; // true for Free
+}): Promise<League> {
   const trimmedName = name.trim();
   const trimmedActivity = activity.trim().slice(0, 40);
 
   if (!trimmedName) throw new Error("League name is required");
   if (!trimmedActivity) throw new Error("Activity is required (max 40 chars)");
+  if (!monthKey) throw new Error("Month key is required");
+
+  // Contract:
+  // - Free => planTier must be null
+  // - Paid => planTier must be A/B/C
+  if (!isFree) {
+    if (planTier !== "A" && planTier !== "B" && planTier !== "C") {
+      throw new Error("Plan tier is required");
+    }
+  }
 
   // 1) Atomic create + join (server-side)
   const { data: leagueId, error: rpcErr } = await supabase.rpc(
     "create_league_and_join",
-    { p_name: trimmedName, p_activity: trimmedActivity }
+    {
+      p_name: trimmedName,
+      p_activity: trimmedActivity,
+      p_month_key: monthKey,
+      p_is_free: isFree,
+      p_plan_tier: planTier, // pass null for free
+    }
   );
 
   if (rpcErr) throw rpcErr;
@@ -86,7 +128,7 @@ export async function createLeague(
   // 2) Fetch league row (consistent return shape)
   const { data: league, error: leagueErr } = await supabase
     .from("leagues")
-    .select("id,name,activity,created_at")
+    .select("id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at")
     .eq("id", leagueId)
     .single();
 
@@ -150,7 +192,7 @@ export async function getLeagueMembers(
 export async function getLeague(leagueId: string): Promise<League> {
   const { data, error } = await supabase
     .from("leagues")
-    .select("id,name,activity,created_at")
+    .select("id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at")
     .eq("id", leagueId)
     .single();
 

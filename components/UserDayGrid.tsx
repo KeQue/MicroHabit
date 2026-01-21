@@ -9,6 +9,9 @@ type Props = {
   // per-user active accent (square fill when done)
   accentActive: string;
 
+  // NEW: days before this index are locked (not tappable + darker)
+  minActiveIndex?: number;
+
   // still accepted if you want to keep API compatibility elsewhere
   colorLight?: string;
   colorDark?: string;
@@ -31,6 +34,10 @@ const TODAY_BORDER = 2;
 // Past inactive
 const INACTIVE_BG = "#2B2B33";
 const INACTIVE_TEXT = "rgba(255,255,255,0.55)";
+
+// Locked (joined mid-month, before join date)
+const LOCKED_BG = "#15151C";
+const LOCKED_TEXT = "rgba(255,255,255,0.22)";
 
 // Future
 const FUTURE_BG = "#0B0B10";
@@ -134,7 +141,7 @@ function boostActiveColor(hex?: string) {
   return rgb01ToHex(out.r, out.g, out.b);
 }
 
-export function UserDayGrid({ days, onToggle, todayIndex, accentActive }: Props) {
+export function UserDayGrid({ days, onToggle, todayIndex, accentActive, minActiveIndex }: Props) {
   const isTodayStreak = useMemo(() => {
     if (todayIndex === undefined) return false;
     if (todayIndex <= 0) return false;
@@ -144,10 +151,12 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive }: Props)
   const activeBg = boostActiveColor(accentActive);
 
   const resolveVisual = (dayIndex: number, isDone: boolean): DayVisual => {
+    const locked = minActiveIndex !== undefined && dayIndex < minActiveIndex;
+
     if (todayIndex === undefined) {
       return {
-        bg: isDone ? activeBg : INACTIVE_BG,
-        text: isDone ? "#FFFFFF" : INACTIVE_TEXT,
+        bg: isDone ? activeBg : locked ? LOCKED_BG : INACTIVE_BG,
+        text: isDone ? "#FFFFFF" : locked ? LOCKED_TEXT : INACTIVE_TEXT,
         fontWeight: isDone ? "700" : "600",
         doneDepth: isDone,
         isFuture: false,
@@ -161,6 +170,16 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive }: Props)
         fontWeight: "600",
         doneDepth: false,
         isFuture: true,
+      };
+    }
+
+    if (locked) {
+      return {
+        bg: LOCKED_BG,
+        text: LOCKED_TEXT,
+        fontWeight: "600",
+        doneDepth: false,
+        isFuture: false,
       };
     }
 
@@ -192,15 +211,18 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive }: Props)
         // ✅ UI reinforcement: future tiles are not tappable
         const isFuture = todayIndex !== undefined && dayIndex > todayIndex;
 
+        // ✅ joined-mid-month lock
+        const isLocked = minActiveIndex !== undefined && dayIndex < minActiveIndex;
+
         return (
           <Pressable
             key={dayIndex}
-            onPress={isFuture ? undefined : () => onToggle(dayIndex)}
+            onPress={isFuture || isLocked ? undefined : () => onToggle(dayIndex)}
             hitSlop={0}
-            // polish: don't dim future days on press (they already look disabled-ish)
+            // polish: don't dim future/locked days on press (they already look disabled-ish)
             style={({ pressed }) => [
               styles.pressable,
-              pressed && !isToday && !isFuture && { opacity: 0.92 },
+              pressed && !isToday && !isFuture && !isLocked && { opacity: 0.92 },
             ]}
           >
             <View

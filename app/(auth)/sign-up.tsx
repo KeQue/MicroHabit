@@ -2,6 +2,7 @@ import { Link, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useAuth } from "../../features/auth/useAuth";
+import { supabase } from "../../lib/supabase";
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -42,10 +43,23 @@ export default function SignUpScreen() {
             setError(null);
             setLoading(true);
 
-            await signUp(email.trim(), password);
+            const e = email.trim();
+            if (!e) throw new Error("Email is required");
+            if (!password || password.length < 6) throw new Error("Password must be at least 6 characters");
 
-            // Go to the leagues list route that exists
-            router.replace("/(app)/league");
+            await signUp(e, password);
+
+            // If email confirmation is ON, session may still be null here.
+            const { data } = await supabase.auth.getSession();
+            const hasSession = !!data.session;
+
+            if (hasSession) {
+              // Your leagues list is app/(app)/index.tsx => route "/(app)"
+              router.replace("/(app)");
+            } else {
+              // Confirmation required: send them to sign in (or tell them to confirm email)
+              router.replace("/(auth)/sign-in");
+            }
           } catch (e: any) {
             setError(e?.message ?? "Sign-up failed");
           } finally {

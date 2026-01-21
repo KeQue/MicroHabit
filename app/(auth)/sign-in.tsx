@@ -42,10 +42,14 @@ export default function SignInScreen() {
             setError(null);
             setLoading(true);
 
-            await signIn(email.trim(), password);
+            const e = email.trim();
+            if (!e) throw new Error("Email is required");
+            if (!password) throw new Error("Password is required");
 
-            // Go to the leagues list route that exists
-            router.replace("/(app)/league");
+            await signIn(e, password);
+
+            // Leagues list is app/(app)/index.tsx => route "/(app)"
+            router.replace("/(app)");
           } catch (e: any) {
             setError(e?.message ?? "Sign-in failed");
           } finally {

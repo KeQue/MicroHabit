@@ -1,26 +1,21 @@
 import type { Session, User } from "@supabase/supabase-js";
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type PropsWithChildren,
-} from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 type AuthContextValue = {
   user: User | null;
   session: Session | null;
   initializing: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+
+  // actions
   signUp: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export function AuthProvider({ children }: PropsWithChildren) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [initializing, setInitializing] = useState(true);
@@ -29,16 +24,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let mounted = true;
 
     (async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (!mounted) return;
-      if (error) throw error;
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!mounted) return;
 
-      setSession(data.session ?? null);
-      setUser(data.session?.user ?? null);
-      setInitializing(false);
+        const s = data.session ?? null;
+        setSession(s);
+        setUser(s?.user ?? null);
+      } finally {
+        if (mounted) setInitializing(false);
+      }
     })();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
       setSession(newSession ?? null);
       setUser(newSession?.user ?? null);
       setInitializing(false);
@@ -46,27 +46,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     return () => {
       mounted = false;
-      sub.subscription.unsubscribe();
+      sub?.subscription?.unsubscribe();
     };
   }, []);
 
-  const value = useMemo<AuthContextValue>(
+  // --- actions ---
+  async function signUp(email: string, password: string) {
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+  }
+
+  async function signIn(email: string, password: string) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  }
+
+  async function signOut() {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  }
+
+  const value = useMemo(
     () => ({
       user,
       session,
       initializing,
-      signIn: async (email, password) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      },
-      signUp: async (email, password) => {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-      },
-      signOut: async () => {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-      },
+      signUp,
+      signIn,
+      signOut,
     }),
     [user, session, initializing]
   );
@@ -74,7 +81,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth(): AuthContextValue {
+export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;

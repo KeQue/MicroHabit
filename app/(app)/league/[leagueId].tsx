@@ -2,11 +2,23 @@ import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { getLeagueMembers } from "@/features/leagues/api";
 import { supabase } from "@/lib/supabase";
+import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+type PlanTier = "A" | "B" | "C";
 
 type Member = {
   id: string; // user_id
@@ -16,6 +28,7 @@ type Member = {
   colorDark: string;
   accentActive: string;
   days: boolean[];
+  joinedAt?: string;
 };
 
 // ---------- UI THEME (local to this screen) ----------
@@ -37,6 +50,13 @@ const UI = {
   segmentActiveBorder: "rgba(162,89,255,0.55)",
 
   error: "rgba(255,120,120,0.9)",
+
+  // modal
+  modalOverlay: "rgba(0,0,0,0.55)",
+  cardBg: "rgba(18,10,34,0.96)",
+  cardBorder: "rgba(255,255,255,0.10)",
+  codeBg: "rgba(255,255,255,0.06)",
+  success: "rgba(140,255,190,0.92)",
 };
 
 // palette (still used per-user)
@@ -73,8 +93,7 @@ function endOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
 
-// ✅ EXACT same scoring logic as UserCard UI count
-// IMPORTANT: count ONLY boolean true (avoids weird truthy values breaking ranking)
+// count ONLY boolean true
 function scoreDays(days: boolean[]) {
   return (days ?? []).reduce((acc, v) => acc + (v === true ? 1 : 0), 0);
 }
@@ -86,7 +105,7 @@ function PillButton({
 }: {
   label: string;
   onPress: () => void | Promise<void>;
-  size?: "md" | "sm";
+  size?: "md" | "sm" | "xs";
 }) {
   return (
     <Pressable
@@ -94,11 +113,20 @@ function PillButton({
       style={({ pressed }) => [
         styles.pillBtn,
         size === "sm" && styles.pillBtnSm,
+        size === "xs" && styles.pillBtnXs,
         pressed && { backgroundColor: UI.pillBgActive },
       ]}
       hitSlop={8}
     >
-      <Text style={[styles.pillBtnText, size === "sm" && styles.pillBtnTextSm]}>{label}</Text>
+      <Text
+        style={[
+          styles.pillBtnText,
+          size === "sm" && styles.pillBtnTextSm,
+          size === "xs" && styles.pillBtnTextXs,
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -139,7 +167,6 @@ export default function LeagueDetailScreen() {
   const params = useLocalSearchParams<{ leagueId: string }>();
   const leagueId = typeof params.leagueId === "string" ? params.leagueId : "";
 
-  // ✅ stable month primitives
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
@@ -149,16 +176,51 @@ export default function LeagueDetailScreen() {
   const [viewMode, setViewMode] = useState<"My View" | "Ranking">("My View");
 
   const [myId, setMyId] = useState<string>("");
+  const [myRole, setMyRole] = useState<string>("member");
+
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [leagueName, setLeagueName] = useState<string>("League");
   const [leagueActivity, setLeagueActivity] = useState<string>("");
+  const [leaguePlanTier, setLeaguePlanTier] = useState<PlanTier | null>(null);
+
+  const [leagueIsFree, setLeagueIsFree] = useState<boolean>(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function onSignOut() {
     await supabase.auth.signOut();
     router.replace("/(auth)/sign-in");
+  }
+
+  function buildInviteMessage(code: string) {
+    // Canonical template (no links)
+    return `Join my MicroHabit league 💪
+Invite code: ${code}
+Open MicroHabit → Join → Paste the code`;
+  }
+
+  function onInvite() {
+    setCopied(false);
+    setInviteOpen(true);
+  }
+
+  async function onCopyCode() {
+    if (!inviteCode) return;
+    await Clipboard.setStringAsync(inviteCode);
+    setCopied(true);
+    // auto-hide the "Copied" hint after a moment
+    setTimeout(() => setCopied(false), 1200);
+  }
+
+  async function onShareInvite() {
+    if (!inviteCode) return;
+    const message = buildInviteMessage(inviteCode);
+    await Share.share({ message });
   }
 
   async function fetchMonthLogs(league_id: string, from: string, to: string) {
@@ -180,7 +242,6 @@ export default function LeagueDetailScreen() {
       setError(null);
       setLoading(true);
 
-      // auth
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
       if (userErr) throw userErr;
       const user = userRes.user;
@@ -190,19 +251,24 @@ export default function LeagueDetailScreen() {
       }
       setMyId(user.id);
 
-      // league meta
       const { data: leagueRow, error: leagueErr } = await supabase
         .from("leagues")
-        .select("id,name,activity")
+        .select("id,name,activity,plan_tier,is_free,invite_code")
         .eq("id", leagueId)
         .single();
       if (leagueErr) throw leagueErr;
 
       setLeagueName(leagueRow?.name ?? "League");
       setLeagueActivity(leagueRow?.activity ?? "");
+      setLeaguePlanTier((leagueRow?.plan_tier as PlanTier) ?? null);
 
-      // members list
+      setLeagueIsFree(!!leagueRow?.is_free);
+      setInviteCode((leagueRow?.invite_code as string) ?? null);
+
       const rows = await getLeagueMembers(leagueId);
+
+      const me = rows.find((r: any) => r.user_id === user.id);
+      setMyRole((me?.role as string) ?? "member");
 
       const roleRank = (role?: string) => (role === "owner" ? 0 : role === "admin" ? 1 : 2);
 
@@ -217,12 +283,10 @@ export default function LeagueDetailScreen() {
           return a.display.localeCompare(b.display);
         });
 
-      // logs for this month
       const from = toDateOnlyLocal(startOfMonth(new Date(year, month, 1)));
       const to = toDateOnlyLocal(endOfMonth(new Date(year, month, 1)));
       const logs = await fetchMonthLogs(leagueId, from, to);
 
-      // build map: user_id -> boolean[monthDays]
       const daysByUser = new Map<string, boolean[]>();
       for (const m of normalized) {
         daysByUser.set(m.user_id, Array(monthDays).fill(false));
@@ -259,13 +323,11 @@ export default function LeagueDetailScreen() {
     }
   }
 
-  // initial load
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId]);
 
-  // ✅ Realtime: apply updates (including mine), but skip exact no-ops
   useEffect(() => {
     if (!leagueId) return;
 
@@ -289,7 +351,7 @@ export default function LeagueDetailScreen() {
           setMembers((prev) =>
             prev.map((m) => {
               if (m.id !== row.user_id) return m;
-              if (m.days[idx] === value) return m; // ✅ no-op guard
+              if (m.days[idx] === value) return m;
               const nextDays = m.days.slice();
               nextDays[idx] = value;
               return { ...m, days: nextDays };
@@ -304,10 +366,8 @@ export default function LeagueDetailScreen() {
     };
   }, [leagueId, year, month, monthDays]);
 
-  // ✅ SINGLE source of truth for render order
   const membersToRender = useMemo((): Member[] => {
     if (viewMode === "Ranking") {
-      // sort using same count logic as the UI
       return [...members]
         .map((m) => ({ m, s: scoreDays(m.days) }))
         .sort((a, b) => {
@@ -319,7 +379,6 @@ export default function LeagueDetailScreen() {
         .map((x) => x.m);
     }
 
-    // My View: pin me on top (only if myId exists)
     if (!myId) return members;
     const i = members.findIndex((m) => m.id === myId);
     if (i <= 0) return members;
@@ -328,28 +387,21 @@ export default function LeagueDetailScreen() {
   }, [members, myId, viewMode]);
 
   const toggleDayForMember = useCallback(
-    async (memberId: string, dayIndex: number) => {
+    async (memberId: string, dayIndex: string | number) => {
+      const day = typeof dayIndex === "number" ? dayIndex : Number(dayIndex);
       if (!myId || memberId !== myId) return;
-      if (dayIndex < 0 || dayIndex >= monthDays) return;
+      if (day < 0 || day >= monthDays) return;
+      if (day > todayIndex) return;
 
-      // ✅ block future days
-      if (todayIndex !== undefined && dayIndex > todayIndex) return;
-
-      const d = new Date(year, month, dayIndex + 1);
+      const d = new Date(year, month, day + 1);
       const log_date = toDateOnlyLocal(d);
 
-      const current = members.find((m) => m.id === myId)?.days?.[dayIndex] ?? false;
+      const current = members.find((m) => m.id === myId)?.days?.[day] ?? false;
       const next = !current;
 
-      // Optimistic UI
       setMembers((prev) =>
         prev.map((x) =>
-          x.id !== memberId
-            ? x
-            : {
-                ...x,
-                days: x.days.map((v, i) => (i === dayIndex ? next : v)),
-              }
+          x.id !== memberId ? x : { ...x, days: x.days.map((v, i) => (i === day ? next : v)) }
         )
       );
 
@@ -365,21 +417,21 @@ export default function LeagueDetailScreen() {
       );
 
       if (error) {
-        // rollback
         setMembers((prev) =>
           prev.map((x) =>
             x.id !== memberId
               ? x
-              : {
-                  ...x,
-                  days: x.days.map((v, i) => (i === dayIndex ? current : v)),
-                }
+              : { ...x, days: x.days.map((v, i) => (i === day ? current : v)) }
           )
         );
       }
     },
     [leagueId, members, monthDays, myId, year, month, todayIndex]
   );
+
+  const showInvite = myRole === "owner";
+
+  const inviteMessage = inviteCode ? buildInviteMessage(inviteCode) : "";
 
   return (
     <ThemedView style={styles.container}>
@@ -389,15 +441,75 @@ export default function LeagueDetailScreen() {
         end={{ x: 1, y: 1 }}
         style={styles.bg}
       >
-        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-          <View style={styles.headerRow}>
-            <PillButton label="Back" onPress={() => router.back()} />
+        {/* INVITE MODAL */}
+        <Modal
+          visible={inviteOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setInviteOpen(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setInviteOpen(false)}>
+            <Pressable style={styles.modalCard} onPress={() => {}}>
+              <Text style={styles.modalTitle}>Invite code</Text>
 
+              <View style={styles.codeBox}>
+                <Text style={styles.codeText}>{inviteCode ?? "—"}</Text>
+              </View>
+
+              <Text style={styles.modalMessageLabel}>Message</Text>
+              <View style={styles.messageBox}>
+                <Text style={styles.messageText}>{inviteMessage}</Text>
+              </View>
+
+              {copied ? <Text style={styles.copiedText}>Copied</Text> : <View style={{ height: 18 }} />}
+
+              <View style={styles.modalActions}>
+                <PillButton
+                  label="Copy code"
+                  size="sm"
+                  onPress={onCopyCode}
+                />
+                <PillButton
+                  label="Share"
+                  size="sm"
+                  onPress={onShareInvite}
+                />
+                <PillButton
+                  label="Close"
+                  size="sm"
+                  onPress={() => setInviteOpen(false)}
+                />
+              </View>
+
+              {!inviteCode ? (
+                <Text style={styles.modalHint}>
+                  No invite code found for this league.
+                </Text>
+              ) : null}
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* HEADER: Row 1 (Back/Invite/Sign out) + Row 2 (Title) */}
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <View style={styles.headerRowTop3}>
+            <View style={styles.headerSide}>
+              <PillButton label="Back" onPress={() => router.back()} />
+            </View>
+
+            <View style={styles.headerMid}>
+              {showInvite ? <PillButton label="Invite" size="sm" onPress={onInvite} /> : null}
+            </View>
+
+            <View style={[styles.headerSide, { alignItems: "flex-end" }]}>
+              <PillButton label="Sign out" size="sm" onPress={onSignOut} />
+            </View>
+          </View>
+
+          <View style={styles.headerCenterBlock}>
             <Text style={styles.headerTitle} numberOfLines={1}>
               {leagueName ? `League: ${leagueName}` : "League"}
             </Text>
-
-            <PillButton label="Sign out" size="sm" onPress={onSignOut} />
           </View>
         </View>
 
@@ -434,7 +546,7 @@ export default function LeagueDetailScreen() {
                 accentActive={m.accentActive}
                 todayIndex={todayIndex}
                 disabled={!!myId && m.id !== myId}
-                onToggle={(dayIndex) => toggleDayForMember(m.id, dayIndex)}
+                onToggle={(i) => toggleDayForMember(m.id, i)}
                 showRank={viewMode === "Ranking"}
                 rank={idx + 1}
               />
@@ -456,14 +568,37 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: UI.border,
   },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  headerTitle: {
+
+  headerRowTop3: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerSide: {
     flex: 1,
+    alignItems: "flex-start",
+  },
+  headerMid: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 40,
+  },
+
+  headerCenterBlock: {
+    marginTop: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+
+  headerTitle: {
     textAlign: "center",
     color: UI.text,
     fontSize: 22,
     fontWeight: "800",
     letterSpacing: 0.2,
+    maxWidth: "100%",
   },
 
   pillBtn: {
@@ -478,8 +613,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
+  pillBtnXs: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
   pillBtnText: { color: UI.text, fontSize: 16, fontWeight: "700" },
   pillBtnTextSm: { fontSize: 14 },
+  pillBtnTextXs: { fontSize: 14, fontWeight: "800" },
 
   scroll: { flex: 1 },
   scrollContent: { padding: 16, gap: 14, paddingBottom: 32 },
@@ -505,4 +645,86 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: UI.text },
 
   errorText: { color: UI.error, fontSize: 14, fontWeight: "600" },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: UI.modalOverlay,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 520,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: UI.cardBorder,
+    backgroundColor: UI.cardBg,
+    padding: 16,
+  },
+  modalTitle: {
+    color: UI.text,
+    fontSize: 18,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  codeBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: UI.border,
+    backgroundColor: UI.codeBg,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  codeText: {
+    color: UI.text,
+    fontSize: 28,
+    fontWeight: "900",
+    letterSpacing: 3,
+  },
+  modalMessageLabel: {
+    marginTop: 14,
+    marginBottom: 8,
+    color: UI.muted,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  messageBox: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: UI.border,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    padding: 12,
+  },
+  messageText: {
+    color: UI.text,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 20,
+  },
+  copiedText: {
+    marginTop: 10,
+    color: UI.success,
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  modalActions: {
+    marginTop: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  modalHint: {
+    marginTop: 10,
+    color: UI.muted,
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
 });

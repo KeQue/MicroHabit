@@ -1,30 +1,80 @@
 import { supabase } from "@/lib/supabase";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+
+
+type PlanTier = "A" | "B" | "C";
+
+type LeagueInfo = {
+  id: string;
+  name: string | null;
+  activity: string | null;
+  plan_tier: PlanTier | null;
+  month_key: string | null;
+  is_free: boolean | null;
+  status: string | null;
+};
 
 export default function JoinLeagueScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ leagueId?: string; code?: string }>();
+  const params = useLocalSearchParams<{ code?: string }>();
 
-  // If opened from invite link: /league/join?leagueId=...
-  const leagueIdFromLink = useMemo(() => {
-    const v = params?.leagueId;
-    return typeof v === "string" ? v.trim() : "";
-  }, [params]);
-
-  // Optional: if you ever use /league/join?code=XXXX
+  // Optional: /join?code=XXXX (not required, but safe to keep)
   const codeFromLink = useMemo(() => {
     const v = params?.code;
     return typeof v === "string" ? v.trim() : "";
   }, [params]);
 
   const [code, setCode] = useState(codeFromLink || "");
-  const [joining, setJoining] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Prevent double-run on iOS/Expo dev
-  const autoJoinRanRef = useRef(false);
+  const [leagueInfo, setLeagueInfo] = useState<LeagueInfo | null>(null);
+  const [joinedLeagueId, setJoinedLeagueId] = useState<string | null>(null);
+
+  // Acceptance handshake state
+  const [accepting, setAccepting] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+
+  async function fetchLeagueInfo(leagueId: string) {
+    const { data, error } = await supabase
+      .from("leagues")
+      .select("id,name,activity,plan_tier,month_key,is_free,status")
+      .eq("id", leagueId)
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id as string,
+      name: (data.name as string) ?? null,
+      activity: (data.activity as string) ?? null,
+      plan_tier: (data.plan_tier as PlanTier) ?? null,
+      month_key: (data.month_key as string) ?? null,
+      is_free: (data.is_free as boolean) ?? null,
+      status: (data.status as string) ?? null,
+    } as LeagueInfo;
+  }
+
+  async function acceptPlanAndAgreeToPay(leagueId: string) {
+    try {
+      setError(null);
+      setAccepting(true);
+
+      const { error: rpcErr } = await supabase.rpc("accept_invite_and_agree", {
+        p_league_id: leagueId,
+      });
+
+      if (rpcErr) throw rpcErr;
+
+      setAccepted(true);
+    } catch (e: any) {
+      setError(e?.message ?? "Failed to accept plan");
+    } finally {
+      setAccepting(false);
+    }
+  }
 
   async function joinByCode(inviteCode: string) {
     const trimmed = inviteCode.trim();
@@ -35,7 +85,10 @@ export default function JoinLeagueScreen() {
 
     try {
       setError(null);
-      setJoining(true);
+      setLoading(true);
+      setLeagueInfo(null);
+      setJoinedLeagueId(null);
+      setAccepted(false);
 
       const { data: leagueId, error: rpcErr } = await supabase.rpc("join_league_by_code", {
         p_code: trimmed,
@@ -50,122 +103,171 @@ export default function JoinLeagueScreen() {
 
       if (!leagueId) throw new Error("Join failed");
 
-      router.replace(`/league/${leagueId}`);
+      const info = await fetchLeagueInfo(leagueId);
+      setLeagueInfo(info);
+      setJoinedLeagueId(leagueId);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to join league");
+      setError(e?.message ?? "Failed to open invite");
     } finally {
-      setJoining(false);
+      setLoading(false);
     }
   }
 
-  // IMPORTANT:
-  // Do NOT insert into league_members from the client (RLS blocks it).
-  // Use a SECURITY DEFINER RPC: join_league_by_id(p_league_id uuid)
-  async function joinByLeagueId(leagueId: string) {
-    const trimmedId = leagueId.trim();
-    if (!trimmedId) return;
+  const planLabel = useMemo(() => {
+    if (!leagueInfo) return null;
+    if (leagueInfo.is_free) return "Free league";
+    if (leagueInfo.plan_tier) return `Plan chosen by owner: ${leagueInfo.plan_tier}`;
+    return "Plan: —";
+  }, [leagueInfo]);
 
-    try {
-      setError(null);
-      setJoining(true);
+  const requiresAcceptance = useMemo(() => {
+    if (!leagueInfo) return false;
+    if (leagueInfo.is_free) return false;
+    return true;
+  }, [leagueInfo]);
 
-      // Must be signed in
-      const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr) throw userErr;
-      if (!userRes.user) {
-        router.replace("/sign-in");
-        return;
-      }
-
-      const { data, error: rpcErr } = await supabase.rpc("join_league_by_id", {
-        p_league_id: trimmedId,
-      });
-
-      if (rpcErr) throw rpcErr;
-      if (!data) throw new Error("Join failed");
-
-      router.replace(`/league/${data}`);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to join league");
-    } finally {
-      setJoining(false);
-    }
-  }
-
-  // Auto-join when opened from an invite link containing leagueId
-  useEffect(() => {
-    if (!leagueIdFromLink) return;
-    if (autoJoinRanRef.current) return;
-    autoJoinRanRef.current = true;
-
-    joinByLeagueId(leagueIdFromLink);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueIdFromLink]);
+  const continueDisabled =
+    loading || accepting || !joinedLeagueId || (requiresAcceptance && !accepted);
 
   return (
     <View style={{ flex: 1, padding: 20, paddingTop: 70, backgroundColor: "#0B0F14" }}>
       <Text style={{ fontSize: 28, fontWeight: "700", color: "white" }}>Join league</Text>
 
       <Text style={{ marginTop: 8, fontSize: 16, color: "#A7B0BC" }}>
-        {leagueIdFromLink ? "Opening invite… joining you automatically." : "Paste an invite code to join a league."}
+        Paste an invite code to open a league invite.
       </Text>
 
-      {/* If invite link is used, we hide the input to avoid confusion */}
-      {!leagueIdFromLink ? (
-        <View style={{ marginTop: 18, gap: 12 }}>
-          <TextInput
-            value={code}
-            onChangeText={setCode}
-            placeholder="Invite code"
-            placeholderTextColor="#6B7280"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!joining}
-            style={{
-              borderWidth: 1,
-              borderColor: "#1F2937",
-              padding: 14,
-              borderRadius: 14,
-              color: "white",
-              backgroundColor: "#111827",
-            }}
-          />
+      {(loading || accepting) && (
+        <View style={{ marginTop: 14 }}>
+          <ActivityIndicator />
+        </View>
+      )}
 
-          {error ? <Text style={{ color: "tomato" }}>{error}</Text> : null}
+      {/* League summary + acceptance gate */}
+      {leagueInfo ? (
+        <View
+          style={{
+            marginTop: 16,
+            padding: 14,
+            borderRadius: 14,
+            backgroundColor: "#111827",
+            borderWidth: 1,
+            borderColor: "#1F2937",
+            gap: 8,
+          }}
+        >
+          <Text style={{ color: "white", fontSize: 16, fontWeight: "800" }}>
+            {leagueInfo.name ?? "League"}
+          </Text>
+
+          {leagueInfo.activity ? (
+            <Text style={{ color: "#A7B0BC" }}>{leagueInfo.activity}</Text>
+          ) : null}
+
+          {planLabel ? (
+            <Text style={{ color: "#A7B0BC" }}>
+              {planLabel}
+              {leagueInfo.month_key ? ` • ${leagueInfo.month_key}` : ""}
+            </Text>
+          ) : null}
+
+          {/* Option A: explicit acceptance required for paid leagues */}
+          {requiresAcceptance ? (
+            <>
+              <Text style={{ color: "#A7B0BC" }}>
+                To join this league you must accept the plan chosen by the owner and agree to pay your share.
+                Payment will be enabled later.
+              </Text>
+
+            import { Link } from "expo-router"; // ← must exist at top
+
+<Link href="/(app)/league/join" asChild>
+  <Pressable
+    style={{ padding: 16, borderRadius: 14, backgroundColor: "#1A2430" }}
+  >
+    <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
+      🔑 Join with code
+    </Text>
+  </Pressable>
+</Link>
+
+            </>
+          ) : (
+            <Text style={{ color: "#A7B0BC" }}>You can continue.</Text>
+          )}
 
           <Pressable
-            onPress={() => joinByCode(code)}
-            disabled={joining}
+            onPress={() => {
+              if (!joinedLeagueId) return;
+              router.replace(`/league/${joinedLeagueId}`);
+            }}
+            disabled={continueDisabled}
             style={{
-              padding: 16,
-              borderRadius: 14,
-              backgroundColor: joining ? "#0F172A" : "#1A2430",
+              marginTop: 8,
+              padding: 14,
+              borderRadius: 12,
+              backgroundColor: continueDisabled ? "#0F172A" : "#1A2430",
               borderWidth: 1,
               borderColor: "#1F2937",
+              opacity: continueDisabled ? 0.65 : 1,
             }}
           >
             <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
-              {joining ? "Joining..." : "Join league"}
+              Continue to league
             </Text>
           </Pressable>
 
-          <Pressable onPress={() => router.back()} disabled={joining}>
-            <Text style={{ color: "#A7B0BC" }}>Back</Text>
-          </Pressable>
+          {requiresAcceptance && !accepted ? (
+            <Text style={{ marginTop: 4, color: "#6B7280", fontSize: 12 }}>
+              You must accept the plan before entering.
+            </Text>
+          ) : null}
         </View>
-      ) : (
-        <View style={{ marginTop: 18, gap: 12 }}>
-          {error ? <Text style={{ color: "tomato" }}>{error}</Text> : null}
+      ) : null}
 
-          <Pressable onPress={() => router.replace("/league")} disabled={joining}>
-            <Text style={{ color: "#A7B0BC" }}>Go to leagues</Text>
-          </Pressable>
+      <View style={{ marginTop: 18, gap: 12 }}>
+        <TextInput
+          value={code}
+          onChangeText={(t) => setCode(t.toUpperCase())}
+          placeholder="Invite code"
+          placeholderTextColor="#6B7280"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          editable={!loading && !accepting}
+          style={{
+            borderWidth: 1,
+            borderColor: "#1F2937",
+            padding: 14,
+            borderRadius: 14,
+            color: "white",
+            backgroundColor: "#111827",
+            letterSpacing: 2,
+            fontWeight: "700",
+          }}
+        />
 
-          <Pressable onPress={() => router.back()} disabled={joining}>
-            <Text style={{ color: "#A7B0BC" }}>Back</Text>
-          </Pressable>
-        </View>
-      )}
+        {error ? <Text style={{ color: "tomato" }}>{error}</Text> : null}
+
+        <Pressable
+          onPress={() => joinByCode(code)}
+          disabled={loading || accepting}
+          style={{
+            padding: 16,
+            borderRadius: 14,
+            backgroundColor: loading || accepting ? "#0F172A" : "#1A2430",
+            borderWidth: 1,
+            borderColor: "#1F2937",
+          }}
+        >
+          <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
+            {loading ? "Opening..." : "Open invite"}
+          </Text>
+        </Pressable>
+
+        <Pressable onPress={() => router.back()} disabled={loading || accepting}>
+          <Text style={{ color: "#A7B0BC" }}>Back</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

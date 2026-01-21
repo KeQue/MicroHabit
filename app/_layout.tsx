@@ -1,32 +1,32 @@
-import { Stack, router, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
 
 function RouteGate() {
   const { user, initializing } = useAuth();
   const segments = useSegments();
+  const router = useRouter();
 
   useEffect(() => {
     if (initializing) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
+    const group = segments[0]; // "(auth)" | "(app)" | etc.
+    const inAuthGroup = group === "(auth)";
+    const inAppGroup = group === "(app)";
 
-    if (!user && !inAuthGroup) {
-      router.replace("/(auth)/sign-in");
+    if (!user) {
+      if (!inAuthGroup) router.replace("/(auth)/sign-in");
       return;
     }
 
-    if (user && inAuthGroup) {
-      // Typed routes in this project don't include "/league" even though it exists at runtime.
-      router.replace("/league" as any);
-      return;
-    }
-  }, [user, initializing, segments]);
+    if (!inAppGroup) router.replace("/(app)");
+  }, [user, initializing, segments, router]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(app)" />
+      <Stack.Screen name="+not-found" />
     </Stack>
   );
 }

@@ -1,0 +1,8 @@
+﻿{
+  "cli": { "version": ">= 12.0.0" },
+  "build": {
+    "preview": { "ios": { "resourceClass": "m-medium" } },
+    "production": { "ios": { "resourceClass": "m-medium" } }
+  },
+  "submit": { "production": {} }
+}

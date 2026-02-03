@@ -59,6 +59,17 @@ function displayNameFromProfile(p: Profile | null) {
   );
 }
 
+function currentMonthBoundsISO(): { start: string; end: string } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+    .toISOString()
+    .slice(0, 10);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    .toISOString()
+    .slice(0, 10);
+  return { start, end };
+}
+
 /**
  * My leagues (for current logged-in user)
  */
@@ -128,7 +139,9 @@ export async function createLeague({
   // 2) Fetch league row (consistent return shape)
   const { data: league, error: leagueErr } = await supabase
     .from("leagues")
-    .select("id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at")
+    .select(
+      "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at"
+    )
     .eq("id", leagueId)
     .single();
 
@@ -192,10 +205,74 @@ export async function getLeagueMembers(
 export async function getLeague(leagueId: string): Promise<League> {
   const { data, error } = await supabase
     .from("leagues")
-    .select("id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at")
+    .select(
+      "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at"
+    )
     .eq("id", leagueId)
     .single();
 
   if (error) throw error;
   return data as League;
+}
+
+/**
+ * Load current-month logs for a league (user_id + log_date rows)
+ */
+export async function loadMonthLogs(leagueId: string) {
+  const { start, end } = currentMonthBoundsISO();
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select("user_id, log_date")
+    .eq("league_id", leagueId)
+    .gte("log_date", start)
+    .lte("log_date", end);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Toggle a specific day for the signed-in user.
+ * on = true  -> upsert
+ * on = false -> delete
+ */
+export async function toggleDay(params: {
+  leagueId: string;
+  userId: string;
+  dateISO: string; // 'YYYY-MM-DD'
+  on: boolean;
+}) {
+  const { leagueId, userId, dateISO, on } = params;
+
+  if (on) {
+    const { error } = await supabase
+      .from("daily_logs")
+      .upsert(
+        { league_id: leagueId, user_id: userId, log_date: dateISO },
+        { onConflict: "league_id,user_id,log_date" }
+      );
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("daily_logs")
+      .delete()
+      .eq("league_id", leagueId)
+      .eq("user_id", userId)
+      .eq("log_date", dateISO);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Leaderboard for current month: sorted by days desc, then longest_streak desc.
+ */
+export async function getLeaderboard(leagueId: string) {
+  const { data, error } = await supabase
+    .from("v_month_results")
+    .select("user_id, days_completed, longest_streak, position")
+    .eq("league_id", leagueId)
+    .order("position", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
 }

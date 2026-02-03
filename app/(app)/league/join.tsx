@@ -126,10 +126,20 @@ export default function JoinLeagueScreen() {
       setJoinedLeagueId(leagueId);
       setUserTier(myTier);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to open invite");
-    } finally {
-      setLoading(false);
+    const msg = (e?.message ?? "").toLowerCase();
+
+    if (msg.includes("payment_required") || msg.includes("paid")) {
+      router.push({
+        pathname: "/(app)/paywall",
+        params: { reason: "paid_required", code: trimmed },
+      });
+      return;
     }
+
+    setError(e?.message ?? "Failed to open invite");
+  } finally {
+    setLoading(false);
+  }
   }
 
   const requiredTier: UserTier = useMemo(() => {

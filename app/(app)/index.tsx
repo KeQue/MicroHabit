@@ -203,7 +203,7 @@ export default function LeaguesScreen() {
 
   function onStartCreate() {
     setError(null);
-    router.push("/(app)/league/choose-plan");
+    router.push({ pathname: "/league/choose-plan", params: { source: "create" } });
   }
 
   return (

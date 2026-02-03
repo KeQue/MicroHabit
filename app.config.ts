@@ -9,6 +9,9 @@ const config: ExpoConfig = {
   },
   scheme: "microhabit",
   extra: {
+    eas: {
+      projectId: "d3fde64e-5b05-47c2-b4c5-91ff25cd3045"
+    },
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnon: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
   }

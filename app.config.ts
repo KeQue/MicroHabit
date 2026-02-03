@@ -7,6 +7,9 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.sadik.microhabit",
     supportsTablet: false
   },
+  android: {
+    package: "com.sadik.microhabit"
+  },
   scheme: "microhabit",
   extra: {
     eas: {

@@ -1,3 +1,4 @@
+import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
@@ -33,8 +34,10 @@ function RouteGate() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RouteGate />
-    </AuthProvider>
+    <ThemeProvider value={DarkTheme}>
+      <AuthProvider>
+        <RouteGate />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

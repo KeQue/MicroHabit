@@ -4,9 +4,12 @@ const config: ExpoConfig = {
   name: "MicroHabit",
   slug: "microhabit",
   ios: {
-    bundleIdentifier: "com.sadik.microhabit",
-    supportsTablet: false
-  },
+  bundleIdentifier: "com.sadik.microhabit",
+  supportsTablet: false,
+  infoPlist: {
+    ITSAppUsesNonExemptEncryption: false
+  }
+},
   android: {
     package: "com.sadik.microhabit"
   },

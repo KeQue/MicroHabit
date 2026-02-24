@@ -98,6 +98,16 @@ function scoreDays(days: boolean[]) {
   return (days ?? []).reduce((acc, v) => acc + (v === true ? 1 : 0), 0);
 }
 
+/**
+ * ✅ Edit window rule (MVP):
+ * - Allow toggling: today and yesterday only
+ * - Block: earlier days, future days
+ */
+function isEditableDay(dayIndex: number, todayIndex?: number) {
+  if (typeof todayIndex !== "number") return false;
+  return dayIndex === todayIndex || dayIndex === todayIndex - 1;
+}
+
 function PillButton({
   label,
   onPress,
@@ -389,9 +399,18 @@ Open MicroHabit → Join → Paste the code`;
   const toggleDayForMember = useCallback(
     async (memberId: string, dayIndex: string | number) => {
       const day = typeof dayIndex === "number" ? dayIndex : Number(dayIndex);
+
+      // only allow self
       if (!myId || memberId !== myId) return;
+
+      // bounds
       if (day < 0 || day >= monthDays) return;
+
+      // no future
       if (day > todayIndex) return;
+
+      // ✅ NEW: only today + yesterday
+      if (!isEditableDay(day, todayIndex)) return;
 
       const d = new Date(year, month, day + 1);
       const log_date = toDateOnlyLocal(d);
@@ -399,6 +418,7 @@ Open MicroHabit → Join → Paste the code`;
       const current = members.find((m) => m.id === myId)?.days?.[day] ?? false;
       const next = !current;
 
+      // optimistic UI
       setMembers((prev) =>
         prev.map((x) =>
           x.id !== memberId ? x : { ...x, days: x.days.map((v, i) => (i === day ? next : v)) }
@@ -416,6 +436,7 @@ Open MicroHabit → Join → Paste the code`;
         { onConflict: "league_id,user_id,log_date" }
       );
 
+      // revert if failed
       if (error) {
         setMembers((prev) =>
           prev.map((x) =>
@@ -430,7 +451,6 @@ Open MicroHabit → Join → Paste the code`;
   );
 
   const showInvite = myRole === "owner" || myRole === "admin" || myRole === "member";
-
 
   const inviteMessage = inviteCode ? buildInviteMessage(inviteCode) : "";
 
@@ -465,27 +485,13 @@ Open MicroHabit → Join → Paste the code`;
               {copied ? <Text style={styles.copiedText}>Copied</Text> : <View style={{ height: 18 }} />}
 
               <View style={styles.modalActions}>
-                <PillButton
-                  label="Copy code"
-                  size="sm"
-                  onPress={onCopyCode}
-                />
-                <PillButton
-                  label="Share"
-                  size="sm"
-                  onPress={onShareInvite}
-                />
-                <PillButton
-                  label="Close"
-                  size="sm"
-                  onPress={() => setInviteOpen(false)}
-                />
+                <PillButton label="Copy code" size="sm" onPress={onCopyCode} />
+                <PillButton label="Share" size="sm" onPress={onShareInvite} />
+                <PillButton label="Close" size="sm" onPress={() => setInviteOpen(false)} />
               </View>
 
               {!inviteCode ? (
-                <Text style={styles.modalHint}>
-                  No invite code found for this league.
-                </Text>
+                <Text style={styles.modalHint}>No invite code found for this league.</Text>
               ) : null}
             </Pressable>
           </Pressable>

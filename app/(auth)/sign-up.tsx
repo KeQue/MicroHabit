@@ -13,28 +13,44 @@ export default function SignUpScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const INPUT_BG = "rgba(255,255,255,0.06)";
+  const INPUT_BORDER = "rgba(255,255,255,0.16)";
+  const TEXT = "#FFFFFF";
+  const PLACEHOLDER = "rgba(255,255,255,0.55)";
+
+  const inputStyle = {
+    borderWidth: 1,
+    borderColor: INPUT_BORDER,
+    backgroundColor: INPUT_BG,
+    padding: 12,
+    borderRadius: 10,
+    color: TEXT,
+  } as const;
+
   return (
     <View style={{ flex: 1, justifyContent: "center", padding: 20, gap: 12 }}>
-      <Text style={{ fontSize: 22, fontWeight: "600" }}>Create account</Text>
+      <Text style={{ fontSize: 22, fontWeight: "600", color: TEXT }}>Create account</Text>
 
       <TextInput
         placeholder="Email"
+        placeholderTextColor={PLACEHOLDER}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 10 }}
+        style={inputStyle}
       />
 
       <TextInput
         placeholder="Password (min 6 chars)"
+        placeholderTextColor={PLACEHOLDER}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 10 }}
+        style={inputStyle}
       />
 
-      {error ? <Text style={{ color: "red" }}>{error}</Text> : null}
+      {error ? <Text style={{ color: "#FF6B6B" }}>{error}</Text> : null}
 
       <Pressable
         disabled={loading}
@@ -45,7 +61,8 @@ export default function SignUpScreen() {
 
             const e = email.trim();
             if (!e) throw new Error("Email is required");
-            if (!password || password.length < 6) throw new Error("Password must be at least 6 characters");
+            if (!password || password.length < 6)
+              throw new Error("Password must be at least 6 characters");
 
             await signUp(e, password);
 
@@ -54,10 +71,8 @@ export default function SignUpScreen() {
             const hasSession = !!data.session;
 
             if (hasSession) {
-              // Your leagues list is app/(app)/index.tsx => route "/(app)"
               router.replace("/(app)");
             } else {
-              // Confirmation required: send them to sign in (or tell them to confirm email)
               router.replace("/(auth)/sign-in");
             }
           } catch (e: any) {
@@ -79,7 +94,7 @@ export default function SignUpScreen() {
         </Text>
       </Pressable>
 
-      <Link href="/(auth)/sign-in" style={{ marginTop: 8 }}>
+      <Link href="/(auth)/sign-in" style={{ marginTop: 8, color: "rgba(255,255,255,0.85)" }}>
         Back to sign in
       </Link>
     </View>

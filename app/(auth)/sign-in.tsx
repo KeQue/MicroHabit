@@ -12,28 +12,44 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const INPUT_BG = "rgba(255,255,255,0.06)";
+  const INPUT_BORDER = "rgba(255,255,255,0.16)";
+  const TEXT = "#FFFFFF";
+  const PLACEHOLDER = "rgba(255,255,255,0.55)";
+
+  const inputStyle = {
+    borderWidth: 1,
+    borderColor: INPUT_BORDER,
+    backgroundColor: INPUT_BG,
+    padding: 12,
+    borderRadius: 10,
+    color: TEXT,
+  } as const;
+
   return (
     <View style={{ flex: 1, justifyContent: "center", padding: 20, gap: 12 }}>
-      <Text style={{ fontSize: 22, fontWeight: "600" }}>Sign in</Text>
+      <Text style={{ fontSize: 22, fontWeight: "600", color: TEXT }}>Sign in</Text>
 
       <TextInput
         placeholder="Email"
+        placeholderTextColor={PLACEHOLDER}
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 10 }}
+        style={inputStyle}
       />
 
       <TextInput
         placeholder="Password"
+        placeholderTextColor={PLACEHOLDER}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 12, borderRadius: 10 }}
+        style={inputStyle}
       />
 
-      {error ? <Text style={{ color: "red" }}>{error}</Text> : null}
+      {error ? <Text style={{ color: "#FF6B6B" }}>{error}</Text> : null}
 
       <Pressable
         disabled={loading}
@@ -69,7 +85,7 @@ export default function SignInScreen() {
         </Text>
       </Pressable>
 
-      <Link href="/(auth)/sign-up" style={{ marginTop: 8 }}>
+      <Link href="/(auth)/sign-up" style={{ marginTop: 8, color: "rgba(255,255,255,0.85)" }}>
         Create an account
       </Link>
     </View>

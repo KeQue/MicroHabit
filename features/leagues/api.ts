@@ -38,6 +38,7 @@ export type LeagueMember = {
   joined_at: string | null;
   profile: Profile | null;
   display_name: string; // what the UI should show
+  has_profile: boolean;
 };
 
 /**
@@ -187,7 +188,7 @@ export async function getLeagueMembers(
   });
 
   // 3) merge
-  return (members ?? []).map((m: any) => {
+  const merged = (members ?? []).map((m: any) => {
     const profile = byId.get(m.user_id) ?? null;
     return {
       user_id: m.user_id as string,
@@ -195,8 +196,27 @@ export async function getLeagueMembers(
       joined_at: (m.joined_at as string) ?? null,
       profile,
       display_name: displayNameFromProfile(profile),
+      has_profile: profile !== null,
     };
   });
+
+  if (__DEV__) {
+    console.log("[getLeagueMembers] requested user ids", userIds);
+    console.log(
+      "[getLeagueMembers] returned profile ids",
+      (profiles ?? []).map((p: any) => p.id)
+    );
+    console.log(
+      "[getLeagueMembers] merged",
+      merged.map((m) => ({
+        user_id: m.user_id,
+        hasProfile: m.has_profile,
+        display_name: m.display_name,
+      }))
+    );
+  }
+
+  return merged;
 }
 
 /**

@@ -67,8 +67,15 @@ const PALETTE = [
   { colorLight: "#90CDF4", colorDark: "#2B6CB0", accentActive: "#3B82F6" }, // blue
   { colorLight: "#FBD38D", colorDark: "#B7791F", accentActive: "#F59E0B" }, // amber
 ];
-function colorsForIndex(i: number) {
-  return PALETTE[i % PALETTE.length];
+function colorIndexFromUserId(userId: string, paletteSize: number) {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) {
+    h = (h * 31 + userId.charCodeAt(i)) >>> 0;
+  }
+  return h % paletteSize;
+}
+function colorsForUserId(userId: string) {
+  return PALETTE[colorIndexFromUserId(userId, PALETTE.length)];
 }
 
 function toHandle(s?: string | null) {
@@ -200,6 +207,7 @@ export default function LeagueDetailScreen() {
   const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   async function onSignOut() {
@@ -217,6 +225,10 @@ Open MicroHabit → Join → Paste the code`;
   function onInvite() {
     setCopied(false);
     setInviteOpen(true);
+  }
+
+  function onMenu() {
+    setMenuOpen(true);
   }
 
   async function onCopyCode() {
@@ -284,13 +296,18 @@ Open MicroHabit → Join → Paste the code`;
 
       const normalized = rows
         .map((r: any) => {
-          const raw = r.profile?.username || r.profile?.name || r.profile?.email || "user";
-          return { user_id: r.user_id, role: r.role, display: toHandle(raw) };
+          return {
+            user_id: r.user_id,
+            role: r.role,
+            display: toHandle(r.display_name),
+          };
         })
         .sort((a, b) => {
           const rr = roleRank(a.role) - roleRank(b.role);
           if (rr !== 0) return rr;
-          return a.display.localeCompare(b.display);
+          const byDisplay = a.display.localeCompare(b.display);
+          if (byDisplay !== 0) return byDisplay;
+          return a.user_id.localeCompare(b.user_id);
         });
 
       const from = toDateOnlyLocal(startOfMonth(new Date(year, month, 1)));
@@ -314,8 +331,8 @@ Open MicroHabit → Join → Paste the code`;
         arr[idx] = !!row.completed;
       }
 
-      const nextMembers: Member[] = normalized.map((r, idx) => {
-        const c = colorsForIndex(idx);
+      const nextMembers: Member[] = normalized.map((r) => {
+        const c = colorsForUserId(r.user_id);
         return {
           id: r.user_id,
           name: r.display,
@@ -375,6 +392,26 @@ Open MicroHabit → Join → Paste the code`;
       supabase.removeChannel(channel);
     };
   }, [leagueId, year, month, monthDays]);
+
+  useEffect(() => {
+    if (!leagueId) return;
+
+    const channel = supabase
+      .channel(`league_members_${leagueId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "league_members", filter: `league_id=eq.${leagueId}` },
+        () => {
+          load();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leagueId]);
 
   const membersToRender = useMemo((): Member[] => {
     if (viewMode === "Ranking") {
@@ -497,26 +534,52 @@ Open MicroHabit → Join → Paste the code`;
           </Pressable>
         </Modal>
 
-        {/* HEADER: Row 1 (Back/Invite/Sign out) + Row 2 (Title) */}
+        <Modal
+          visible={menuOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMenuOpen(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
+            <Pressable style={styles.menuCard} onPress={() => {}}>
+              <Text style={styles.menuTitle}>Menu</Text>
+              <PillButton
+                label="Back"
+                size="sm"
+                onPress={() => {
+                  setMenuOpen(false);
+                  router.back();
+                }}
+              />
+              <PillButton
+                label="Sign out"
+                size="sm"
+                onPress={async () => {
+                  setMenuOpen(false);
+                  await onSignOut();
+                }}
+              />
+              <PillButton label="Close" size="sm" onPress={() => setMenuOpen(false)} />
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* HEADER */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <View style={styles.headerRowTop3}>
+          <View style={styles.headerBar}>
             <View style={styles.headerSide}>
-              <PillButton label="Back" onPress={() => router.back()} />
+              <PillButton label="☰" onPress={onMenu} />
             </View>
 
-            <View style={styles.headerMid}>
-              {showInvite ? <PillButton label="Invite" size="sm" onPress={onInvite} /> : null}
+            <View style={styles.headerTitleWrap}>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {leagueName ? `League: ${leagueName}` : "League"}
+              </Text>
             </View>
 
             <View style={[styles.headerSide, { alignItems: "flex-end" }]}>
-              <PillButton label="Sign out" size="sm" onPress={onSignOut} />
+              {showInvite ? <PillButton label="Invite" size="sm" onPress={onInvite} /> : null}
             </View>
-          </View>
-
-          <View style={styles.headerCenterBlock}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {leagueName ? `League: ${leagueName}` : "League"}
-            </Text>
           </View>
         </View>
 
@@ -576,27 +639,21 @@ const styles = StyleSheet.create({
     borderBottomColor: UI.border,
   },
 
-  headerRowTop3: {
+  headerBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 10,
   },
   headerSide: {
-    flex: 1,
+    width: 88,
     alignItems: "flex-start",
   },
-  headerMid: {
+  headerTitleWrap: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 40,
-  },
-
-  headerCenterBlock: {
-    marginTop: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
+    minHeight: 44,
   },
 
   headerTitle: {
@@ -733,5 +790,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     textAlign: "center",
+  },
+  menuCard: {
+    width: "100%",
+    maxWidth: 280,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: UI.cardBorder,
+    backgroundColor: UI.cardBg,
+    padding: 16,
+    gap: 10,
+  },
+  menuTitle: {
+    color: UI.text,
+    fontSize: 18,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 4,
   },
 });

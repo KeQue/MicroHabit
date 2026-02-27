@@ -28,10 +28,8 @@ function clamp01(n: number) {
 function computeStreak(days: boolean[], todayIndex?: number) {
   if (!days?.length) return 0;
 
-  // Default: end at last day in array
   let end = days.length - 1;
 
-  // If we know "today", end at today if done, otherwise end at yesterday
   if (typeof todayIndex === "number") {
     if (days[todayIndex]) {
       end = Math.min(todayIndex, days.length - 1);
@@ -49,8 +47,6 @@ function computeStreak(days: boolean[], todayIndex?: number) {
   }
   return s;
 }
-
-/* ---------- COLOR HELPERS (for strong purple gradient) ---------- */
 
 function safeHexToRgb01(hex?: string) {
   if (!hex) return null;
@@ -111,9 +107,9 @@ function hslToRgb(h: number, s: number, l: number) {
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;
 
-  let r1 = 0,
-    g1 = 0,
-    b1 = 0;
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
 
   if (h < 60) [r1, g1, b1] = [c, x, 0];
   else if (h < 120) [r1, g1, b1] = [x, c, 0];
@@ -125,14 +121,11 @@ function hslToRgb(h: number, s: number, l: number) {
   return { r: r1 + m, g: g1 + m, b: b1 + m };
 }
 
-/* 🔥 STRONGER ACCENT */
 function strongerAccent(hex: string) {
   const rgb = safeHexToRgb01(hex);
   if (!rgb) return hex;
 
   const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
-
-  // More punch than before, without blowing out to neon white
   const s2 = clamp01(s * 2.4);
   const l2 = clamp01(l + 0.12);
 
@@ -153,18 +146,14 @@ export function UserCard({
   rank,
 }: Props) {
   const totalDays = days.length;
-
-  // ✅ IMPORTANT: must match Ranking logic exactly (count ALL true values)
   const activeDays = useMemo(() => (days ?? []).filter(Boolean).length, [days]);
 
   const pct = totalDays === 0 ? 0 : activeDays / totalDays;
   const fillPct = clamp01(pct);
-
   const streak = useMemo(() => computeStreak(days, todayIndex), [days, todayIndex]);
 
   const nameStyle = disabled ? styles.nameMuted : styles.name;
   const countStyle = disabled ? styles.countMuted : styles.count;
-
   const isLeader = showRank && rank === 1;
 
   const gradientEnd = strongerAccent(accentActive);
@@ -206,12 +195,18 @@ export function UserCard({
       )}
 
       <View pointerEvents={disabled ? "none" : "auto"}>
-        <UserDayGrid days={days} accentActive={accentActive} onToggle={onToggle} todayIndex={todayIndex} />
+        <UserDayGrid
+          days={days}
+          accentActive={accentActive}
+          onToggle={onToggle}
+          todayIndex={todayIndex}
+        />
       </View>
 
       <View style={styles.streakRow}>
+        <ThemedText style={styles.streakEmoji}>🔥</ThemedText>
         <ThemedText style={styles.streakText}>
-          🔥 Streak: {streak} {streak === 1 ? "day" : "days"}
+          Streak: {streak} {streak === 1 ? "day" : "days"}
         </ThemedText>
       </View>
     </View>
@@ -253,7 +248,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // ✅ Fix username top clipping (give it real vertical breathing room)
   name: {
     fontSize: 30,
     fontWeight: "800",
@@ -296,8 +290,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
 
-  // ✅ More “impressive” bar without changing layout:
-  // subtle glow + slight elevation (Android)
   progressGlow: {
     shadowOpacity: 0.38,
     shadowRadius: 10,
@@ -315,10 +307,20 @@ const styles = StyleSheet.create({
     marginTop: 2,
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+  },
+  streakEmoji: {
+    fontSize: 24,
+    lineHeight: 26,
   },
   streakText: {
-    opacity: 0.65,
-    fontSize: 16,
-    fontWeight: "700",
+    color: "#F4EEFF",
+    opacity: 0.92,
+    fontSize: 18,
+    fontWeight: "800",
+    lineHeight: 22,
+    textShadowColor: "rgba(0,0,0,0.28)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

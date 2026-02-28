@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { getLeagueMembers } from "@/features/leagues/api";
@@ -5,9 +6,10 @@ import { supabase } from "@/lib/supabase";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -29,6 +31,12 @@ type Member = {
   accentActive: string;
   days: boolean[];
   joinedAt?: string;
+};
+
+type RenderedMember = {
+  member: Member;
+  rank?: number;
+  rivalLabel?: string;
 };
 
 // ---------- UI THEME (local to this screen) ----------
@@ -155,8 +163,42 @@ function Segmented({
   value: "My View" | "Ranking";
   onChange: (v: "My View" | "Ranking") => void;
 }) {
+  const thumbAnim = useRef(new Animated.Value(value === "Ranking" ? 1 : 0)).current;
+  const [trackWidth, setTrackWidth] = useState(0);
+
+  useEffect(() => {
+    Animated.spring(thumbAnim, {
+      toValue: value === "Ranking" ? 1 : 0,
+      damping: 18,
+      stiffness: 220,
+      mass: 0.9,
+      useNativeDriver: true,
+    }).start();
+  }, [thumbAnim, value]);
+
+  const thumbWidth = trackWidth > 6 ? (trackWidth - 6) / 2 : 0;
+  const thumbTranslateX = thumbAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, thumbWidth],
+  });
+
   return (
-    <View style={styles.segmentWrap}>
+    <View
+      style={styles.segmentWrap}
+      onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+    >
+      {thumbWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.segmentThumb,
+            {
+              width: thumbWidth,
+              transform: [{ translateX: thumbTranslateX }],
+            },
+          ]}
+        />
+      ) : null}
       {(["My View", "Ranking"] as const).map((k) => {
         const active = value === k;
         return (
@@ -165,7 +207,6 @@ function Segmented({
             onPress={() => onChange(k)}
             style={({ pressed }) => [
               styles.segmentBtn,
-              active && styles.segmentBtnActive,
               pressed && !active && { opacity: 0.9 },
             ]}
             hitSlop={6}
@@ -174,6 +215,27 @@ function Segmented({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+function MemberCardSkeleton() {
+  return (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonHeader}>
+        <View style={styles.skeletonName} />
+        <View style={styles.skeletonCount} />
+      </View>
+      <View style={styles.skeletonBarTrack}>
+        <View style={styles.skeletonBarFill} />
+      </View>
+      <View style={styles.skeletonSub} />
+      <View style={styles.skeletonGrid}>
+        {Array.from({ length: 16 }).map((_, idx) => (
+          <View key={idx} style={styles.skeletonTile} />
+        ))}
+      </View>
+      <View style={styles.skeletonStreak} />
     </View>
   );
 }
@@ -209,6 +271,16 @@ export default function LeagueDetailScreen() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const listAnim = useRef(new Animated.Value(1)).current;
+
+  const rankingSummary = useMemo(() => {
+    if (!members.length) return "";
+    const scores = members.map((m) => scoreDays(m.days));
+    const topScore = Math.max(...scores);
+    return `${members.length} members competing • Top score ${topScore} ${
+      topScore === 1 ? "day" : "days"
+    }`;
+  }, [members]);
 
   async function onSignOut() {
     await supabase.auth.signOut();
@@ -356,6 +428,15 @@ Open MicroHabit → Join → Paste the code`;
   }, [leagueId]);
 
   useEffect(() => {
+    listAnim.setValue(0);
+    Animated.timing(listAnim, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [listAnim, viewMode]);
+
+  useEffect(() => {
     if (!leagueId) return;
 
     const channel = supabase
@@ -413,24 +494,45 @@ Open MicroHabit → Join → Paste the code`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId]);
 
-  const membersToRender = useMemo((): Member[] => {
+  const membersToRender = useMemo((): RenderedMember[] => {
     if (viewMode === "Ranking") {
-      return [...members]
+      const ranked = [...members]
         .map((m) => ({ m, s: scoreDays(m.days) }))
         .sort((a, b) => {
           if (b.s !== a.s) return b.s - a.s;
           const n = a.m.name.localeCompare(b.m.name);
           if (n !== 0) return n;
           return a.m.id.localeCompare(b.m.id);
-        })
-        .map((x) => x.m);
+        });
+
+      return ranked.map((entry, idx) => {
+        const above = ranked[idx - 1];
+        const below = ranked[idx + 1];
+
+        let rivalLabel: string | undefined;
+        if (idx === 0 && below) {
+          const delta = entry.s - below.s;
+          rivalLabel =
+            delta <= 0 ? `Tied with ${below.m.name}` : `+${delta} days ahead of ${below.m.name}`;
+        } else if (above) {
+          const delta = above.s - entry.s;
+          rivalLabel =
+            delta <= 0 ? `Tied with ${above.m.name}` : `${delta} days behind ${above.m.name}`;
+        }
+
+        return {
+          member: entry.m,
+          rank: idx + 1,
+          rivalLabel,
+        };
+      });
     }
 
-    if (!myId) return members;
+    if (!myId) return members.map((member) => ({ member }));
     const i = members.findIndex((m) => m.id === myId);
-    if (i <= 0) return members;
+    if (i <= 0) return members.map((member) => ({ member }));
     const me = members[i];
-    return [me, ...members.slice(0, i), ...members.slice(i + 1)];
+    return [me, ...members.slice(0, i), ...members.slice(i + 1)].map((member) => ({ member }));
   }, [members, myId, viewMode]);
 
   const toggleDayForMember = useCallback(
@@ -565,10 +667,19 @@ Open MicroHabit → Join → Paste the code`;
         </Modal>
 
         {/* HEADER */}
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <View style={styles.headerBar}>
             <View style={styles.headerSide}>
-              <PillButton label="☰" onPress={onMenu} />
+              <Pressable
+                onPress={onMenu}
+                style={({ pressed }) => [
+                  styles.headerIconBtn,
+                  pressed && { backgroundColor: UI.pillBgActive },
+                ]}
+                hitSlop={8}
+              >
+                <Ionicons name="menu" size={22} color={UI.text} />
+              </Pressable>
             </View>
 
             <View style={styles.headerTitleWrap}>
@@ -590,37 +701,60 @@ Open MicroHabit → Join → Paste the code`;
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.topBar}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.activityPill}>
+              <Text style={styles.activityLabel}>Activity</Text>
               <Text style={styles.activityText} numberOfLines={1}>
-                {leagueActivity || " "}
+                {leagueActivity || "Not set"}
               </Text>
             </View>
 
             <Segmented value={viewMode} onChange={setViewMode} />
           </View>
 
+          {viewMode === "Ranking" ? (
+            <Text style={styles.rankSummary}>{rankingSummary}</Text>
+          ) : null}
+
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           {loading ? (
-            <View style={{ paddingTop: 18 }}>
+            <View style={styles.loadingWrap}>
               <ActivityIndicator />
+              <MemberCardSkeleton />
+              <MemberCardSkeleton />
             </View>
           ) : (
-            membersToRender.map((m, idx) => (
-              <UserCard
-                key={m.id}
-                name={m.name}
-                subtitle={m.subtitle}
-                days={m.days}
-                colorDark={m.colorDark}
-                accentActive={m.accentActive}
-                todayIndex={todayIndex}
-                disabled={!!myId && m.id !== myId}
-                onToggle={(i) => toggleDayForMember(m.id, i)}
-                showRank={viewMode === "Ranking"}
-                rank={idx + 1}
-              />
-            ))
+            <Animated.View
+              style={{
+                opacity: listAnim,
+                transform: [
+                  {
+                    translateY: listAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [8, 0],
+                    }),
+                  },
+                ],
+              }}
+            >
+              {membersToRender.map(({ member, rank, rivalLabel }) => (
+                <View key={member.id} style={styles.memberCardWrap}>
+                  <UserCard
+                    name={member.name}
+                    subtitle={member.subtitle}
+                    days={member.days}
+                    colorDark={member.colorDark}
+                    accentActive={member.accentActive}
+                    todayIndex={todayIndex}
+                    disabled={!!myId && member.id !== myId}
+                    onToggle={(i) => toggleDayForMember(member.id, i)}
+                    showRank={viewMode === "Ranking"}
+                    rank={rank}
+                    rivalLabel={rivalLabel}
+                  />
+                </View>
+              ))}
+            </Animated.View>
           )}
         </ScrollView>
       </LinearGradient>
@@ -634,7 +768,7 @@ const styles = StyleSheet.create({
 
   header: {
     paddingHorizontal: 14,
-    paddingBottom: 12,
+    paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: UI.border,
   },
@@ -649,6 +783,16 @@ const styles = StyleSheet.create({
     width: 88,
     alignItems: "flex-start",
   },
+  headerIconBtn: {
+    minWidth: 46,
+    minHeight: 46,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: UI.pillBorder,
+    backgroundColor: UI.pillBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitleWrap: {
     flex: 1,
     alignItems: "center",
@@ -659,7 +803,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     textAlign: "center",
     color: UI.text,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     letterSpacing: 0.2,
     maxWidth: "100%",
@@ -688,27 +832,139 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, gap: 14, paddingBottom: 32 },
 
-  topBar: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 2 },
-  activityText: { color: UI.muted, fontSize: 16, fontWeight: "600" },
+  topBar: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 0 },
+  rankSummary: {
+    color: "rgba(237,231,255,0.58)",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.1,
+  },
+  activityPill: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: "center",
+    gap: 2,
+  },
+  activityLabel: {
+    color: "rgba(237,231,255,0.48)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  activityText: { color: UI.text, fontSize: 16, fontWeight: "700" },
 
   segmentWrap: {
+    position: "relative",
     flexDirection: "row",
+    width: 210,
     borderRadius: 999,
     padding: 3,
+    overflow: "hidden",
     backgroundColor: UI.segmentBg,
     borderWidth: 1,
     borderColor: UI.segmentBorder,
   },
-  segmentBtn: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999 },
-  segmentBtnActive: {
+  segmentThumb: {
+    position: "absolute",
+    top: 3,
+    left: 3,
+    bottom: 3,
     backgroundColor: UI.segmentActiveBg,
     borderWidth: 1,
     borderColor: UI.segmentActiveBorder,
+    borderRadius: 999,
+    shadowColor: "rgba(162,89,255,0.45)",
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
   },
   segmentText: { color: UI.muted, fontWeight: "700", fontSize: 14 },
   segmentTextActive: { color: UI.text },
 
   errorText: { color: UI.error, fontSize: 14, fontWeight: "600" },
+  loadingWrap: {
+    paddingTop: 18,
+    gap: 14,
+  },
+  skeletonCard: {
+    borderRadius: 20,
+    padding: 14,
+    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
+  },
+  skeletonHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  skeletonName: {
+    width: 140,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  skeletonCount: {
+    width: 52,
+    height: 18,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+  skeletonBarTrack: {
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    overflow: "hidden",
+  },
+  skeletonBarFill: {
+    width: "28%",
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  skeletonSub: {
+    width: 120,
+    height: 18,
+    borderRadius: 8,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    maxWidth: 13 * (28 + 8),
+  },
+  skeletonTile: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  skeletonStreak: {
+    width: "42%",
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+  memberCardWrap: {
+    marginBottom: 10,
+  },
 
   // Modal styles
   modalOverlay: {

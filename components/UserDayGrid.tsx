@@ -1,47 +1,45 @@
-import React, { useMemo } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import React, { useMemo, useRef, useState } from "react";
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
   days: boolean[];
   onToggle: (dayIndex: number) => void;
   todayIndex?: number;
 
-  // per-user active accent (square fill when done)
   accentActive: string;
-
-  // NEW: days before this index are locked (not tappable + darker)
   minActiveIndex?: number;
 
-  // still accepted if you want to keep API compatibility elsewhere
   colorLight?: string;
   colorDark?: string;
 };
 
 const NUM_COLS = 13;
-
-// keep size as-is (do not change number font visuals)
 const SQUARE = 28;
-
-// spacing increase (requested)
 const GAP = 8;
-
-// slightly rounder (subtle)
 const RADIUS = 7;
-
-// Today highlight: white border only + glow
 const TODAY_BORDER = 2;
 
-// Past inactive
 const INACTIVE_BG = "#2B2B33";
 const INACTIVE_TEXT = "rgba(255,255,255,0.55)";
 
-// Locked (joined mid-month, before join date)
 const LOCKED_BG = "#15151C";
 const LOCKED_TEXT = "rgba(255,255,255,0.22)";
 
-// Future
 const FUTURE_BG = "#0B0B10";
 const FUTURE_TEXT = "rgba(255,255,255,0.22)";
+
+const CONFETTI_PIECES = [
+  { dx: -26, dy: -24, rotate: "-24deg", size: 5, color: "#FFD666" },
+  { dx: -18, dy: -30, rotate: "18deg", size: 4, color: "#FFFFFF" },
+  { dx: -10, dy: -34, rotate: "-12deg", size: 4, color: "#7CFFB2" },
+  { dx: 0, dy: -36, rotate: "0deg", size: 5, color: "#8B5CFF" },
+  { dx: 10, dy: -34, rotate: "14deg", size: 4, color: "#FF8AC6" },
+  { dx: 18, dy: -30, rotate: "-16deg", size: 4, color: "#6FB4FF" },
+  { dx: 26, dy: -24, rotate: "22deg", size: 5, color: "#FFD666" },
+  { dx: -22, dy: -14, rotate: "34deg", size: 3, color: "#FFFFFF" },
+  { dx: 22, dy: -14, rotate: "-34deg", size: 3, color: "#FFFFFF" },
+];
 
 type DayVisual = {
   bg: string;
@@ -51,7 +49,6 @@ type DayVisual = {
   isFuture: boolean;
 };
 
-// --- safe helpers (never crash) ---
 function clamp01(n: number) {
   return Math.min(1, Math.max(0, n));
 }
@@ -110,9 +107,9 @@ function hslToRgb(h: number, s: number, l: number) {
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = l - c / 2;
 
-  let r1 = 0,
-    g1 = 0,
-    b1 = 0;
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
 
   if (0 <= h && h < 60) [r1, g1, b1] = [c, x, 0];
   else if (60 <= h && h < 120) [r1, g1, b1] = [x, c, 0];
@@ -124,24 +121,26 @@ function hslToRgb(h: number, s: number, l: number) {
   return { r: r1 + m, g: g1 + m, b: b1 + m };
 }
 
-// Strong boost so accents "pop" on small tiles
 function boostActiveColor(hex?: string) {
   const rgb = safeHexToRgb01(hex);
   if (!rgb) return hex ?? "#00C853";
 
   const { h, s, l } = rgbToHsl(rgb.r, rgb.g, rgb.b);
-
-  const SAT_MULT = 1.5;
-  const LIGHT_ADD = 0.06;
-
-  const s2 = clamp01(s * SAT_MULT);
-  const l2 = clamp01(l + LIGHT_ADD);
+  const s2 = clamp01(s * 1.5);
+  const l2 = clamp01(l + 0.06);
 
   const out = hslToRgb(h, s2, l2);
   return rgb01ToHex(out.r, out.g, out.b);
 }
 
 export function UserDayGrid({ days, onToggle, todayIndex, accentActive, minActiveIndex }: Props) {
+  const [burstState, setBurstState] = useState<{ seed: number; dayIndex: number | null }>({
+    seed: 0,
+    dayIndex: null,
+  });
+  const tileScale = useRef(days.map(() => new Animated.Value(1))).current;
+  const burstAnim = useRef(new Animated.Value(0)).current;
+
   const isTodayStreak = useMemo(() => {
     if (todayIndex === undefined) return false;
     if (todayIndex <= 0) return false;
@@ -149,6 +148,38 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive, minActiv
   }, [days, todayIndex]);
 
   const activeBg = boostActiveColor(accentActive);
+
+  const triggerTilePop = (dayIndex: number) => {
+    const scale = tileScale[dayIndex];
+    if (!scale) return;
+    scale.stopAnimation();
+    scale.setValue(1);
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: 0.94,
+        duration: 70,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 4,
+        tension: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const triggerBurst = (dayIndex: number) => {
+    burstAnim.stopAnimation();
+    burstAnim.setValue(0);
+    setBurstState((prev) => ({ seed: prev.seed + 1, dayIndex }));
+    Animated.timing(burstAnim, {
+      toValue: 1,
+      duration: 820,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
 
   const resolveVisual = (dayIndex: number, isDone: boolean): DayVisual => {
     const locked = minActiveIndex !== undefined && dayIndex < minActiveIndex;
@@ -202,43 +233,128 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive, minActiv
     };
   };
 
+  const burstOpacity = burstAnim.interpolate({
+    inputRange: [0, 0.12, 1],
+    outputRange: [0, 1, 0],
+  });
+
   return (
     <View style={styles.grid}>
       {days.map((isDone, dayIndex) => {
         const isToday = todayIndex === dayIndex;
         const visual = resolveVisual(dayIndex, isDone);
-
-        // ✅ UI reinforcement: future tiles are not tappable
         const isFuture = todayIndex !== undefined && dayIndex > todayIndex;
-
-        // ✅ joined-mid-month lock
         const isLocked = minActiveIndex !== undefined && dayIndex < minActiveIndex;
+
+        const handlePress =
+          isFuture || isLocked
+            ? undefined
+            : async () => {
+                triggerTilePop(dayIndex);
+                const allowBurst =
+                  typeof todayIndex === "number" &&
+                  (dayIndex === todayIndex || dayIndex === todayIndex - 1);
+                if (!isDone && allowBurst) {
+                  triggerBurst(dayIndex);
+                }
+                if (isToday && !isDone) {
+                  await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                } else {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }
+                onToggle(dayIndex);
+              };
 
         return (
           <Pressable
             key={dayIndex}
-            onPress={isFuture || isLocked ? undefined : () => onToggle(dayIndex)}
+            onPress={handlePress}
             hitSlop={0}
-            // polish: don't dim future/locked days on press (they already look disabled-ish)
             style={({ pressed }) => [
               styles.pressable,
               pressed && !isToday && !isFuture && !isLocked && { opacity: 0.92 },
             ]}
           >
-            <View
-              style={[
-                styles.tile,
-                { backgroundColor: visual.bg },
-                visual.doneDepth && styles.doneDepth,
-                isToday && styles.todayTile,
-              ]}
-            >
-              {isToday && isTodayStreak && <View style={styles.streakDot} />}
+            <Animated.View style={{ transform: [{ scale: tileScale[dayIndex] ?? 1 }] }}>
+              <View
+                style={[
+                  styles.tile,
+                  { backgroundColor: visual.bg },
+                  visual.doneDepth && styles.doneDepth,
+                  isToday && styles.todayTile,
+                ]}
+              >
+                {isToday && isTodayStreak && <View style={styles.streakDot} />}
 
-              <Text style={[styles.dayNumber, { color: visual.text, fontWeight: visual.fontWeight }]}>
-                {dayIndex + 1}
-              </Text>
-            </View>
+                <Text style={[styles.dayNumber, { color: visual.text, fontWeight: visual.fontWeight }]}>
+                  {dayIndex + 1}
+                </Text>
+              </View>
+            </Animated.View>
+
+            {burstState.dayIndex === dayIndex && burstState.seed > 0 ? (
+              <View pointerEvents="none" style={styles.burstLayer}>
+                {CONFETTI_PIECES.map((piece, index) => {
+                  const progress = burstAnim;
+                  const driftX = progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, piece.dx],
+                  });
+                  const driftY = progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, piece.dy],
+                  });
+                  const scale = progress.interpolate({
+                    inputRange: [0, 0.15, 1],
+                    outputRange: [0.35, 1, 0.7],
+                  });
+                  const spin = progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["0deg", piece.rotate],
+                  });
+
+                  return (
+                    <Animated.View
+                      key={`${burstState.seed}-${index}`}
+                      style={[
+                        styles.confettiPiece,
+                        {
+                          width: piece.size,
+                          height: piece.size * 2.2,
+                          backgroundColor: piece.color,
+                          opacity: burstOpacity,
+                          transform: [
+                            { translateX: driftX },
+                            { translateY: driftY },
+                            { scale },
+                            { rotate: spin },
+                          ],
+                        },
+                      ]}
+                    />
+                  );
+                })}
+                <Animated.View
+                  style={[
+                    styles.burstGlow,
+                    {
+                      opacity: burstAnim.interpolate({
+                        inputRange: [0, 0.2, 1],
+                        outputRange: [0, 0.28, 0],
+                      }),
+                      transform: [
+                        {
+                          scale: burstAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.5, 2.1],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </View>
+            ) : null}
           </Pressable>
         );
       })}
@@ -257,8 +373,8 @@ const styles = StyleSheet.create({
   pressable: {
     width: SQUARE,
     height: SQUARE,
+    position: "relative",
   },
-
   tile: {
     width: SQUARE,
     height: SQUARE,
@@ -268,8 +384,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: INACTIVE_BG,
   },
-
-  // subtle depth only for DONE tiles
   doneDepth: {
     ...Platform.select({
       ios: {
@@ -283,12 +397,10 @@ const styles = StyleSheet.create({
     }),
   },
 
-  // Today: ONLY white border + soft glow (no fog / no extra layers)
-  // polish: keep border crisp + consistent rounding
   todayTile: {
     borderWidth: TODAY_BORDER,
     borderColor: "rgba(255,255,255,0.85)",
-    borderRadius: RADIUS, // keep consistent rounding with border
+    borderRadius: RADIUS,
     ...Platform.select({
       ios: {
         shadowColor: "rgba(255,255,255,0.25)",
@@ -301,8 +413,30 @@ const styles = StyleSheet.create({
     }),
   },
 
+  burstLayer: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: SQUARE,
+    height: SQUARE,
+    alignItems: "center",
+    justifyContent: "center",
+    pointerEvents: "none",
+  },
+  confettiPiece: {
+    position: "absolute",
+    borderRadius: 2,
+  },
+  burstGlow: {
+    position: "absolute",
+    width: 16,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.9)",
+  },
+
   dayNumber: {
-    fontSize: 11, // keep same
+    fontSize: 11,
     zIndex: 2,
   },
 

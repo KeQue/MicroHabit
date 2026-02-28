@@ -1,13 +1,17 @@
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { ensureProfileForCurrentUser } from "../../features/auth/profile";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
 import { supabase } from "../../lib/supabase";
 
@@ -23,6 +27,14 @@ function normalizeErr(e: any): string {
   return e?.message || e?.error_description || e?.hint || JSON.stringify(e);
 }
 
+function planLabel(isFreeSelected: boolean, selectedPlanTier: PlanTier | null) {
+  if (isFreeSelected) return "Free";
+  if (selectedPlanTier === "A") return "Plus";
+  if (selectedPlanTier === "B") return "Circle";
+  if (selectedPlanTier === "C") return "Team";
+  return "Choose a plan";
+}
+
 export default function LeaguesScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -33,33 +45,23 @@ export default function LeaguesScreen() {
     return null;
   }, [params.planTier]);
 
-  const isFreeFromParams = useMemo(() => {
-    const v = params.isFree;
-    return v === "1";
-  }, [params.isFree]);
-
+  const isFreeFromParams = useMemo(() => params.isFree === "1", [params.isFree]);
   const lastConsumedSelection = useRef<string | null>(null);
 
   const [selectedPlanTier, setSelectedPlanTier] = useState<PlanTier | null>(null);
-  const [isFreeSelected, setIsFreeSelected] = useState<boolean>(false);
-
+  const [isFreeSelected, setIsFreeSelected] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-
   const [leagues, setLeagues] = useState<League[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
-
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newActivity, setNewActivity] = useState("");
 
   async function resolveUser() {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    const u = data.user;
+    const u = await ensureProfileForCurrentUser();
     if (!u) throw new Error("Not authenticated");
     setUserId(u.id);
     return u.id;
@@ -72,9 +74,7 @@ export default function LeaguesScreen() {
       .eq("id", uid)
       .single();
 
-    // If profile row missing, treat as free (PostgREST often returns 406)
     if (error && status !== 406) throw error;
-
     const t = (data?.plan_tier ?? "free") as UserTier;
     return t || "free";
   }
@@ -99,7 +99,6 @@ export default function LeaguesScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Consume plan selection params once and open the create form
   useEffect(() => {
     if (params.isFree == null && params.planTier == null) return;
 
@@ -127,17 +126,14 @@ export default function LeaguesScreen() {
       setCreating(true);
       creatingRef.current = true;
 
-      // ✅ Validate selection BEFORE any DB/RPC work
       if (!isFreeSelected && !selectedPlanTier) {
         throw new Error("Please choose a plan first");
       }
 
       const uid = userId ?? (await resolveUser());
 
-      // ✅ Paid league: require a paid tier stored in profiles
       if (!isFreeSelected) {
         const myTier = await getMyTier(uid);
-
         if (myTier === "free") {
           router.push({
             pathname: "/(app)/paywall",
@@ -160,7 +156,7 @@ export default function LeaguesScreen() {
           name: newName,
           activity: newActivity,
           isFree: isFreeSelected,
-          planTier: isFreeSelected ? null : selectedPlanTier, // "A" | "B" | "C"
+          planTier: isFreeSelected ? null : selectedPlanTier,
           monthKey: getMonthKey(),
         }),
         timeout,
@@ -173,14 +169,9 @@ export default function LeaguesScreen() {
       setIsFreeSelected(false);
 
       await load();
-
-      // ✅ IMPORTANT: correct absolute route to app/(app)/league/[leagueId].tsx
       router.push(`/(app)/league/${league.id}`);
     } catch (e: any) {
       const msg = normalizeErr(e);
-      console.log("Create league error:", e);
-
-      // ✅ If backend still blocks paid creation, route to paywall instead of just showing red error
       if (msg.toLowerCase().includes("payment required")) {
         router.push({
           pathname: "/(app)/paywall",
@@ -188,7 +179,6 @@ export default function LeaguesScreen() {
         });
         return;
       }
-
       setError(msg);
     } finally {
       setCreating(false);
@@ -206,176 +196,416 @@ export default function LeaguesScreen() {
     router.push({ pathname: "/league/choose-plan", params: { source: "create" } });
   }
 
-  return (
-    <View style={{ flex: 1, padding: 20, paddingTop: 70, backgroundColor: "#0B0F14" }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Text style={{ fontSize: 28, fontWeight: "700", color: "white" }}>Leagues</Text>
+  function resetCreate() {
+    setShowCreate(false);
+    setSelectedPlanTier(null);
+    setIsFreeSelected(false);
+    setNewName("");
+    setNewActivity("");
+    setError(null);
+  }
 
-        <Pressable onPress={onSignOut} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
-          <Text style={{ color: "#A7B0BC" }}>Sign out</Text>
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.select({ ios: "padding", android: undefined })}
+      style={styles.screen}
+    >
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.title}>Leagues</Text>
+          <Text style={styles.subtitle}>Create or join a league.</Text>
+        </View>
+
+        <Pressable onPress={onSignOut} style={styles.headerGhostBtn}>
+          <Text style={styles.headerGhostText}>Sign out</Text>
         </Pressable>
       </View>
 
-      <Text style={{ marginTop: 8, fontSize: 16, color: "#A7B0BC" }}>
-        Create or join a league.
-      </Text>
-
       {error ? (
-        <View
-          style={{
-            marginTop: 12,
-            padding: 12,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: "#7F1D1D",
-            backgroundColor: "#2A0E0E",
-          }}
-        >
-          <Text style={{ color: "#FCA5A5" }}>{error}</Text>
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
 
-      <View style={{ marginTop: 24, gap: 12 }}>
-        <Pressable
-          onPress={onStartCreate}
-          style={{ padding: 16, borderRadius: 14, backgroundColor: "#1A2430" }}
-        >
-          <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
-            + Create league
+      <View style={styles.actionStack}>
+        <Pressable onPress={onStartCreate} style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}>
+          <Text style={styles.actionTitle}>{showCreate ? "Change plan" : "+ Create a league"}</Text>
+          <Text style={styles.actionSubtitle}>
+            {showCreate ? "Pick a different plan before creating." : "Start a new accountability group."}
           </Text>
         </Pressable>
 
-        {showCreate ? (
-          <View style={{ gap: 10, padding: 14, borderRadius: 14, backgroundColor: "#111827" }}>
-            <Text style={{ color: "#A7B0BC" }}>
-              Selected plan:{" "}
-              <Text style={{ color: "white", fontWeight: "800" }}>
-                {isFreeSelected ? "FREE" : (selectedPlanTier ?? "—")}
-              </Text>
-            </Text>
+        {!showCreate ? (
+          <Pressable
+            onPress={() => router.push("/(app)/league/join")}
+            style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
+          >
+            <Text style={styles.actionTitle}>Join with code</Text>
+            <Text style={styles.actionSubtitle}>Jump into an existing league in seconds.</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
-            <Text style={{ color: "#A7B0BC" }}>League name</Text>
+      {showCreate ? (
+        <View style={styles.createCard}>
+          <View style={styles.createHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.createEyebrow}>CREATE A LEAGUE</Text>
+              <Text style={styles.createTitle}>Name your league</Text>
+            </View>
+
+            <View style={styles.planChip}>
+              <Text style={styles.planChipText}>{planLabel(isFreeSelected, selectedPlanTier)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>League name</Text>
             <TextInput
               value={newName}
               onChangeText={(t) => {
                 setNewName(t);
                 if (error) setError(null);
               }}
-              placeholder="e.g. January Push"
-              placeholderTextColor="#6B7280"
+              placeholder="e.g. April consistency club"
+              placeholderTextColor="#64748B"
               autoCapitalize="sentences"
-              style={{
-                borderWidth: 1,
-                borderColor: "#1F2937",
-                padding: 12,
-                borderRadius: 12,
-                color: "white",
-              }}
+              style={styles.input}
             />
+          </View>
 
-            <Text style={{ color: "#A7B0BC", marginTop: 6 }}>
-              Activity (max 40 chars) — {newActivity.length}/40
-            </Text>
+          <View style={styles.fieldBlock}>
+            <View style={styles.fieldLabelRow}>
+              <Text style={styles.fieldLabel}>Activity</Text>
+              <Text style={styles.fieldCount}>{newActivity.length}/40</Text>
+            </View>
             <TextInput
               value={newActivity}
               onChangeText={(t) => {
                 setNewActivity(t.slice(0, 40));
                 if (error) setError(null);
               }}
-              placeholder="e.g. Gym / Run / Reading"
-              placeholderTextColor="#6B7280"
+              placeholder="e.g. Gym, walking, reading"
+              placeholderTextColor="#64748B"
               autoCapitalize="sentences"
-              style={{
-                borderWidth: 1,
-                borderColor: "#1F2937",
-                padding: 12,
-                borderRadius: 12,
-                color: "white",
-              }}
+              style={styles.input}
             />
-
-            <Pressable
-              onPress={onCreate}
-              disabled={!canSubmit}
-              style={{
-                padding: 14,
-                borderRadius: 12,
-                backgroundColor: !canSubmit ? "#0F172A" : "#1A2430",
-                borderWidth: 1,
-                borderColor: "#1F2937",
-                opacity: !canSubmit ? 0.6 : 1,
-              }}
-            >
-              <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
-                {creating ? "Creating..." : "Create"}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                setShowCreate(false);
-                setSelectedPlanTier(null);
-                setIsFreeSelected(false);
-                setNewName("");
-                setNewActivity("");
-                setError(null);
-              }}
-            >
-              <Text style={{ color: "#A7B0BC", textAlign: "center" }}>Cancel</Text>
-            </Pressable>
           </View>
-        ) : null}
 
-        <Link href="/(app)/league/join" asChild>
-          <Pressable style={{ padding: 16, borderRadius: 14, backgroundColor: "#1A2430" }}>
-            <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>
-              🔑 Join with code
-            </Text>
+          <Pressable
+            onPress={onCreate}
+            disabled={!canSubmit}
+            style={({ pressed }) => [
+              styles.createBtn,
+              !canSubmit && styles.createBtnDisabled,
+              pressed && canSubmit && styles.createBtnPressed,
+            ]}
+          >
+            <Text style={styles.createBtnText}>{creating ? "Creating..." : "Create league"}</Text>
           </Pressable>
-        </Link>
 
-        <Pressable onPress={load}>
-          <Text style={{ color: "#A7B0BC" }}>Refresh</Text>
-        </Pressable>
-      </View>
+          <Pressable onPress={resetCreate} style={styles.cancelInlineBtn}>
+            <Text style={styles.cancelInlineText}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
-      <View style={{ marginTop: 18, flex: 1 }}>
+      <View style={styles.listWrap}>
         {loading ? (
-          <View style={{ marginTop: 20 }}>
+          <View style={styles.loadingState}>
             <ActivityIndicator />
           </View>
         ) : leagues.length === 0 ? (
-          <Text style={{ color: "#A7B0BC" }}>No leagues yet. Create one or join.</Text>
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No leagues yet</Text>
+            <Text style={styles.emptyText}>Your leagues will show up here once you create or join one.</Text>
+            <Pressable onPress={load} style={styles.emptyRefreshBtn}>
+              <Text style={styles.emptyRefreshText}>Refresh</Text>
+            </Pressable>
+          </View>
         ) : (
-          <FlatList
-            data={leagues}
-            keyExtractor={(l) => l.id}
-            contentContainerStyle={{ gap: 12 }}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => router.push(`/(app)/league/${item.id}`)}
-                style={{
-                  padding: 16,
-                  borderRadius: 14,
-                  backgroundColor: "#111827",
-                  borderWidth: 1,
-                  borderColor: "#1F2937",
-                }}
-              >
-                <Text style={{ color: "white", fontSize: 16, fontWeight: "700" }}>
-                  {item.name ?? "Untitled league"}
-                </Text>
-
-                {item.activity ? (
-                  <Text style={{ marginTop: 6, color: "#A7B0BC" }}>
-                    {item.activity}
-                  </Text>
-                ) : null}
+          <>
+            <View style={styles.listHeader}>
+              <Text style={styles.listHeaderText}>Your leagues</Text>
+              <Pressable onPress={load} style={styles.inlineRefreshBtn}>
+                <Text style={styles.inlineRefreshText}>Refresh</Text>
               </Pressable>
-            )}
-          />
+            </View>
+
+            <FlatList
+              data={leagues}
+              keyExtractor={(l) => l.id}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => router.push(`/(app)/league/${item.id}`)}
+                  style={({ pressed }) => [
+                    styles.leagueCard,
+                    pressed && styles.actionPressed,
+                  ]}
+                >
+                  <Text style={styles.leagueName}>{item.name ?? "Untitled league"}</Text>
+                  {item.activity ? <Text style={styles.leagueActivity}>{item.activity}</Text> : null}
+                </Pressable>
+              )}
+            />
+          </>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 70,
+    paddingBottom: 20,
+    backgroundColor: "#0B0F14",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  title: {
+    fontSize: 40,
+    fontWeight: "900",
+    color: "white",
+    letterSpacing: -0.8,
+  },
+  subtitle: {
+    marginTop: 8,
+    fontSize: 17,
+    lineHeight: 23,
+    color: "#A7B0BC",
+  },
+  headerGhostBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 2,
+    marginTop: 6,
+  },
+  headerGhostText: {
+    color: "#C8D0DB",
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  errorBox: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#7F1D1D",
+    backgroundColor: "#2A0E0E",
+  },
+  errorText: {
+    color: "#FCA5A5",
+    lineHeight: 20,
+  },
+  actionStack: {
+    marginTop: 24,
+    gap: 12,
+  },
+  actionCard: {
+    padding: 18,
+    borderRadius: 18,
+    backgroundColor: "#162131",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    gap: 6,
+  },
+  actionPressed: {
+    opacity: 0.92,
+  },
+  actionTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  actionSubtitle: {
+    color: "#A7B0BC",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  createCard: {
+    marginTop: 14,
+    borderRadius: 22,
+    padding: 16,
+    gap: 14,
+    backgroundColor: "#101826",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  createHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  createEyebrow: {
+    color: "rgba(237,231,255,0.48)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+  },
+  createTitle: {
+    marginTop: 4,
+    color: "white",
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  planChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(162,89,255,0.34)",
+    backgroundColor: "rgba(162,89,255,0.12)",
+  },
+  planChipText: {
+    color: "#EDE7FF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  fieldBlock: {
+    gap: 8,
+  },
+  fieldLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  fieldLabel: {
+    color: "#A7B0BC",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  fieldCount: {
+    color: "rgba(237,231,255,0.48)",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#1F2937",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    paddingHorizontal: 13,
+    paddingVertical: 13,
+    borderRadius: 14,
+    color: "white",
+    fontSize: 16,
+  },
+  createBtn: {
+    marginTop: 2,
+    paddingVertical: 15,
+    borderRadius: 16,
+    backgroundColor: "rgba(162,89,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(162,89,255,0.4)",
+    alignItems: "center",
+  },
+  createBtnPressed: {
+    backgroundColor: "rgba(162,89,255,0.24)",
+  },
+  createBtnDisabled: {
+    opacity: 0.55,
+  },
+  createBtnText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  cancelInlineBtn: {
+    paddingVertical: 4,
+  },
+  cancelInlineText: {
+    color: "#A7B0BC",
+    textAlign: "center",
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  listWrap: {
+    marginTop: 18,
+    flex: 1,
+  },
+  loadingState: {
+    marginTop: 24,
+    alignItems: "center",
+  },
+  emptyCard: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 8,
+    backgroundColor: "rgba(16,24,38,0.58)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.04)",
+  },
+  emptyTitle: {
+    color: "rgba(237,231,255,0.88)",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  emptyText: {
+    color: "rgba(167,176,188,0.88)",
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  emptyRefreshBtn: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.02)",
+  },
+  emptyRefreshText: {
+    color: "rgba(237,231,255,0.78)",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  listHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  listHeaderText: {
+    color: "rgba(237,231,255,0.72)",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  inlineRefreshBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  inlineRefreshText: {
+    color: "#A7B0BC",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  listContent: {
+    gap: 12,
+    paddingBottom: 16,
+  },
+  leagueCard: {
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#1F2937",
+  },
+  leagueName: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  leagueActivity: {
+    marginTop: 6,
+    color: "#A7B0BC",
+    fontSize: 14,
+  },
+});

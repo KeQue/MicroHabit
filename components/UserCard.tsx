@@ -174,7 +174,7 @@ function rankIcon(rank?: number) {
 function streakMood(streak: number) {
   if (streak >= 7) return "Unstoppable";
   if (streak >= 3) return "On fire";
-  return "Warming up";
+  return "Just getting started";
 }
 
 export function UserCard({
@@ -195,11 +195,17 @@ export function UserCard({
   const fillPct = totalDays === 0 ? 0 : clamp01(activeDays / totalDays);
   const streak = useMemo(() => computeStreak(days, todayIndex), [days, todayIndex]);
 
+  const isEmpty = activeDays === 0;
   const nameStyle = disabled ? styles.nameMuted : styles.name;
-  const countStyle = disabled ? styles.countMuted : styles.count;
+  const countStyle = isEmpty
+    ? disabled
+      ? styles.countEmptyMuted
+      : styles.countEmpty
+    : disabled
+      ? styles.countMuted
+      : styles.count;
   const isLeader = showRank && rank === 1;
   const isPrimaryCard = !disabled && !showRank;
-  const isEmpty = activeDays === 0;
   const rankAccent = showRank ? rankTheme(rank) : null;
   const medal = showRank ? rankIcon(rank) : null;
 
@@ -353,7 +359,7 @@ export function UserCard({
         <View style={styles.emptyRow}>
           <View style={[styles.emptyDot, { backgroundColor: accentActive }]} />
           <ThemedText style={styles.emptyText}>
-            {isPrimaryCard ? "Tap today to kick off your streak." : "No check-ins yet this month."}
+            {isPrimaryCard ? "Tap today to start your first check-in." : "No check-ins yet this month."}
           </ThemedText>
         </View>
       ) : null}
@@ -456,10 +462,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     opacity: 0.75,
   },
+  countEmpty: {
+    fontSize: 14,
+    fontWeight: "700",
+    opacity: 0.4,
+  },
   countMuted: {
     fontSize: 16,
     fontWeight: "800",
     opacity: 0.65,
+  },
+  countEmptyMuted: {
+    fontSize: 14,
+    fontWeight: "700",
+    opacity: 0.34,
   },
 
   rivalRow: {

@@ -26,7 +26,7 @@ type PlanTier = "A" | "B" | "C";
 type Member = {
   id: string; // user_id
   name: string; // handle
-  subtitle: string; // activity
+  subtitle?: string; // optional per-card meta
   colorLight: string;
   colorDark: string;
   accentActive: string;
@@ -170,9 +170,11 @@ function PillButton({
 function Segmented({
   value,
   onChange,
+  compact = false,
 }: {
   value: "My View" | "Ranking";
   onChange: (v: "My View" | "Ranking") => void;
+  compact?: boolean;
 }) {
   const thumbAnim = useRef(new Animated.Value(value === "Ranking" ? 1 : 0)).current;
   const [trackWidth, setTrackWidth] = useState(0);
@@ -195,7 +197,7 @@ function Segmented({
 
   return (
     <View
-      style={styles.segmentWrap}
+      style={[styles.segmentWrap, compact && styles.segmentWrapCompact]}
       onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
     >
       {thumbWidth > 0 ? (
@@ -218,11 +220,20 @@ function Segmented({
             onPress={() => onChange(k)}
             style={({ pressed }) => [
               styles.segmentBtn,
+              compact && styles.segmentBtnCompact,
               pressed && !active && { opacity: 0.9 },
             ]}
             hitSlop={6}
           >
-            <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{k}</Text>
+            <Text
+              style={[
+                styles.segmentText,
+                compact && styles.segmentTextCompact,
+                active && styles.segmentTextActive,
+              ]}
+            >
+              {k}
+            </Text>
           </Pressable>
         );
       })}
@@ -289,7 +300,8 @@ export default function LeagueDetailScreen() {
     if (!members.length) return "";
     const scores = members.map((m) => scoreDays(m.days));
     const topScore = Math.max(...scores);
-    return `${members.length} members competing • Top score ${topScore} ${
+    const memberLabel = members.length === 1 ? "member" : "members";
+    return `${members.length} ${memberLabel} competing • Most check-ins this month: ${topScore} ${
       topScore === 1 ? "day" : "days"
     }`;
   }, [members]);
@@ -318,7 +330,7 @@ export default function LeagueDetailScreen() {
     if (totalCheckIns === 0) {
       return {
         countText: "0 check-ins",
-        strongestDay: "No standout day yet",
+        strongestDay: "Your first check-in sets the week",
       };
     }
 
@@ -459,7 +471,7 @@ Open MicroHabit → Join → Paste the code`;
         return {
           id: r.user_id,
           name: r.display,
-          subtitle: leagueRow?.activity ?? "",
+          subtitle: undefined,
           ...c,
           days: daysByUser.get(r.user_id) ?? Array(monthDays).fill(false),
         };
@@ -744,15 +756,29 @@ Open MicroHabit → Join → Paste the code`;
             </View>
 
             <View style={styles.headerTitleWrap}>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                {leagueName ? `League: ${leagueName}` : "League"}
-              </Text>
+              <Segmented value={viewMode} onChange={setViewMode} compact />
             </View>
 
             <View style={[styles.headerSide, { alignItems: "flex-end" }]}>
               {showInvite ? <PillButton label="Invite" size="sm" onPress={onInvite} /> : null}
             </View>
           </View>
+
+          {leagueName ? (
+            <Text
+              style={[
+                styles.headerName,
+                leagueName.length > 40
+                  ? styles.headerNameLong
+                  : leagueName.length > 24
+                    ? styles.headerNameMedium
+                    : null,
+              ]}
+              numberOfLines={2}
+            >
+              {leagueName}
+            </Text>
+          ) : null}
         </View>
 
         <ScrollView
@@ -761,35 +787,36 @@ Open MicroHabit → Join → Paste the code`;
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.topBar}>
-            <View style={styles.activityPill}>
-              <Text style={styles.activityLabel}>Activity</Text>
-              <Text style={styles.activityText} numberOfLines={1}>
-                {leagueActivity || "Not set"}
-              </Text>
+          {leagueActivity ? (
+            <View style={styles.metaRow}>
+              <Text style={styles.metaLabel}>Activity</Text>
+              <Text style={styles.metaDivider}>·</Text>
+              <Text style={styles.metaValue}>{leagueActivity}</Text>
             </View>
-
-            <Segmented value={viewMode} onChange={setViewMode} />
-          </View>
-
-          {viewMode === "Ranking" ? (
-            <Text style={styles.rankSummary}>{rankingSummary}</Text>
           ) : null}
 
           {weeklyPulse ? (
-            <View style={styles.pulseCard}>
-              <View style={styles.pulseMetaRow}>
-                <Text style={styles.pulseMetaLabel}>WEEKLY PULSE:</Text>
-                <Text style={styles.pulseLineValue}>{weeklyPulse.countText}</Text>
-              </View>
-              <View style={styles.pulseMetaRow}>
-                <Text style={styles.pulseMetaLabel}>Strongest day:</Text>
-                <Text style={styles.pulseMetaValue}>{weeklyPulse.strongestDay}</Text>
-              </View>
+            <View style={styles.statusStrip}>
+              <Text style={styles.statusLine}>
+                <Text style={styles.statusLabel}>Weekly pulse</Text>
+                <Text style={styles.statusDivider}> · </Text>
+                <Text style={styles.statusValue}>{weeklyPulse.countText}</Text>
+              </Text>
+              <Text style={styles.statusSubline}>{weeklyPulse.strongestDay}</Text>
+              {viewMode === "Ranking" ? (
+                <Text style={styles.statusHint}>{rankingSummary}</Text>
+              ) : null}
             </View>
           ) : null}
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <LinearGradient
+            colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.08)", "rgba(255,255,255,0)"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.contentDivider}
+          />
 
           {loading ? (
             <View style={styles.loadingWrap}>
@@ -842,7 +869,7 @@ const styles = StyleSheet.create({
 
   header: {
     paddingHorizontal: 14,
-    paddingBottom: 10,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: UI.border,
   },
@@ -854,7 +881,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headerSide: {
-    width: 88,
+    width: 84,
     alignItems: "flex-start",
   },
   headerIconBtn: {
@@ -871,16 +898,26 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: 46,
   },
 
-  headerTitle: {
+  headerName: {
+    marginTop: 10,
     textAlign: "center",
-    color: UI.text,
-    fontSize: 20,
+    color: "rgba(237,231,255,0.9)",
+    fontSize: 22,
     fontWeight: "800",
-    letterSpacing: 0.2,
-    maxWidth: "100%",
+    lineHeight: 28,
+    letterSpacing: -0.2,
+    paddingHorizontal: 14,
+  },
+  headerNameMedium: {
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  headerNameLong: {
+    fontSize: 18,
+    lineHeight: 24,
   },
 
   pillBtn: {
@@ -904,68 +941,81 @@ const styles = StyleSheet.create({
   pillBtnTextXs: { fontSize: 14, fontWeight: "800" },
 
   scroll: { flex: 1 },
-  scrollContent: { padding: 16, gap: 14, paddingBottom: 32 },
+  scrollContent: { padding: 16, gap: 8, paddingBottom: 28 },
 
-  topBar: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 0 },
-  rankSummary: {
-    color: "rgba(237,231,255,0.58)",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.1,
-  },
-  pulseCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 4,
-  },
-  pulseMetaRow: {
+  metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
+    paddingHorizontal: 4,
+    marginTop: 0,
     flexWrap: "wrap",
   },
-  pulseMetaLabel: {
-    color: "rgba(237,231,255,0.64)",
-    fontSize: 13,
-    fontWeight: "600",
-    lineHeight: 18,
-  },
-  pulseLineValue: {
-    color: UI.text,
-    fontSize: 15,
-    fontWeight: "700",
-    lineHeight: 20,
-  },
-  pulseMetaValue: {
-    color: UI.text,
-    fontSize: 13,
-    fontWeight: "700",
-    lineHeight: 18,
-  },
-  activityPill: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: "center",
-    gap: 2,
-  },
-  activityLabel: {
-    color: "rgba(237,231,255,0.48)",
-    fontSize: 11,
+  metaLabel: {
+    color: "rgba(237,231,255,0.42)",
+    fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
-  activityText: { color: UI.text, fontSize: 16, fontWeight: "700" },
+  metaDivider: {
+    color: "rgba(237,231,255,0.32)",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  metaValue: {
+    color: "rgba(237,231,255,0.74)",
+    fontSize: 13.5,
+    fontWeight: "600",
+    lineHeight: 19,
+    flexShrink: 1,
+  },
+  statusStrip: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "rgba(255,255,255,0.045)",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    gap: 1,
+    marginBottom: 2,
+  },
+  statusLine: {
+    color: UI.text,
+    fontSize: 13.5,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  statusLabel: {
+    color: "rgba(237,231,255,0.46)",
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
+  statusDivider: {
+    color: "rgba(237,231,255,0.26)",
+    fontWeight: "700",
+  },
+  statusValue: {
+    color: "rgba(237,231,255,0.82)",
+    fontWeight: "700",
+  },
+  statusSubline: {
+    color: "rgba(237,231,255,0.58)",
+    fontSize: 12.5,
+    fontWeight: "500",
+    lineHeight: 17,
+  },
+  statusHint: {
+    marginTop: 2,
+    color: "rgba(237,231,255,0.38)",
+    fontSize: 11.5,
+    fontWeight: "600",
+    lineHeight: 16,
+  },
+  contentDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: 2,
+    marginBottom: 6,
+  },
 
   segmentWrap: {
     position: "relative",
@@ -977,6 +1027,9 @@ const styles = StyleSheet.create({
     backgroundColor: UI.segmentBg,
     borderWidth: 1,
     borderColor: UI.segmentBorder,
+  },
+  segmentWrapCompact: {
+    width: 176,
   },
   segmentThumb: {
     position: "absolute",
@@ -1000,12 +1053,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  segmentBtnCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
   segmentText: { color: UI.muted, fontWeight: "700", fontSize: 14 },
+  segmentTextCompact: { fontSize: 12.5 },
   segmentTextActive: { color: UI.text },
 
   errorText: { color: UI.error, fontSize: 14, fontWeight: "600" },
   loadingWrap: {
-    paddingTop: 18,
+    paddingTop: 8,
     gap: 14,
   },
   skeletonCard: {

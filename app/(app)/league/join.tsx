@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { ensureProfileForCurrentUser } from "@/features/auth/profile";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
@@ -37,10 +38,9 @@ export default function JoinLeagueScreen() {
   const [userTier, setUserTier] = useState<UserTier>("free");
 
   async function getAuthedUserId(): Promise<string> {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    if (!data.user) throw new Error("Not authenticated");
-    return data.user.id;
+    const user = await ensureProfileForCurrentUser();
+    if (!user) throw new Error("Not authenticated");
+    return user.id;
   }
 
   async function fetchLeagueInfo(leagueId: string): Promise<LeagueInfo> {

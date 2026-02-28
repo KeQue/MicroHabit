@@ -1,5 +1,6 @@
 import type { Session, User } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { ensureProfileForUser } from "./profile";
 import { supabase } from "../../lib/supabase";
 
 type AuthContextValue = {
@@ -32,6 +33,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const s = data.session ?? null;
         setSession(s);
         setUser(s?.user ?? null);
+        if (s?.user) {
+          void ensureProfileForUser(s.user).catch((err) => {
+            console.log("ensureProfileForUser(init) failed", err);
+          });
+        }
       } finally {
         if (mounted) setInitializing(false);
       }
@@ -41,6 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
       setSession(newSession ?? null);
       setUser(newSession?.user ?? null);
+      if (newSession?.user) {
+        void ensureProfileForUser(newSession.user).catch((err) => {
+          console.log("ensureProfileForUser(auth change) failed", err);
+        });
+      }
       setInitializing(false);
     });
 
@@ -52,13 +63,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- actions ---
   async function signUp(email: string, password: string) {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
+    if (data.user) {
+      await ensureProfileForUser(data.user);
+    }
   }
 
   async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    if (data.user) {
+      await ensureProfileForUser(data.user);
+    }
   }
 
   async function signOut() {

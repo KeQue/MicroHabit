@@ -1,6 +1,11 @@
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect } from "react";
+import {
+  cancelGentleDailyReminder,
+  configureNotifications,
+  ensureGentleDailyReminder,
+} from "../features/notifications/local";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
 
 function RouteGate() {
@@ -23,6 +28,17 @@ function RouteGate() {
     if (!inAppGroup) router.replace("/(app)");
   }, [user, initializing, segments, router]);
 
+  useEffect(() => {
+    if (initializing) return;
+
+    if (!user) {
+      void cancelGentleDailyReminder();
+      return;
+    }
+
+    void ensureGentleDailyReminder();
+  }, [user, initializing]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
@@ -33,6 +49,10 @@ function RouteGate() {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    configureNotifications();
+  }, []);
+
   return (
     <ThemeProvider value={DarkTheme}>
       <AuthProvider>

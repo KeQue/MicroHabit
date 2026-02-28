@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { getLeagueMembers } from "@/features/leagues/api";
+import { scheduleGentleTestNotification } from "@/features/notifications/local";
 import { supabase } from "@/lib/supabase";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
@@ -107,6 +108,16 @@ function startOfMonth(d: Date) {
 function endOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
+
+const WEEKDAY_LABELS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
 
 // count ONLY boolean true
 function scoreDays(days: boolean[]) {
@@ -249,6 +260,7 @@ export default function LeagueDetailScreen() {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
+  const todayWeekday = today.getDay();
   const todayIndex = today.getDate() - 1;
   const monthDays = useMemo(() => new Date(year, month + 1, 0).getDate(), [year, month]);
 
@@ -281,6 +293,45 @@ export default function LeagueDetailScreen() {
       topScore === 1 ? "day" : "days"
     }`;
   }, [members]);
+
+  const weeklyPulse = useMemo(() => {
+    if (!members.length) return null;
+
+    const weekOffset = (todayWeekday + 6) % 7;
+    const weekStartIndex = Math.max(0, todayIndex - weekOffset);
+    const weekEndIndex = Math.min(todayIndex, monthDays - 1);
+
+    if (weekEndIndex < weekStartIndex) return null;
+
+    const countsByDay = Array.from({ length: weekEndIndex - weekStartIndex + 1 }, () => 0);
+
+    for (const member of members) {
+      for (let dayIndex = weekStartIndex; dayIndex <= weekEndIndex; dayIndex++) {
+        if (member.days[dayIndex]) {
+          countsByDay[dayIndex - weekStartIndex] += 1;
+        }
+      }
+    }
+
+    const totalCheckIns = countsByDay.reduce((sum, value) => sum + value, 0);
+
+    if (totalCheckIns === 0) {
+      return {
+        countText: "0 check-ins",
+        strongestDay: "No standout day yet",
+      };
+    }
+
+    const bestCount = Math.max(...countsByDay);
+    const bestOffset = countsByDay.findIndex((value) => value === bestCount);
+    const bestDate = new Date(year, month, weekStartIndex + bestOffset + 1);
+    const bestDayLabel = WEEKDAY_LABELS[bestDate.getDay()];
+
+    return {
+      countText: `${totalCheckIns} ${totalCheckIns === 1 ? "check-in" : "check-ins"}`,
+      strongestDay: bestDayLabel,
+    };
+  }, [members, month, monthDays, todayIndex, todayWeekday, year]);
 
   async function onSignOut() {
     await supabase.auth.signOut();
@@ -661,6 +712,16 @@ Open MicroHabit → Join → Paste the code`;
                   await onSignOut();
                 }}
               />
+              {__DEV__ ? (
+                <PillButton
+                  label="Test notification"
+                  size="sm"
+                  onPress={async () => {
+                    setMenuOpen(false);
+                    await scheduleGentleTestNotification();
+                  }}
+                />
+              ) : null}
               <PillButton label="Close" size="sm" onPress={() => setMenuOpen(false)} />
             </Pressable>
           </Pressable>
@@ -713,6 +774,19 @@ Open MicroHabit → Join → Paste the code`;
 
           {viewMode === "Ranking" ? (
             <Text style={styles.rankSummary}>{rankingSummary}</Text>
+          ) : null}
+
+          {weeklyPulse ? (
+            <View style={styles.pulseCard}>
+              <View style={styles.pulseMetaRow}>
+                <Text style={styles.pulseMetaLabel}>WEEKLY PULSE:</Text>
+                <Text style={styles.pulseLineValue}>{weeklyPulse.countText}</Text>
+              </View>
+              <View style={styles.pulseMetaRow}>
+                <Text style={styles.pulseMetaLabel}>Strongest day:</Text>
+                <Text style={styles.pulseMetaValue}>{weeklyPulse.strongestDay}</Text>
+              </View>
+            </View>
           ) : null}
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -838,6 +912,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     letterSpacing: 0.1,
+  },
+  pulseCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  pulseMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexWrap: "wrap",
+  },
+  pulseMetaLabel: {
+    color: "rgba(237,231,255,0.64)",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  pulseLineValue: {
+    color: UI.text,
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 20,
+  },
+  pulseMetaValue: {
+    color: UI.text,
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 18,
   },
   activityPill: {
     flex: 1,

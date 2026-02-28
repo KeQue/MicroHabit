@@ -4,5 +4,11 @@
     "preview": { "ios": { "resourceClass": "m-medium" } },
     "production": { "ios": { "resourceClass": "m-medium" } }
   },
-  "submit": { "production": {} }
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6759626676"
+      }
+    }
+  }
 }

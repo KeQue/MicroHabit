@@ -1,4 +1,5 @@
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useRef, useState } from "react";
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -12,22 +13,25 @@ type Props = {
 
   colorLight?: string;
   colorDark?: string;
+  compact?: boolean;
 };
 
 const NUM_COLS = 13;
-const SQUARE = 28;
-const GAP = 8;
-const RADIUS = 7;
+const SQUARE = 26;
+const COMPACT_SQUARE = 24;
+const COLUMN_GAP = 7;
+const ROW_GAP = 9;
+const RADIUS = 10;
 const TODAY_BORDER = 2;
 
-const INACTIVE_BG = "#2B2B33";
-const INACTIVE_TEXT = "rgba(255,255,255,0.55)";
+const INACTIVE_BG = "#272634";
+const INACTIVE_TEXT = "rgba(237,231,255,0.52)";
 
-const LOCKED_BG = "#15151C";
-const LOCKED_TEXT = "rgba(255,255,255,0.22)";
+const LOCKED_BG = "#171420";
+const LOCKED_TEXT = "rgba(237,231,255,0.22)";
 
-const FUTURE_BG = "#0B0B10";
-const FUTURE_TEXT = "rgba(255,255,255,0.22)";
+const FUTURE_BG = "#100D17";
+const FUTURE_TEXT = "rgba(237,231,255,0.22)";
 
 const CONFETTI_PIECES = [
   { dx: -26, dy: -24, rotate: "-24deg", size: 5, color: "#FFD666" },
@@ -133,7 +137,24 @@ function boostActiveColor(hex?: string) {
   return rgb01ToHex(out.r, out.g, out.b);
 }
 
-export function UserDayGrid({ days, onToggle, todayIndex, accentActive, minActiveIndex }: Props) {
+function liftColor(hex?: string, amount = 0.18) {
+  const rgb = safeHexToRgb01(hex);
+  if (!rgb) return hex ?? "#FFFFFF";
+
+  const r = rgb.r + (1 - rgb.r) * amount;
+  const g = rgb.g + (1 - rgb.g) * amount;
+  const b = rgb.b + (1 - rgb.b) * amount;
+  return rgb01ToHex(r, g, b);
+}
+
+export function UserDayGrid({
+  days,
+  onToggle,
+  todayIndex,
+  accentActive,
+  minActiveIndex,
+  compact = false,
+}: Props) {
   const [burstState, setBurstState] = useState<{ seed: number; dayIndex: number | null }>({
     seed: 0,
     dayIndex: null,
@@ -148,6 +169,11 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive, minActiv
   }, [days, todayIndex]);
 
   const activeBg = boostActiveColor(accentActive);
+  const activeBgSoft = liftColor(activeBg, 0.2);
+  const tileSize = compact ? COMPACT_SQUARE : SQUARE;
+  const tileRadius = compact ? 9 : RADIUS;
+  const gridWidth = NUM_COLS * tileSize + (NUM_COLS - 1) * COLUMN_GAP;
+  const streakDotSize = compact ? 3 : 4;
 
   const triggerTilePop = (dayIndex: number) => {
     const scale = tileScale[dayIndex];
@@ -239,7 +265,7 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive, minActiv
   });
 
   return (
-    <View style={styles.grid}>
+    <View style={[styles.grid, { maxWidth: gridWidth }]}>
       {days.map((isDone, dayIndex) => {
         const isToday = todayIndex === dayIndex;
         const visual = resolveVisual(dayIndex, isDone);
@@ -272,28 +298,72 @@ export function UserDayGrid({ days, onToggle, todayIndex, accentActive, minActiv
             hitSlop={0}
             style={({ pressed }) => [
               styles.pressable,
+              { width: tileSize, height: tileSize },
               pressed && !isToday && !isFuture && !isLocked && { opacity: 0.92 },
             ]}
           >
             <Animated.View style={{ transform: [{ scale: tileScale[dayIndex] ?? 1 }] }}>
-              <View
-                style={[
-                  styles.tile,
-                  { backgroundColor: visual.bg },
-                  visual.doneDepth && styles.doneDepth,
-                  isToday && styles.todayTile,
-                ]}
-              >
-                {isToday && isTodayStreak && <View style={styles.streakDot} />}
+              {visual.doneDepth ? (
+                <LinearGradient
+                  colors={[activeBgSoft, activeBg]}
+                  start={{ x: 0.2, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[
+                    styles.tile,
+                    styles.doneDepth,
+                    {
+                      width: tileSize,
+                      height: tileSize,
+                      borderRadius: isToday ? tileSize / 2 : tileRadius,
+                    },
+                    isToday && styles.todayTile,
+                  ]}
+                >
+                  <View style={styles.doneHighlight} />
+                  {isToday && isTodayStreak ? (
+                    <View
+                      style={[
+                        styles.streakDot,
+                        { width: streakDotSize, height: streakDotSize, borderRadius: streakDotSize / 2 },
+                      ]}
+                    />
+                  ) : null}
 
-                <Text style={[styles.dayNumber, { color: visual.text, fontWeight: visual.fontWeight }]}>
-                  {dayIndex + 1}
-                </Text>
-              </View>
+                  <Text style={[styles.dayNumber, { color: visual.text, fontWeight: visual.fontWeight }]}>
+                    {dayIndex + 1}
+                  </Text>
+                </LinearGradient>
+              ) : (
+                <View
+                  style={[
+                    styles.tile,
+                    {
+                      width: tileSize,
+                      height: tileSize,
+                      borderRadius: isToday ? tileSize / 2 : tileRadius,
+                      backgroundColor: visual.bg,
+                    },
+                    isToday && styles.todayTile,
+                  ]}
+                >
+                  {isToday && isTodayStreak ? (
+                    <View
+                      style={[
+                        styles.streakDot,
+                        { width: streakDotSize, height: streakDotSize, borderRadius: streakDotSize / 2 },
+                      ]}
+                    />
+                  ) : null}
+
+                  <Text style={[styles.dayNumber, { color: visual.text, fontWeight: visual.fontWeight }]}>
+                    {dayIndex + 1}
+                  </Text>
+                </View>
+              )}
             </Animated.View>
 
             {burstState.dayIndex === dayIndex && burstState.seed > 0 ? (
-              <View pointerEvents="none" style={styles.burstLayer}>
+              <View pointerEvents="none" style={[styles.burstLayer, { width: tileSize, height: tileSize }]}>
                 {CONFETTI_PIECES.map((piece, index) => {
                   const progress = burstAnim;
                   const driftX = progress.interpolate({
@@ -366,19 +436,14 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: GAP,
-    maxWidth: NUM_COLS * (SQUARE + GAP),
+    columnGap: COLUMN_GAP,
+    rowGap: ROW_GAP,
   },
 
   pressable: {
-    width: SQUARE,
-    height: SQUARE,
     position: "relative",
   },
   tile: {
-    width: SQUARE,
-    height: SQUARE,
-    borderRadius: RADIUS,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -400,12 +465,11 @@ const styles = StyleSheet.create({
   todayTile: {
     borderWidth: TODAY_BORDER,
     borderColor: "rgba(255,255,255,0.85)",
-    borderRadius: RADIUS,
     ...Platform.select({
       ios: {
-        shadowColor: "rgba(255,255,255,0.25)",
+        shadowColor: "rgba(255,255,255,0.22)",
         shadowOpacity: 1,
-        shadowRadius: 10,
+        shadowRadius: 12,
         shadowOffset: { width: 0, height: 0 },
       },
       android: { elevation: 8 },
@@ -417,8 +481,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     top: 0,
-    width: SQUARE,
-    height: SQUARE,
     alignItems: "center",
     justifyContent: "center",
     pointerEvents: "none",
@@ -436,8 +498,19 @@ const styles = StyleSheet.create({
   },
 
   dayNumber: {
-    fontSize: 11,
+    fontSize: 10,
     zIndex: 2,
+  },
+
+  doneHighlight: {
+    position: "absolute",
+    top: 2,
+    left: 2,
+    right: "42%",
+    bottom: "48%",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    zIndex: 1,
   },
 
   streakDot: {

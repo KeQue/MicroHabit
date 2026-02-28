@@ -207,7 +207,7 @@ export function UserCard({
   const primaryBorder = withAlpha(gradientEnd, 0.22);
 
   const progressAnim = useRef(new Animated.Value(fillPct)).current;
-  const barGlowAnim = useRef(new Animated.Value(0.12)).current;
+  const barGlowAnim = useRef(new Animated.Value(0.18)).current;
   const leaderGlowAnim = useRef(new Animated.Value(isLeader ? 1 : 0)).current;
   const prevActiveDays = useRef(activeDays);
 
@@ -225,13 +225,13 @@ export function UserCard({
     if (activeDays > prevActiveDays.current) {
       Animated.sequence([
         Animated.timing(barGlowAnim, {
-          toValue: 0.42,
+          toValue: 0.64,
           duration: 120,
           easing: Easing.out(Easing.quad),
           useNativeDriver: false,
         }),
         Animated.timing(barGlowAnim, {
-          toValue: 0.12,
+          toValue: 0.18,
           duration: 280,
           easing: Easing.out(Easing.quad),
           useNativeDriver: false,
@@ -316,23 +316,30 @@ export function UserCard({
 
       <View style={styles.progressBlock}>
         <View style={styles.progressTrack}>
-          <Animated.View
-            style={[
-              styles.progressFillWrap,
-              {
-                width: animatedWidth,
-                shadowColor: gradientEnd,
-                shadowOpacity: barGlowAnim,
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={[accentActive, gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.progressFill}
-            />
-          </Animated.View>
+            <Animated.View
+              style={[
+                styles.progressFillWrap,
+                {
+                  width: animatedWidth,
+                  shadowColor: gradientEnd,
+                  shadowOpacity: barGlowAnim,
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={[withAlpha(accentActive, 1), gradientEnd, withAlpha(gradientEnd, 0.96)]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.progressFill}
+              />
+              <LinearGradient
+                pointerEvents="none"
+                colors={["rgba(255,255,255,0.34)", "rgba(255,255,255,0.09)", "rgba(255,255,255,0)"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={styles.progressSheen}
+              />
+            </Animated.View>
         </View>
       </View>
 
@@ -357,6 +364,7 @@ export function UserCard({
           accentActive={accentActive}
           onToggle={onToggle}
           todayIndex={todayIndex}
+          compact={showRank}
         />
       </View>
 
@@ -364,8 +372,8 @@ export function UserCard({
         style={[
           styles.streakCard,
           {
-            borderColor: withAlpha(accentActive, streak > 3 ? 0.22 : 0.1),
-            backgroundColor: withAlpha(accentActive, 0.04),
+            borderColor: withAlpha(accentActive, streak > 3 ? 0.16 : 0.07),
+            backgroundColor: withAlpha(accentActive, 0.025),
           },
         ]}
       >
@@ -473,30 +481,37 @@ const styles = StyleSheet.create({
   },
 
   progressBlock: {
-    marginTop: 2,
-    marginBottom: 2,
+    marginTop: 3,
+    marginBottom: 3,
   },
   progressTrack: {
-    height: 16,
+    height: 12,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.05)",
     overflow: "hidden",
   },
   progressFillWrap: {
     height: "100%",
     borderRadius: 999,
-    shadowRadius: 12,
+    overflow: "hidden",
+    shadowRadius: 20,
     shadowOffset: { width: 0, height: 0 },
   },
   progressFill: {
     height: "100%",
     borderRadius: 999,
   },
+  progressSheen: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 999,
+  },
 
   sub: {
-    opacity: 0.56,
-    fontSize: 15,
-    fontWeight: "600",
+    opacity: 0.46,
+    fontSize: 14,
+    fontWeight: "500",
   },
   emptyRow: {
     flexDirection: "row",
@@ -533,9 +548,9 @@ const styles = StyleSheet.create({
     gap: 8,
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginTop: 2,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    marginTop: 1,
   },
   streakTextRow: {
     flexDirection: "row",
@@ -544,33 +559,33 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   streakEmoji: {
-    fontSize: 15,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 16,
   },
   streakLabel: {
     color: "rgba(255,255,255,0.68)",
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 16,
+    fontSize: 11,
+    fontWeight: "700",
+    lineHeight: 14,
     marginTop: 1,
   },
   streakValue: {
     color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "900",
-    lineHeight: 22,
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 20,
   },
   streakDivider: {
-    color: "rgba(255,255,255,0.38)",
-    fontSize: 14,
+    color: "rgba(255,255,255,0.28)",
+    fontSize: 13,
     fontWeight: "700",
-    lineHeight: 16,
+    lineHeight: 15,
   },
   streakMood: {
-    color: "rgba(255,255,255,0.68)",
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16,
+    color: "rgba(255,255,255,0.56)",
+    fontSize: 11,
+    fontWeight: "600",
+    lineHeight: 14,
     marginTop: 1,
   },
 });

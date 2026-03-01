@@ -355,15 +355,6 @@ export function UserCard({
         </ThemedText>
       ) : null}
 
-      {isEmpty ? (
-        <View style={styles.emptyRow}>
-          <View style={[styles.emptyDot, { backgroundColor: accentActive }]} />
-          <ThemedText style={styles.emptyText}>
-            {isPrimaryCard ? "Tap today to start your first check-in." : "No check-ins yet this month."}
-          </ThemedText>
-        </View>
-      ) : null}
-
       <View pointerEvents={disabled ? "none" : "auto"} style={styles.gridWrap}>
         <UserDayGrid
           days={days}

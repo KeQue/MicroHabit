@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { getLeagueMembers } from "@/features/leagues/api";
@@ -87,12 +87,71 @@ function colorsForUserId(userId: string) {
   return PALETTE[colorIndexFromUserId(userId, PALETTE.length)];
 }
 
+function buildLeagueColorMap(userIds: string[]) {
+  const available = PALETTE.map((_, idx) => idx);
+  const assigned = new Map<string, number>();
+
+  const sortedIds = [...userIds].sort((a, b) => a.localeCompare(b));
+
+  for (const userId of sortedIds) {
+    const preferred = colorIndexFromUserId(userId, PALETTE.length);
+    const preferredIdx = available.indexOf(preferred);
+
+    if (preferredIdx >= 0) {
+      assigned.set(userId, preferred);
+      available.splice(preferredIdx, 1);
+      continue;
+    }
+
+    if (available.length > 0) {
+      const fallback = available.shift()!;
+      assigned.set(userId, fallback);
+      continue;
+    }
+
+    assigned.set(userId, preferred);
+  }
+
+  return assigned;
+}
+
 function toHandle(s?: string | null) {
   if (!s) return "user";
   const v = String(s).trim();
   const at = v.indexOf("@");
   if (at > 0) return v.slice(0, at);
   return v;
+}
+
+function emojiForActivity(activity?: string | null) {
+  const value = String(activity ?? "").toLowerCase();
+  if (value.includes("gym") || value.includes("lift") || value.includes("workout")) return "\u{1F4AA}";
+  if (value.includes("run") || value.includes("cardio")) return "\u{1F3C3}";
+  if (value.includes("bike") || value.includes("cycle")) return "\u{1F6B4}";
+  if (value.includes("walk") || value.includes("steps")) return "\u{1F6B6}";
+  if (value.includes("read") || value.includes("book")) return "\u{1F4DA}";
+  if (value.includes("yoga") || value.includes("mobility") || value.includes("stretch")) return "\u{1F9D8}";
+  if (value.includes("swim")) return "\u{1F3CA}";
+  return "\u2728";
+}
+
+function weekCapsuleTone(count: number) {
+  if (count <= 0) {
+    return {
+      borderColor: "rgba(255,255,255,0.10)",
+      backgroundColor: "rgba(255,255,255,0.04)",
+    };
+  }
+  if (count <= 2) {
+    return {
+      borderColor: "rgba(245,158,11,0.22)",
+      backgroundColor: "rgba(245,158,11,0.08)",
+    };
+  }
+  return {
+    borderColor: "rgba(162,89,255,0.22)",
+    backgroundColor: "rgba(162,89,255,0.10)",
+  };
 }
 
 // Date helpers (LOCAL, no timezone bugs)
@@ -125,7 +184,7 @@ function scoreDays(days: boolean[]) {
 }
 
 /**
- * ✅ Edit window rule (MVP):
+ * âœ… Edit window rule (MVP):
  * - Allow toggling: today and yesterday only
  * - Block: earlier days, future days
  */
@@ -301,7 +360,7 @@ export default function LeagueDetailScreen() {
     const scores = members.map((m) => scoreDays(m.days));
     const topScore = Math.max(...scores);
     const memberLabel = members.length === 1 ? "member" : "members";
-    return `${members.length} ${memberLabel} competing • Most check-ins this month: ${topScore} ${
+    return `${members.length} ${memberLabel} competing â€¢ Most check-ins this month: ${topScore} ${
       topScore === 1 ? "day" : "days"
     }`;
   }, [members]);
@@ -329,6 +388,7 @@ export default function LeagueDetailScreen() {
 
     if (totalCheckIns === 0) {
       return {
+        count: 0,
         countText: "0 check-ins",
         strongestDay: "Your first check-in sets the week",
       };
@@ -340,6 +400,7 @@ export default function LeagueDetailScreen() {
     const bestDayLabel = WEEKDAY_LABELS[bestDate.getDay()];
 
     return {
+      count: totalCheckIns,
       countText: `${totalCheckIns} ${totalCheckIns === 1 ? "check-in" : "check-ins"}`,
       strongestDay: bestDayLabel,
     };
@@ -352,9 +413,9 @@ export default function LeagueDetailScreen() {
 
   function buildInviteMessage(code: string) {
     // Canonical template (no links)
-    return `Join my MicroHabit league 💪
+    return `Join my MicroHabit league ðŸ’ª
 Invite code: ${code}
-Open MicroHabit → Join → Paste the code`;
+Open MicroHabit â†’ Join â†’ Paste the code`;
   }
 
   function onInvite() {
@@ -466,8 +527,11 @@ Open MicroHabit → Join → Paste the code`;
         arr[idx] = !!row.completed;
       }
 
+      const colorIndexByUserId = buildLeagueColorMap(normalized.map((r) => r.user_id));
+
       const nextMembers: Member[] = normalized.map((r) => {
-        const c = colorsForUserId(r.user_id);
+        const colorIndex = colorIndexByUserId.get(r.user_id);
+        const c = colorIndex == null ? colorsForUserId(r.user_id) : PALETTE[colorIndex];
         return {
           id: r.user_id,
           name: r.display,
@@ -611,7 +675,7 @@ Open MicroHabit → Join → Paste the code`;
       // no future
       if (day > todayIndex) return;
 
-      // ✅ NEW: only today + yesterday
+      // âœ… NEW: only today + yesterday
       if (!isEditableDay(day, todayIndex)) return;
 
       const d = new Date(year, month, day + 1);
@@ -676,7 +740,7 @@ Open MicroHabit → Join → Paste the code`;
               <Text style={styles.modalTitle}>Invite code</Text>
 
               <View style={styles.codeBox}>
-                <Text style={styles.codeText}>{inviteCode ?? "—"}</Text>
+                <Text style={styles.codeText}>{inviteCode ?? "â€”"}</Text>
               </View>
 
               <Text style={styles.modalMessageLabel}>Message</Text>
@@ -740,6 +804,7 @@ Open MicroHabit → Join → Paste the code`;
         </Modal>
 
         {/* HEADER */}
+        {false ? (
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <View style={styles.headerBar}>
             <View style={styles.headerSide}>
@@ -779,7 +844,15 @@ Open MicroHabit → Join → Paste the code`;
               {leagueName}
             </Text>
           ) : null}
+          {leagueActivity ? (
+            <View style={styles.activityChip}>
+              <Text style={styles.activityChipText}>
+                {`${emojiForActivity(leagueActivity)} ${leagueActivity}`}
+              </Text>
+            </View>
+          ) : null}
         </View>
+        ) : null}
 
         <ScrollView
           style={styles.scroll}
@@ -787,22 +860,74 @@ Open MicroHabit → Join → Paste the code`;
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {leagueActivity ? (
-            <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Activity</Text>
-              <Text style={styles.metaDivider}>·</Text>
-              <Text style={styles.metaValue}>{leagueActivity}</Text>
+          <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+            <View style={styles.headerBar}>
+              <View style={styles.headerSide}>
+                <Pressable
+                  onPress={onMenu}
+                  style={({ pressed }) => [
+                    styles.headerIconBtn,
+                    pressed && { backgroundColor: UI.pillBgActive },
+                  ]}
+                  hitSlop={8}
+                >
+                  <Ionicons name="menu" size={22} color={UI.text} />
+                </Pressable>
+              </View>
+
+              <View style={styles.headerTitleWrap}>
+                <Segmented value={viewMode} onChange={setViewMode} compact />
+              </View>
+
+              <View style={[styles.headerSide, { alignItems: "flex-end" }]}>
+                {showInvite ? <PillButton label="Invite" size="sm" onPress={onInvite} /> : null}
+              </View>
+            </View>
+
+            {leagueName ? (
+              <Text
+                style={[
+                  styles.headerName,
+                  leagueName.length > 40
+                    ? styles.headerNameLong
+                    : leagueName.length > 24
+                      ? styles.headerNameMedium
+                      : null,
+                ]}
+                numberOfLines={2}
+              >
+                {leagueName}
+              </Text>
+            ) : null}
+            {leagueActivity ? (
+              <View style={styles.activityChip}>
+                <Text style={styles.activityChipText}>
+                  {`${emojiForActivity(leagueActivity)} ${leagueActivity}`}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {false ? (
+            <View style={styles.activityChip}>
+              <Text style={styles.activityChipEmoji}>{emojiForActivity(leagueActivity)}</Text>
+              <Text style={styles.metaDivider}>Â·</Text>
+              <Text style={styles.activityChipText}>{leagueActivity}</Text>
             </View>
           ) : null}
 
           {weeklyPulse ? (
-            <View style={styles.statusStrip}>
+            <View style={[styles.weekCapsule, weekCapsuleTone(weeklyPulse.count)]}>
               <Text style={styles.statusLine}>
-                <Text style={styles.statusLabel}>Weekly pulse</Text>
+                <Text style={styles.statusLabel}>{"\u26A1 This week"}</Text>
                 <Text style={styles.statusDivider}> · </Text>
                 <Text style={styles.statusValue}>{weeklyPulse.countText}</Text>
               </Text>
-              <Text style={styles.statusSubline}>{weeklyPulse.strongestDay}</Text>
+              <Text style={styles.statusSubline}>
+                <Text style={styles.statusLabel}>Strongest day</Text>
+                <Text style={styles.statusDivider}>: </Text>
+                <Text style={styles.statusSubvalue}>{weeklyPulse.strongestDay}</Text>
+              </Text>
               {viewMode === "Ranking" ? (
                 <Text style={styles.statusHint}>{rankingSummary}</Text>
               ) : null}
@@ -943,6 +1068,33 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { padding: 16, gap: 8, paddingBottom: 28 },
 
+  activityChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 4,
+    marginTop: 4,
+    marginBottom: 2,
+    alignSelf: "center",
+  },
+  activityChipEmoji: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  activityChipText: {
+    color: "rgba(237,231,255,0.68)",
+    fontSize: 12.5,
+    fontWeight: "600",
+    lineHeight: 17,
+    textAlign: "center",
+  },
+  activitySpacer: {
+    width: 0,
+    opacity: 0,
+    fontSize: 0,
+    lineHeight: 0,
+  },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -959,9 +1111,10 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   metaDivider: {
-    color: "rgba(237,231,255,0.32)",
-    fontSize: 14,
-    fontWeight: "700",
+    width: 0,
+    opacity: 0,
+    fontSize: 0,
+    lineHeight: 0,
   },
   metaValue: {
     color: "rgba(237,231,255,0.74)",
@@ -969,6 +1122,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 19,
     flexShrink: 1,
+  },
+  weekCapsule: {
+    alignSelf: "flex-start",
+    marginTop: 1,
+    marginBottom: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(162,89,255,0.18)",
+    backgroundColor: "rgba(162,89,255,0.08)",
   },
   statusStrip: {
     borderTopWidth: 1,
@@ -999,12 +1163,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   statusSubline: {
+    display: "none",
     color: "rgba(237,231,255,0.58)",
     fontSize: 12.5,
     fontWeight: "500",
     lineHeight: 17,
   },
+  statusSubvalue: {
+    color: "rgba(237,231,255,0.82)",
+    fontWeight: "700",
+  },
   statusHint: {
+    display: "none",
     marginTop: 2,
     color: "rgba(237,231,255,0.38)",
     fontSize: 11.5,
@@ -1230,3 +1400,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 });
+
+
+

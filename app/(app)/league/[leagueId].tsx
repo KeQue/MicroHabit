@@ -135,25 +135,6 @@ function emojiForActivity(activity?: string | null) {
   return "\u2728";
 }
 
-function weekCapsuleTone(count: number) {
-  if (count <= 0) {
-    return {
-      borderColor: "rgba(255,255,255,0.10)",
-      backgroundColor: "rgba(255,255,255,0.04)",
-    };
-  }
-  if (count <= 2) {
-    return {
-      borderColor: "rgba(245,158,11,0.22)",
-      backgroundColor: "rgba(245,158,11,0.08)",
-    };
-  }
-  return {
-    borderColor: "rgba(162,89,255,0.22)",
-    backgroundColor: "rgba(162,89,255,0.10)",
-  };
-}
-
 // Date helpers (LOCAL, no timezone bugs)
 function pad2(n: number) {
   return n < 10 ? `0${n}` : `${n}`;
@@ -167,16 +148,6 @@ function startOfMonth(d: Date) {
 function endOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
-
-const WEEKDAY_LABELS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-] as const;
 
 // count ONLY boolean true
 function scoreDays(days: boolean[]) {
@@ -354,57 +325,6 @@ export default function LeagueDetailScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const listAnim = useRef(new Animated.Value(1)).current;
-
-  const rankingSummary = useMemo(() => {
-    if (!members.length) return "";
-    const scores = members.map((m) => scoreDays(m.days));
-    const topScore = Math.max(...scores);
-    const memberLabel = members.length === 1 ? "member" : "members";
-    return `${members.length} ${memberLabel} competing â€¢ Most check-ins this month: ${topScore} ${
-      topScore === 1 ? "day" : "days"
-    }`;
-  }, [members]);
-
-  const weeklyPulse = useMemo(() => {
-    if (!members.length) return null;
-
-    const weekOffset = (todayWeekday + 6) % 7;
-    const weekStartIndex = Math.max(0, todayIndex - weekOffset);
-    const weekEndIndex = Math.min(todayIndex, monthDays - 1);
-
-    if (weekEndIndex < weekStartIndex) return null;
-
-    const countsByDay = Array.from({ length: weekEndIndex - weekStartIndex + 1 }, () => 0);
-
-    for (const member of members) {
-      for (let dayIndex = weekStartIndex; dayIndex <= weekEndIndex; dayIndex++) {
-        if (member.days[dayIndex]) {
-          countsByDay[dayIndex - weekStartIndex] += 1;
-        }
-      }
-    }
-
-    const totalCheckIns = countsByDay.reduce((sum, value) => sum + value, 0);
-
-    if (totalCheckIns === 0) {
-      return {
-        count: 0,
-        countText: "0 check-ins",
-        strongestDay: "Your first check-in sets the week",
-      };
-    }
-
-    const bestCount = Math.max(...countsByDay);
-    const bestOffset = countsByDay.findIndex((value) => value === bestCount);
-    const bestDate = new Date(year, month, weekStartIndex + bestOffset + 1);
-    const bestDayLabel = WEEKDAY_LABELS[bestDate.getDay()];
-
-    return {
-      count: totalCheckIns,
-      countText: `${totalCheckIns} ${totalCheckIns === 1 ? "check-in" : "check-ins"}`,
-      strongestDay: bestDayLabel,
-    };
-  }, [members, month, monthDays, todayIndex, todayWeekday, year]);
 
   async function onSignOut() {
     await supabase.auth.signOut();
@@ -916,32 +836,7 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
             </View>
           ) : null}
 
-          {weeklyPulse ? (
-            <View style={[styles.weekCapsule, weekCapsuleTone(weeklyPulse.count)]}>
-              <Text style={styles.statusLine}>
-                <Text style={styles.statusLabel}>{"\u26A1 This week"}</Text>
-                <Text style={styles.statusDivider}> · </Text>
-                <Text style={styles.statusValue}>{weeklyPulse.countText}</Text>
-              </Text>
-              <Text style={styles.statusSubline}>
-                <Text style={styles.statusLabel}>Strongest day</Text>
-                <Text style={styles.statusDivider}>: </Text>
-                <Text style={styles.statusSubvalue}>{weeklyPulse.strongestDay}</Text>
-              </Text>
-              {viewMode === "Ranking" ? (
-                <Text style={styles.statusHint}>{rankingSummary}</Text>
-              ) : null}
-            </View>
-          ) : null}
-
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <LinearGradient
-            colors={["rgba(255,255,255,0)", "rgba(255,255,255,0.08)", "rgba(255,255,255,0)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.contentDivider}
-          />
 
           {loading ? (
             <View style={styles.loadingWrap}>
@@ -1125,8 +1020,8 @@ const styles = StyleSheet.create({
   },
   weekCapsule: {
     alignSelf: "flex-start",
-    marginTop: 1,
-    marginBottom: 2,
+    marginTop: 0,
+    marginBottom: 0,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 999,
@@ -1138,10 +1033,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: "rgba(255,255,255,0.045)",
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 4,
     gap: 1,
-    marginBottom: 2,
+    marginBottom: 0,
   },
   statusLine: {
     color: UI.text,
@@ -1181,12 +1076,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 16,
   },
-  contentDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginTop: 2,
-    marginBottom: 6,
-  },
-
   segmentWrap: {
     position: "relative",
     flexDirection: "row",

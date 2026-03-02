@@ -307,10 +307,6 @@ export function UserCard({
             {name}
           </ThemedText>
         </View>
-
-        <ThemedText style={countStyle}>
-          {activeDays}/{totalDays}
-        </ThemedText>
       </View>
 
       {showRank && rivalLabel ? (
@@ -321,6 +317,12 @@ export function UserCard({
       ) : null}
 
       <View style={styles.progressBlock}>
+        <View style={styles.progressMetaRow}>
+          <ThemedText style={styles.progressLabel}>Monthly progress</ThemedText>
+          <ThemedText style={countStyle}>
+            {activeDays}/{totalDays}
+          </ThemedText>
+        </View>
         <View style={styles.progressTrack}>
             <Animated.View
               style={[
@@ -391,8 +393,8 @@ export function UserCard({
 const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
-    padding: 14,
-    gap: 12,
+    padding: 12,
+    gap: 10,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -427,24 +429,24 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   name: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "800",
     letterSpacing: 0.2,
-    lineHeight: 40,
-    paddingTop: 4,
-    paddingBottom: 2,
+    lineHeight: 36,
+    paddingTop: 3,
+    paddingBottom: 1,
     flexShrink: 1,
   },
   namePrimary: {
-    fontSize: 32,
+    fontSize: 30,
   },
   nameMuted: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "800",
     letterSpacing: 0.2,
-    lineHeight: 40,
-    paddingTop: 4,
-    paddingBottom: 2,
+    lineHeight: 36,
+    paddingTop: 3,
+    paddingBottom: 1,
     opacity: 0.92,
     flexShrink: 1,
   },
@@ -488,8 +490,21 @@ const styles = StyleSheet.create({
   },
 
   progressBlock: {
-    marginTop: 3,
-    marginBottom: 3,
+    marginTop: 1,
+    marginBottom: 2,
+  },
+  progressMetaRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  progressLabel: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.35,
+    textTransform: "uppercase",
   },
   progressTrack: {
     height: 12,
@@ -545,54 +560,52 @@ const styles = StyleSheet.create({
   },
 
   gridWrap: {
-    marginTop: 1,
-    marginBottom: 3,
+    marginTop: 0,
+    marginBottom: 2,
   },
 
   streakCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    marginTop: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 0,
   },
   streakTextRow: {
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 4,
+    gap: 3,
     flexShrink: 1,
   },
   streakEmoji: {
-    fontSize: 14,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 14,
   },
   streakLabel: {
     color: "rgba(255,255,255,0.68)",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
-    lineHeight: 14,
-    marginTop: 1,
+    lineHeight: 12,
   },
   streakValue: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "800",
-    lineHeight: 20,
+    lineHeight: 18,
   },
   streakDivider: {
     color: "rgba(255,255,255,0.28)",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "700",
-    lineHeight: 15,
+    lineHeight: 13,
   },
   streakMood: {
     color: "rgba(255,255,255,0.56)",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
-    lineHeight: 14,
-    marginTop: 1,
+    lineHeight: 12,
   },
 });

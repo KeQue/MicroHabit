@@ -637,13 +637,17 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
   );
 
   const showInvite = myRole === "owner" || myRole === "admin" || myRole === "member";
+  const bgColors =
+    viewMode === "Ranking"
+      ? (["#11041F", "#1D0D38", "#160A2D"] as const)
+      : ([UI.bgTop, UI.bgBottom] as const);
 
   const inviteMessage = inviteCode ? buildInviteMessage(inviteCode) : "";
 
   return (
     <ThemedView style={styles.container}>
       <LinearGradient
-        colors={[UI.bgTop, UI.bgBottom]}
+        colors={bgColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.bg}
@@ -838,6 +842,10 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+          {viewMode === "Ranking" ? (
+            <Text style={styles.leaderboardLabel}>Leaderboard</Text>
+          ) : null}
+
           {loading ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator />
@@ -857,26 +865,35 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
                   },
                 ],
               }}
-            >
-              {membersToRender.map(({ member, rank, rivalLabel }) => (
-                <View key={member.id} style={styles.memberCardWrap}>
-                  <UserCard
-                    name={member.name}
-                    subtitle={member.subtitle}
-                    days={member.days}
-                    colorDark={member.colorDark}
+              >
+                {membersToRender.map(({ member, rank, rivalLabel }, index) => (
+                  <React.Fragment key={member.id}>
+                    {viewMode !== "Ranking" && index === 1 ? (
+                      <View style={styles.othersDividerWrap}>
+                        <View style={styles.othersDividerLine} />
+                        <Text style={styles.othersDividerText}>Others in the league</Text>
+                        <View style={styles.othersDividerLine} />
+                      </View>
+                    ) : null}
+                  <View style={styles.memberCardWrap}>
+                    <UserCard
+                      name={viewMode !== "Ranking" && index === 0 ? "You" : member.name}
+                      subtitle={member.subtitle}
+                      days={member.days}
+                      colorDark={member.colorDark}
                     accentActive={member.accentActive}
                     todayIndex={todayIndex}
                     disabled={!!myId && member.id !== myId}
                     onToggle={(i) => toggleDayForMember(member.id, i)}
                     showRank={viewMode === "Ranking"}
-                    rank={rank}
-                    rivalLabel={rivalLabel}
-                  />
-                </View>
-              ))}
-            </Animated.View>
-          )}
+                      rank={rank}
+                      rivalLabel={rivalLabel}
+                    />
+                  </View>
+                  </React.Fragment>
+                ))}
+              </Animated.View>
+            )}
         </ScrollView>
       </LinearGradient>
     </ThemedView>
@@ -1121,6 +1138,16 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: UI.text },
 
   errorText: { color: UI.error, fontSize: 14, fontWeight: "600" },
+  leaderboardLabel: {
+    color: "rgba(237,231,255,0.46)",
+    fontSize: 11.5,
+    fontWeight: "800",
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+    marginTop: 2,
+    marginBottom: 4,
+    paddingHorizontal: 2,
+  },
   loadingWrap: {
     paddingTop: 8,
     gap: 14,
@@ -1188,6 +1215,25 @@ const styles = StyleSheet.create({
   },
   memberCardWrap: {
     marginBottom: 10,
+  },
+  othersDividerWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: -2,
+    marginBottom: 6,
+  },
+  othersDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  othersDividerText: {
+    color: "rgba(237,231,255,0.38)",
+    fontSize: 10.5,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
 
   // Modal styles

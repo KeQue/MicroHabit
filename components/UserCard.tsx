@@ -141,34 +141,53 @@ function withAlpha(hex: string, alpha: number) {
 }
 
 function rankTheme(rank?: number) {
-  if (rank === 1) {
-    return {
-      border: "rgba(255,214,102,0.26)",
-    };
-  }
-  if (rank === 2) {
-    return {
-      border: "rgba(214,220,232,0.18)",
-    };
-  }
-  if (rank === 3) {
-    return {
-      border: "rgba(211,145,102,0.14)",
-    };
-  }
-  if (typeof rank === "number") {
-    return {
-      border: "rgba(255,255,255,0.08)",
+    if (rank === 1) {
+      return {
+          border: "rgba(255,224,96,1)",
+          background: "rgba(255,214,74,0.4)",
+          shadowColor: "#FFE27A",
+          shadowOpacity: 0.66,
+      };
+    }
+    if (rank === 2) {
+      return {
+          border: "rgba(236,244,255,0.96)",
+          background: "rgba(172,186,216,0.28)",
+          shadowColor: "rgba(236,244,255,1)",
+          shadowOpacity: 0.5,
+      };
+    }
+    if (rank === 3) {
+      return {
+          border: "rgba(230,146,82,0.94)",
+          background: "rgba(138,74,30,0.3)",
+          shadowColor: "rgba(230,146,82,1)",
+          shadowOpacity: 0.48,
+      };
+    }
+    if (typeof rank === "number") {
+      return {
+          border: "rgba(255,255,255,0.42)",
+          background: "rgba(255,255,255,0.11)",
+          shadowColor: "rgba(255,255,255,0.32)",
+          shadowOpacity: 0.12,
     };
   }
   return null;
 }
 
 function rankIcon(rank?: number) {
+  if (rank === 1) return "\u{1F451}";
+  return null;
   if (rank === 1) return "👑";
   if (rank === 2) return "🥈";
   if (rank === 3) return "🥉";
   return null;
+}
+
+function rankBadgeText(rank?: number) {
+  if (typeof rank !== "number") return null;
+  return `#${rank}`;
 }
 
 function streakMood(streak: number) {
@@ -208,9 +227,38 @@ export function UserCard({
   const isPrimaryCard = !disabled && !showRank;
   const rankAccent = showRank ? rankTheme(rank) : null;
   const medal = showRank ? rankIcon(rank) : null;
+  const rankBadge = showRank ? rankBadgeText(rank) : null;
 
   const gradientEnd = strongerAccent(accentActive);
   const primaryBorder = withAlpha(gradientEnd, 0.22);
+  const rankBarColors =
+    showRank && rank === 1
+      ? {
+          start: "#FFC92E",
+          mid: "#FFF09A",
+          end: "#FFB000",
+          glow: "#FFE27A",
+        }
+      : showRank && rank === 2
+        ? {
+            start: "#D3DBEF",
+            mid: "#FFFFFF",
+            end: "#AAB7D0",
+            glow: "#F5FAFF",
+          }
+        : showRank && rank === 3
+          ? {
+              start: "#E38A3A",
+              mid: "#F7C08E",
+              end: "#B75A18",
+              glow: "#F0A363",
+            }
+          : null;
+  const progressStart = rankBarColors?.start ?? withAlpha(accentActive, 1);
+  const progressMid = rankBarColors?.mid ?? gradientEnd;
+  const progressEnd = rankBarColors?.end ?? withAlpha(gradientEnd, 0.96);
+  const progressGlow = rankBarColors?.glow ?? gradientEnd;
+  const rivalDotColor = showRank && rankBarColors ? progressStart : accentActive;
 
   const progressAnim = useRef(new Animated.Value(fillPct)).current;
   const barGlowAnim = useRef(new Animated.Value(0.18)).current;
@@ -276,7 +324,7 @@ export function UserCard({
 
   const leaderShadowOpacity = leaderGlowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 0.14],
+    outputRange: [0, 0.24],
   });
 
   return (
@@ -285,57 +333,76 @@ export function UserCard({
         styles.card,
         showRank && styles.cardRanked,
         isPrimaryCard && styles.cardPrimary,
-        isPrimaryCard && {
-          borderColor: primaryBorder,
-          shadowColor: withAlpha(accentActive, 0.28),
-        },
-        rankAccent && { borderColor: rankAccent.border },
-        isLeader && {
-          shadowColor: "#FFD666",
-          shadowOpacity: leaderShadowOpacity,
-        },
+          isPrimaryCard && {
+            borderColor: primaryBorder,
+            shadowColor: withAlpha(accentActive, 0.28),
+          },
+          rankAccent && {
+            borderColor: rankAccent.border,
+            backgroundColor: rankAccent.background,
+            shadowColor: rankAccent.shadowColor,
+            shadowOpacity: rankAccent.shadowOpacity,
+          },
+          isLeader && {
+            shadowColor: "#FFD666",
+            shadowOpacity: leaderShadowOpacity,
+          },
       ]}
     >
       <View style={styles.headerRow}>
         <View style={styles.nameWrap}>
+          {rankBadge ? (
+            <View
+              style={[
+                styles.rankBadge,
+                rank === 1 && styles.rankBadgeGold,
+                rank === 2 && styles.rankBadgeSilver,
+                rank === 3 && styles.rankBadgeBronze,
+              ]}
+            >
+              <ThemedText style={styles.rankBadgeText}>{rankBadge}</ThemedText>
+            </View>
+          ) : null}
           {medal ? <ThemedText style={styles.rankMedal}>{medal}</ThemedText> : null}
-          <ThemedText
-            style={[nameStyle, isPrimaryCard && styles.namePrimary]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {name}
-          </ThemedText>
+            <ThemedText
+              style={[nameStyle, isPrimaryCard && styles.namePrimary, showRank && styles.nameRanked]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {name}
+            </ThemedText>
         </View>
       </View>
 
       {showRank && rivalLabel ? (
         <View style={styles.rivalRow}>
-          <View style={[styles.rivalDot, { backgroundColor: accentActive }]} />
+          <View style={[styles.rivalDot, { backgroundColor: rivalDotColor }]} />
           <ThemedText style={styles.rivalText}>{rivalLabel}</ThemedText>
         </View>
       ) : null}
 
-      <View style={styles.progressBlock}>
+      <View style={[styles.progressBlock, !showRank && styles.progressBlockMyView]}>
         <View style={styles.progressMetaRow}>
-          <ThemedText style={styles.progressLabel}>Monthly progress</ThemedText>
+          <ThemedText style={[styles.progressLabel, showRank && styles.progressLabelRanked]}>
+            Monthly progress
+          </ThemedText>
           <ThemedText style={countStyle}>
             {activeDays}/{totalDays}
           </ThemedText>
         </View>
-        <View style={styles.progressTrack}>
+        <View style={[styles.progressTrack, showRank && styles.progressTrackRanked]}>
             <Animated.View
               style={[
                 styles.progressFillWrap,
                 {
                   width: animatedWidth,
-                  shadowColor: gradientEnd,
+                  shadowColor: progressGlow,
                   shadowOpacity: barGlowAnim,
                 },
               ]}
             >
               <LinearGradient
-                colors={[withAlpha(accentActive, 1), gradientEnd, withAlpha(gradientEnd, 0.96)]}
+                colors={[progressStart, progressMid, progressEnd]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.progressFill}
@@ -357,15 +424,17 @@ export function UserCard({
         </ThemedText>
       ) : null}
 
-      <View pointerEvents={disabled ? "none" : "auto"} style={styles.gridWrap}>
-        <UserDayGrid
-          days={days}
-          accentActive={accentActive}
-          onToggle={onToggle}
-          todayIndex={todayIndex}
-          compact={showRank}
-        />
-      </View>
+      {!showRank ? (
+        <View pointerEvents={disabled ? "none" : "auto"} style={styles.gridWrap}>
+          <UserDayGrid
+            days={days}
+            accentActive={accentActive}
+            onToggle={onToggle}
+            todayIndex={todayIndex}
+            compact={showRank}
+          />
+        </View>
+      ) : null}
 
       <View
         style={[
@@ -377,15 +446,19 @@ export function UserCard({
         ]}
       >
         <ThemedText style={[styles.streakEmoji, { color: accentActive }]}>🔥</ThemedText>
-        <View style={styles.streakTextRow}>
-          <ThemedText style={styles.streakLabel}>Streak</ThemedText>
-          <ThemedText style={styles.streakValue}>
-            {streak} {streak === 1 ? "Day" : "Days"}
-          </ThemedText>
-          <ThemedText style={styles.streakDivider}>-</ThemedText>
-          <ThemedText style={styles.streakMood}>{streakMood(streak)}</ThemedText>
+          <View style={styles.streakTextRow}>
+            <ThemedText style={styles.streakLabel}>Streak</ThemedText>
+            <ThemedText style={styles.streakValue}>
+              {streak} {streak === 1 ? "Day" : "Days"}
+            </ThemedText>
+            {!showRank ? (
+              <>
+                <ThemedText style={styles.streakDivider}>-</ThemedText>
+                <ThemedText style={styles.streakMood}>{streakMood(streak)}</ThemedText>
+              </>
+            ) : null}
+          </View>
         </View>
-      </View>
     </Animated.View>
   );
 }
@@ -425,8 +498,36 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   rankMedal: {
-    fontSize: 21,
-    lineHeight: 24,
+    fontSize: 23,
+    lineHeight: 25,
+  },
+  rankBadge: {
+    width: 46,
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rankBadgeGold: {
+    borderColor: "rgba(255,214,102,0.96)",
+    backgroundColor: "rgba(255,214,102,0.26)",
+  },
+  rankBadgeSilver: {
+    borderColor: "rgba(232,240,255,0.94)",
+    backgroundColor: "rgba(188,200,224,0.2)",
+  },
+  rankBadgeBronze: {
+    borderColor: "rgba(214,136,78,0.94)",
+    backgroundColor: "rgba(156,94,48,0.18)",
+  },
+  rankBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: 0.2,
   },
   name: {
     fontSize: 28,
@@ -439,6 +540,10 @@ const styles = StyleSheet.create({
   },
   namePrimary: {
     fontSize: 30,
+  },
+  nameRanked: {
+    paddingTop: 1,
+    paddingBottom: 0,
   },
   nameMuted: {
     fontSize: 28,
@@ -474,7 +579,7 @@ const styles = StyleSheet.create({
   rivalRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 4,
     marginTop: -2,
   },
   rivalDot: {
@@ -483,15 +588,19 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   rivalText: {
-    color: "rgba(244,238,255,0.68)",
-    fontSize: 12,
-    fontWeight: "700",
+    color: "rgba(244,238,255,0.62)",
+    fontSize: 11.5,
+    fontWeight: "800",
     lineHeight: 16,
   },
 
   progressBlock: {
     marginTop: 1,
     marginBottom: 2,
+  },
+  progressBlockMyView: {
+    width: 323,
+    alignSelf: "flex-start",
   },
   progressMetaRow: {
     flexDirection: "row",
@@ -500,19 +609,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   progressLabel: {
-    color: "rgba(255,255,255,0.5)",
+    color: "rgba(255,255,255,0.32)",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.35,
     textTransform: "uppercase",
   },
+  progressLabelRanked: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+  },
   progressTrack: {
-    height: 12,
+    height: 10,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.05)",
     overflow: "hidden",
+  },
+  progressTrackRanked: {
+    height: 14,
   },
   progressFillWrap: {
     height: "100%",
@@ -567,11 +683,12 @@ const styles = StyleSheet.create({
   streakCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    alignSelf: "center",
+    gap: 5,
     borderRadius: 12,
     borderWidth: 1,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     marginTop: 0,
   },
   streakTextRow: {
@@ -581,29 +698,35 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   streakEmoji: {
-    fontSize: 13,
-    lineHeight: 14,
+    fontSize: 12,
+    lineHeight: 13,
   },
   streakLabel: {
-    color: "rgba(255,255,255,0.68)",
+    color: "rgba(255,255,255,0.58)",
     fontSize: 10,
     fontWeight: "700",
     lineHeight: 12,
   },
   streakValue: {
     color: "#FFFFFF",
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "800",
-    lineHeight: 18,
+    lineHeight: 17,
+  },
+  streakRankValue: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 16,
   },
   streakDivider: {
     color: "rgba(255,255,255,0.28)",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
-    lineHeight: 13,
+    lineHeight: 12,
   },
   streakMood: {
-    color: "rgba(255,255,255,0.56)",
+    color: "rgba(255,255,255,0.44)",
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 12,

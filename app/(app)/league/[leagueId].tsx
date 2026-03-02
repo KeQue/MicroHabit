@@ -13,6 +13,7 @@ import {
   Animated,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -312,6 +313,7 @@ export default function LeagueDetailScreen() {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [leagueName, setLeagueName] = useState<string>("League");
@@ -373,7 +375,7 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
     return data ?? [];
   }
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!leagueId) return;
 
     try {
@@ -467,12 +469,20 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
     } finally {
       setLoading(false);
     }
-  }
+  }, [leagueId, month, monthDays, router, year]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId]);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     listAnim.setValue(0);
@@ -514,7 +524,11 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
           );
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (__DEV__) {
+          console.log("[league daily_logs realtime]", leagueId, status);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -530,16 +544,19 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
         "postgres_changes",
         { event: "*", schema: "public", table: "league_members", filter: `league_id=eq.${leagueId}` },
         () => {
-          load();
+          void load();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (__DEV__) {
+          console.log("[league league_members realtime]", leagueId, status);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId]);
+  }, [leagueId, load]);
 
   const membersToRender = useMemo((): RenderedMember[] => {
     if (viewMode === "Ranking") {
@@ -783,6 +800,7 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
             <View style={styles.headerBar}>

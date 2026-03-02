@@ -24,6 +24,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    const syncRealtimeAuth = (nextSession: Session | null) => {
+      const token = nextSession?.access_token;
+      if (!token) return;
+      void supabase.realtime.setAuth(token);
+    };
+
     (async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
@@ -31,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return;
 
         const s = data.session ?? null;
+        syncRealtimeAuth(s);
         setSession(s);
         setUser(s?.user ?? null);
         if (s?.user) {
@@ -45,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (!mounted) return;
+      syncRealtimeAuth(newSession ?? null);
       setSession(newSession ?? null);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {

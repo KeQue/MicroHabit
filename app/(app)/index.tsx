@@ -11,9 +11,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { isCurrentUserAdmin } from "../../features/auth/admin";
 import { ensureProfileForCurrentUser } from "../../features/auth/profile";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
-import { getCommitmentPlan, getPlanName, type PlanTier, type UserTier } from "../../features/leagues/plans";
+import { getCommitmentPlan, getPlanName, type PlanTier } from "../../features/leagues/plans";
 import { supabase } from "../../lib/supabase";
 
 const getMonthKey = (d = new Date()) =>
@@ -54,6 +55,7 @@ export default function LeaguesScreen() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newActivity, setNewActivity] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   async function resolveUser() {
     const u = await ensureProfileForCurrentUser();
@@ -62,36 +64,15 @@ export default function LeaguesScreen() {
     return u.id;
   }
 
-  async function getMyTier(uid: string): Promise<UserTier> {
-    const { data, error, status } = await supabase
-      .from("profiles")
-      .select("plan_tier")
-      .eq("id", uid)
-      .single();
-
-    if (error && status !== 406) throw error;
-    const t = (data?.plan_tier ?? "free") as UserTier;
-    return t || "free";
-  }
-
-  async function isPaywallEnabled() {
-    try {
-      const { data, error } = await supabase.rpc("get_paywall_enabled");
-      if (error) throw error;
-      return Boolean(data);
-    } catch {
-      return true;
-    }
-  }
-
   async function load() {
     try {
       setError(null);
       setLoading(true);
 
       const uid = userId ?? (await resolveUser());
-      const data = await getMyLeagues(uid);
+      const [data, admin] = await Promise.all([getMyLeagues(uid), isCurrentUserAdmin().catch(() => false)]);
       setLeagues(data);
+      setIsAdmin(admin);
     } catch (e: any) {
       setError(normalizeErr(e) ?? "Failed to load leagues");
     } finally {
@@ -135,18 +116,7 @@ export default function LeaguesScreen() {
         throw new Error("Please choose a commitment level first");
       }
 
-      const uid = userId ?? (await resolveUser());
-
-      if (!isFreeSelected) {
-        const [myTier, paywallEnabled] = await Promise.all([getMyTier(uid), isPaywallEnabled()]);
-        if (paywallEnabled && myTier === "free") {
-          router.push({
-            pathname: "/(app)/paywall",
-            params: { reason: "upgrade_required", next: "/(app)" },
-          });
-          return;
-        }
-      }
+      await (userId ?? resolveUser());
 
       if (!newName.trim()) throw new Error("League name is required");
       if (!newActivity.trim()) throw new Error("Activity is required");
@@ -174,17 +144,21 @@ export default function LeaguesScreen() {
       setIsFreeSelected(false);
 
       await load();
-      router.push(`/(app)/league/${league.id}`);
-    } catch (e: any) {
-      const msg = normalizeErr(e);
-      if (msg.toLowerCase().includes("payment required")) {
+
+      if (!isFreeSelected && league.status === "payment_required") {
         router.push({
-          pathname: "/(app)/paywall",
-          params: { reason: "upgrade_required", next: "/(app)" },
+          pathname: "/(app)/league/purchase",
+          params: {
+            leagueId: league.id,
+            next: `/(app)/league/${league.id}`,
+          },
         });
         return;
       }
-      setError(msg);
+
+      router.push(`/(app)/league/${league.id}`);
+    } catch (e: any) {
+      setError(normalizeErr(e));
     } finally {
       setCreating(false);
       creatingRef.current = false;
@@ -198,7 +172,7 @@ export default function LeaguesScreen() {
 
   function onStartCreate() {
     setError(null);
-    router.push({ pathname: "/league/choose-plan", params: { source: "create" } });
+    router.push("/league/choose-plan");
   }
 
   function resetCreate() {
@@ -243,24 +217,42 @@ export default function LeaguesScreen() {
 
         <View style={styles.actionStack}>
           {showCreate ? (
-            <Pressable onPress={onStartCreate} style={({ pressed }) => [styles.backBtn, pressed && styles.actionPressed]}>
+            <Pressable
+              onPress={onStartCreate}
+              style={({ pressed }) => [styles.backBtn, pressed && styles.actionPressed]}
+            >
               <Text style={styles.backBtnText}>Back to plans</Text>
             </Pressable>
           ) : (
-            <Pressable onPress={onStartCreate} style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}>
+            <Pressable
+              onPress={onStartCreate}
+              style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
+            >
               <Text style={styles.actionTitle}>+ Create a league</Text>
               <Text style={styles.actionSubtitle}>Start a new accountability group.</Text>
             </Pressable>
           )}
 
           {!showCreate ? (
-            <Pressable
-              onPress={() => router.push("/(app)/league/join")}
-              style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
-            >
-              <Text style={styles.actionTitle}>Join with code</Text>
-              <Text style={styles.actionSubtitle}>Jump into an existing league in seconds.</Text>
-            </Pressable>
+            <>
+              <Pressable
+                onPress={() => router.push("/(app)/league/join")}
+                style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
+              >
+                <Text style={styles.actionTitle}>Join with code</Text>
+                <Text style={styles.actionSubtitle}>Jump into an existing league in seconds.</Text>
+              </Pressable>
+
+              {isAdmin ? (
+                <Pressable
+                  onPress={() => router.push("/(app)/reports")}
+                  style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
+                >
+                  <Text style={styles.actionTitle}>League reports</Text>
+                  <Text style={styles.actionSubtitle}>Review pending rewards, charity totals, and leagues awaiting settlement.</Text>
+                </Pressable>
+              ) : null}
+            </>
           ) : null}
         </View>
 
@@ -270,11 +262,20 @@ export default function LeaguesScreen() {
               <View style={styles.selectedPlanWrap}>
                 <Text style={styles.selectedPlanLabel}>SELECTED PLAN</Text>
                 <Text style={styles.selectedPlanTitle}>
-                  {selectedPlan.fullName} · {"\u20AC"}
-                  {selectedPlan.priceEuros} per person
+                  {selectedPlan.fullName} - ${selectedPlan.priceEuros} per person
                 </Text>
                 <Text style={styles.selectedPlanMessage}>{selectedPlan.message}</Text>
                 <Text style={styles.selectedPlanMeta}>{selectedPlan.quickDifference}</Text>
+                <Text style={styles.selectedPlanMeta}>{selectedPlan.summary}</Text>
+                {selectedPlan.secondarySummary ? (
+                  <Text style={styles.selectedPlanMeta}>{selectedPlan.secondarySummary}</Text>
+                ) : null}
+                {selectedPlan.unlockLabel ? (
+                  <Text style={styles.selectedPlanMetaHighlight}>{selectedPlan.unlockLabel}</Text>
+                ) : null}
+                {selectedPlan.purchaseNote ? (
+                  <Text style={styles.selectedPlanMeta}>{selectedPlan.purchaseNote}</Text>
+                ) : null}
               </View>
             ) : null}
 
@@ -369,11 +370,27 @@ export default function LeaguesScreen() {
                 {leagues.map((item) => (
                   <Pressable
                     key={item.id}
-                    onPress={() => router.push(`/(app)/league/${item.id}`)}
+                    onPress={() => {
+                      if (item.my_payment_status === "unpaid" && item.plan_tier) {
+                        router.push({
+                          pathname: "/(app)/league/purchase",
+                          params: {
+                            leagueId: item.id,
+                            next: `/(app)/league/${item.id}`,
+                          },
+                        });
+                        return;
+                      }
+
+                      router.push(`/(app)/league/${item.id}`);
+                    }}
                     style={({ pressed }) => [styles.leagueCard, pressed && styles.actionPressed]}
                   >
                     <Text style={styles.leagueName}>{item.name ?? "Untitled league"}</Text>
                     {item.activity ? <Text style={styles.leagueActivity}>{item.activity}</Text> : null}
+                    {item.my_payment_status === "unpaid" && item.plan_tier ? (
+                      <Text style={styles.leagueMeta}>Payment required before you can participate.</Text>
+                    ) : null}
                   </Pressable>
                 ))}
               </View>
@@ -500,6 +517,12 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontSize: 12,
     lineHeight: 18,
+  },
+  selectedPlanMetaHighlight: {
+    color: "#FCD34D",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "700",
   },
   createCard: {
     marginTop: 12,
@@ -687,5 +710,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: "#A7B0BC",
     fontSize: 14,
+  },
+  leagueMeta: {
+    marginTop: 6,
+    color: "#FCD34D",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

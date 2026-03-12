@@ -302,7 +302,6 @@ export default function LeagueDetailScreen() {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
-  const todayWeekday = today.getDay();
   const todayIndex = today.getDate() - 1;
   const monthDays = useMemo(() => new Date(year, month + 1, 0).getDate(), [year, month]);
 
@@ -319,9 +318,10 @@ export default function LeagueDetailScreen() {
   const [leagueName, setLeagueName] = useState<string>("League");
   const [leagueActivity, setLeagueActivity] = useState<string>("");
   const [leaguePlanTier, setLeaguePlanTier] = useState<PlanTier | null>(null);
-
   const [leagueIsFree, setLeagueIsFree] = useState<boolean>(false);
+  const [leagueStatus, setLeagueStatus] = useState<string>("active");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [myPaymentStatus, setMyPaymentStatus] = useState<string>("free");
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -393,7 +393,7 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
 
       const { data: leagueRow, error: leagueErr } = await supabase
         .from("leagues")
-        .select("id,name,activity,plan_tier,is_free,invite_code")
+        .select("id,name,activity,plan_tier,is_free,status,invite_code")
         .eq("id", leagueId)
         .single();
       if (leagueErr) throw leagueErr;
@@ -401,14 +401,24 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
       setLeagueName(leagueRow?.name ?? "League");
       setLeagueActivity(leagueRow?.activity ?? "");
       setLeaguePlanTier((leagueRow?.plan_tier as PlanTier) ?? null);
-
       setLeagueIsFree(!!leagueRow?.is_free);
+      setLeagueStatus((leagueRow?.status as string) ?? "active");
       setInviteCode((leagueRow?.invite_code as string) ?? null);
 
       const rows = await getLeagueMembers(leagueId);
 
       const me = rows.find((r: any) => r.user_id === user.id);
       setMyRole((me?.role as string) ?? "member");
+
+      const { data: membershipRow, error: membershipErr, status: membershipStatus } = await supabase
+        .from("league_members")
+        .select("payment_status")
+        .eq("league_id", leagueId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (membershipErr && membershipStatus !== 406) throw membershipErr;
+      setMyPaymentStatus((membershipRow?.payment_status as string) ?? "free");
 
       const roleRank = (role?: string) => (role === "owner" ? 0 : role === "admin" ? 1 : 2);
 
@@ -603,6 +613,11 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
     async (memberId: string, dayIndex: string | number) => {
       const day = typeof dayIndex === "number" ? dayIndex : Number(dayIndex);
 
+      const canParticipate =
+        leagueIsFree || !leaguePlanTier || myPaymentStatus === "paid" || myPaymentStatus === "free";
+
+      if (!canParticipate) return;
+
       // only allow self
       if (!myId || memberId !== myId) return;
 
@@ -650,10 +665,13 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
         );
       }
     },
-    [leagueId, members, monthDays, myId, year, month, todayIndex]
+    [leagueId, leagueIsFree, leaguePlanTier, members, monthDays, myId, myPaymentStatus, year, month, todayIndex]
   );
 
-  const showInvite = myRole === "owner" || myRole === "admin" || myRole === "member";
+  const canParticipate =
+    leagueIsFree || !leaguePlanTier || myPaymentStatus === "paid" || myPaymentStatus === "free";
+  const showInvite =
+    canParticipate && (myRole === "owner" || myRole === "admin" || myRole === "member");
   const bgColors =
     viewMode === "Ranking"
       ? (["#11041F", "#1D0D38", "#160A2D"] as const)
@@ -850,10 +868,35 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
             ) : null}
           </View>
 
+          {!canParticipate && leaguePlanTier ? (
+            <View style={styles.paymentNotice}>
+              <Text style={styles.paymentNoticeTitle}>Payment required</Text>
+              <Text style={styles.paymentNoticeText}>
+                Complete league entry purchase before logging activity or inviting others.
+              </Text>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/league/purchase",
+                    params: {
+                      leagueId,
+                      next: `/(app)/league/${leagueId}`,
+                    },
+                  })
+                }
+                style={styles.paymentNoticeBtn}
+              >
+                <Text style={styles.paymentNoticeBtnText}>
+                  {leagueStatus === "payment_required" ? "Continue to payment" : "Open payment"}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           {false ? (
             <View style={styles.activityChip}>
               <Text style={styles.activityChipEmoji}>{emojiForActivity(leagueActivity)}</Text>
-              <Text style={styles.metaDivider}>Â·</Text>
+              <Text style={styles.metaDivider}>-</Text>
               <Text style={styles.activityChipText}>{leagueActivity}</Text>
             </View>
           ) : null}
@@ -899,11 +942,11 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
                       subtitle={member.subtitle}
                       days={member.days}
                       colorDark={member.colorDark}
-                    accentActive={member.accentActive}
-                    todayIndex={todayIndex}
-                    disabled={!!myId && member.id !== myId}
-                    onToggle={(i) => toggleDayForMember(member.id, i)}
-                    showRank={viewMode === "Ranking"}
+                      accentActive={member.accentActive}
+                      todayIndex={todayIndex}
+                      disabled={!canParticipate || (!!myId && member.id !== myId)}
+                      onToggle={(i) => toggleDayForMember(member.id, i)}
+                      showRank={viewMode === "Ranking"}
                       rank={rank}
                       rivalLabel={rivalLabel}
                     />
@@ -1018,6 +1061,40 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 17,
     textAlign: "center",
+  },
+  paymentNotice: {
+    marginTop: 12,
+    marginBottom: 6,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.28)",
+    backgroundColor: "rgba(120,53,15,0.22)",
+    gap: 8,
+  },
+  paymentNoticeTitle: {
+    color: "#FDE68A",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  paymentNoticeText: {
+    color: "rgba(254,243,199,0.88)",
+    lineHeight: 20,
+    fontSize: 13,
+  },
+  paymentNoticeBtn: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(245,158,11,0.35)",
+    backgroundColor: "rgba(245,158,11,0.14)",
+  },
+  paymentNoticeBtnText: {
+    color: "#FEF3C7",
+    fontSize: 13,
+    fontWeight: "800",
   },
   activitySpacer: {
     width: 0,

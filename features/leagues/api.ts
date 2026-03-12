@@ -5,6 +5,7 @@ import type { PlanTier } from "./plans";
  * Data types
  */
 export type LeagueStatus = "active" | "payment_required" | "completed" | string;
+export type LeaguePaymentStatus = "free" | "trial" | "unpaid" | "agreed" | "paid" | string;
 
 export type League = {
   id: string;
@@ -18,14 +19,19 @@ export type League = {
   winner_share_bps?: number | null;
   charity_share_bps?: number | null;
   qualification_days_min?: number | null;
+  players_count?: number | null;
+  gross_revenue_cents?: number | null;
+  estimated_store_fee_cents?: number | null;
+  net_revenue_cents?: number | null;
+  prize_amount_cents?: number | null;
+  charity_amount_cents?: number | null;
+  commito_margin_cents?: number | null;
+  max_players?: number | null;
 
-  // NEW
   is_free?: boolean | null;
   status?: LeagueStatus | null;
-
-  // Invite code (NEW)
+  my_payment_status?: LeaguePaymentStatus | null;
   invite_code?: string | null;
-
   created_at?: string | null;
 };
 
@@ -47,7 +53,7 @@ export type LeagueMember = {
 
 const LEAGUE_SELECT_BASE = "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at";
 const LEAGUE_SELECT_WITH_ECONOMICS =
-  "id,name,activity,plan_tier,month_key,is_free,entry_fee_cents,platform_fee_cents,winner_share_bps,charity_share_bps,qualification_days_min,status,invite_code,created_at";
+  "id,name,activity,plan_tier,month_key,is_free,entry_fee_cents,platform_fee_cents,winner_share_bps,charity_share_bps,qualification_days_min,players_count,gross_revenue_cents,estimated_store_fee_cents,net_revenue_cents,prize_amount_cents,charity_amount_cents,commito_margin_cents,max_players,status,invite_code,created_at";
 
 function isMissingEconomicsColumnError(error: any) {
   const message = String(error?.message ?? "").toLowerCase();
@@ -56,7 +62,15 @@ function isMissingEconomicsColumnError(error: any) {
     message.includes("platform_fee_cents") ||
     message.includes("winner_share_bps") ||
     message.includes("charity_share_bps") ||
-    message.includes("qualification_days_min")
+    message.includes("qualification_days_min") ||
+    message.includes("players_count") ||
+    message.includes("gross_revenue_cents") ||
+    message.includes("estimated_store_fee_cents") ||
+    message.includes("net_revenue_cents") ||
+    message.includes("prize_amount_cents") ||
+    message.includes("charity_amount_cents") ||
+    message.includes("commito_margin_cents") ||
+    message.includes("max_players")
   );
 }
 
@@ -105,13 +119,21 @@ export async function getMyLeagues(userId: string): Promise<League[]> {
   const { data, error } = await selectLeaguesWithFallback((selectClause) =>
     supabase
       .from("league_members")
-      .select(`league:leagues(${selectClause})`)
+      .select(`payment_status,league:leagues(${selectClause})`)
       .eq("user_id", userId)
   );
 
   if (error) throw error;
 
-  const leagues = (data ?? []).map((row: any) => row.league).filter(Boolean);
+  const leagues = (data ?? [])
+    .map((row: any) => {
+      if (!row.league) return null;
+      return {
+        ...row.league,
+        my_payment_status: (row.payment_status as LeaguePaymentStatus) ?? null,
+      } as League;
+    })
+    .filter(Boolean);
   return leagues as League[];
 }
 

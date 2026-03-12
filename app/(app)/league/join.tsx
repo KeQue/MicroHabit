@@ -68,6 +68,8 @@ export default function JoinLeagueScreen() {
 
       if (rpcError) {
         if (rpcError.message?.includes("invalid_invite_code")) throw new Error("Invalid invite code");
+        if (rpcError.message?.includes("league_closed")) throw new Error("This league is already completed.");
+        if (rpcError.message?.includes("league_full")) throw new Error("This league is full.");
         throw rpcError;
       }
 
@@ -77,16 +79,6 @@ export default function JoinLeagueScreen() {
       setLeagueInfo(info);
       setJoinedLeagueId(leagueId);
     } catch (e: any) {
-      const msg = (e?.message ?? "").toLowerCase();
-
-      if (msg.includes("payment_required") || msg.includes("paid")) {
-        router.push({
-          pathname: "/(app)/paywall",
-          params: { reason: "paid_required", code: trimmed },
-        });
-        return;
-      }
-
       setError(e?.message ?? "Failed to open invite");
     } finally {
       setLoading(false);
@@ -100,6 +92,8 @@ export default function JoinLeagueScreen() {
     return "Commitment level: -";
   }, [leagueInfo]);
 
+  const needsPurchase = !!leagueInfo?.plan_tier && !leagueInfo?.is_free;
+
   return (
     <View style={{ flex: 1, padding: 20, paddingTop: 70, backgroundColor: "#0B0F14" }}>
       <Text style={{ fontSize: 28, fontWeight: "700", color: "white" }}>Join league</Text>
@@ -108,7 +102,7 @@ export default function JoinLeagueScreen() {
         Paste an invite code to open a league invite.
       </Text>
 
-      {(loading) && (
+      {loading && (
         <View style={{ marginTop: 14 }}>
           <ActivityIndicator />
         </View>
@@ -135,18 +129,31 @@ export default function JoinLeagueScreen() {
           {planLabel ? (
             <Text style={{ color: "#A7B0BC" }}>
               {planLabel}
-              {leagueInfo.month_key ? ` • ${leagueInfo.month_key}` : ""}
+              {leagueInfo.month_key ? ` - ${leagueInfo.month_key}` : ""}
             </Text>
           ) : null}
 
           <Text style={{ color: "#A7B0BC" }}>
-            Invite accepted. You can continue.
+            {needsPurchase
+              ? "Invite accepted. Complete league entry purchase before participating."
+              : "Invite accepted. You can continue."}
           </Text>
 
           <Pressable
             onPress={() => {
               if (!joinedLeagueId) return;
-              router.replace(`/league/${joinedLeagueId}`);
+              if (needsPurchase) {
+                router.replace({
+                  pathname: "/(app)/league/purchase",
+                  params: {
+                    leagueId: joinedLeagueId,
+                    next: `/(app)/league/${joinedLeagueId}`,
+                  },
+                });
+                return;
+              }
+
+              router.replace(`/(app)/league/${joinedLeagueId}`);
             }}
             disabled={loading || !joinedLeagueId}
             style={{
@@ -160,7 +167,7 @@ export default function JoinLeagueScreen() {
             }}
           >
             <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
-              Continue to league
+              {needsPurchase ? "Continue to payment" : "Continue to league"}
             </Text>
           </Pressable>
         </View>

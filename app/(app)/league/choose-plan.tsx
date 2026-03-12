@@ -1,81 +1,14 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import React from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { PLAN_ORDER, getCommitmentPlan, type PlanTier } from "../../../features/leagues/plans";
-import { useAuth } from "../../../features/auth/useAuth";
-import { supabase } from "../../../lib/supabase";
-
-type Tier = "free" | PlanTier;
-type Source = "create" | "paywall";
 
 export default function ChoosePlanScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ source?: string }>();
-  const source: Source = params.source === "paywall" ? "paywall" : "create";
 
-  const { user } = useAuth();
-  const uid = user?.id;
-
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [enabledLoading, setEnabledLoading] = useState(true);
-  const [paywallEnabled, setPaywallEnabled] = useState<boolean>(false);
-
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      try {
-        setEnabledLoading(true);
-        const { data, error: e } = await supabase.rpc("get_paywall_enabled");
-        if (e) throw e;
-        if (!mounted) return;
-        setPaywallEnabled(Boolean(data));
-      } catch {
-        if (mounted) setPaywallEnabled(true);
-      } finally {
-        if (mounted) setEnabledLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const showPaidForTesting = !paywallEnabled;
-
-  async function setPlan(tier: Tier) {
-    try {
-      setError(null);
-      setSaving(true);
-
-      if (source === "create") {
-        if (tier === "free") {
-          router.replace({ pathname: "/(app)", params: { isFree: "1" } });
-        } else {
-          router.replace({ pathname: "/(app)", params: { planTier: tier } });
-        }
-        return;
-      }
-
-      if (!uid) throw new Error("Not authenticated");
-
-      const { error: e } = await supabase.from("profiles").update({ plan_tier: tier }).eq("id", uid);
-      if (e) throw e;
-
-      router.back();
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to update plan");
-    } finally {
-      setSaving(false);
-    }
+  function onSelect(tier: PlanTier) {
+    router.replace({ pathname: "/(app)", params: { planTier: tier } });
   }
-
-  const subtitle = useMemo(() => {
-    if (source === "create") return "Choose your commitment level.";
-    return "Pick the level you want to continue with after your trial month.";
-  }, [source]);
 
   return (
     <ScrollView
@@ -85,46 +18,39 @@ export default function ChoosePlanScreen() {
       bounces
     >
       <Text style={styles.title}>Choose your commitment level</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
+      <Text style={styles.subtitle}>Pick a plan first. Payment happens on the next step.</Text>
       <Text style={styles.helper}>Leagues run for 30 days</Text>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.notice}>
+        <Text style={styles.noticeTitle}>Store-billed leagues</Text>
+        <Text style={styles.noticeText}>
+          League entry is purchased per league on iOS and Android. Commito funds rewards and charity from league revenue.
+        </Text>
+      </View>
 
-      {enabledLoading || saving ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator />
-          <Text style={styles.loadingText}>{saving ? "Saving..." : "Loading..."}</Text>
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {showPaidForTesting ? (
-            PLAN_ORDER.map((tier) => {
-              const plan = getCommitmentPlan(tier);
-              return (
-                <PlanCard
-                  key={tier}
-                  title={plan.fullName}
-                  price={`\u20AC${plan.priceEuros} per person`}
-                  message={plan.message}
-                  quickDifference={plan.quickDifference}
-                  summary={plan.summary}
-                  secondarySummary={plan.secondarySummary}
-                  previewTitle={plan.previewTitle}
-                  preview={plan.preview}
-                  badge={plan.cta}
-                  accent={tier}
-                  featured={plan.featured}
-                  onPress={() => setPlan(tier)}
-                />
-              );
-            })
-          ) : (
-            <Text style={styles.lockedText}>
-              Payments are not wired yet. Disable the paywall toggle to test Friendly, Competitive, and Elite.
-            </Text>
-          )}
-        </View>
-      )}
+      <View style={styles.list}>
+        {PLAN_ORDER.map((tier) => {
+          const plan = getCommitmentPlan(tier);
+          return (
+            <PlanCard
+              key={tier}
+              title={plan.fullName}
+              price={`${plan.currencySymbol}${plan.priceEuros} per person`}
+              message={plan.message}
+              quickDifference={plan.quickDifference}
+              summary={plan.summary}
+              secondarySummary={plan.secondarySummary}
+              previewTitle={plan.previewTitle}
+              preview={plan.preview}
+              unlockLabel={plan.unlockLabel}
+              badge={plan.cta}
+              accent={tier}
+              featured={plan.featured}
+              onPress={() => onSelect(tier)}
+            />
+          );
+        })}
+      </View>
 
       <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
         <Text style={styles.cancelText}>Cancel</Text>
@@ -142,6 +68,7 @@ function PlanCard({
   secondarySummary,
   previewTitle,
   preview,
+  unlockLabel,
   badge,
   accent,
   featured,
@@ -155,6 +82,7 @@ function PlanCard({
   secondarySummary?: string;
   previewTitle?: string;
   preview?: string;
+  unlockLabel?: string;
   badge: string;
   accent: PlanTier;
   featured?: boolean;
@@ -242,6 +170,8 @@ function PlanCard({
         </View>
       ) : null}
 
+      {unlockLabel ? <Text style={styles.unlockLabel}>{unlockLabel}</Text> : null}
+
       <Text style={styles.cardHint}>Tap to continue</Text>
     </Pressable>
   );
@@ -276,27 +206,27 @@ const styles = StyleSheet.create({
     color: "#718096",
     fontWeight: "600",
   },
-  error: {
-    marginTop: 12,
-    color: "#FCA5A5",
-    fontWeight: "600",
+  notice: {
+    marginTop: 18,
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "#101826",
+    gap: 6,
   },
-  loadingWrap: {
-    marginTop: 28,
-    alignItems: "center",
+  noticeTitle: {
+    color: "white",
+    fontSize: 15,
+    fontWeight: "800",
   },
-  loadingText: {
-    marginTop: 10,
+  noticeText: {
     color: "#A7B0BC",
+    lineHeight: 20,
   },
   list: {
-    marginTop: 28,
+    marginTop: 22,
     gap: 14,
-  },
-  lockedText: {
-    color: "#A7B0BC",
-    marginTop: 6,
-    lineHeight: 20,
   },
   cancelBtn: {
     marginTop: 22,
@@ -388,6 +318,13 @@ const styles = StyleSheet.create({
     color: "#E2E8F0",
     fontSize: 15,
     lineHeight: 20,
+    fontWeight: "700",
+  },
+  unlockLabel: {
+    marginTop: 10,
+    color: "#FCD34D",
+    fontSize: 12,
+    lineHeight: 18,
     fontWeight: "700",
   },
   cardHint: {

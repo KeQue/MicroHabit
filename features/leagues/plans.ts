@@ -6,6 +6,7 @@ export type CommitmentPlan = {
   name: string;
   fullName: string;
   priceEuros: number;
+  currencySymbol: string;
   tone: string;
   message: string;
   quickDifference: string;
@@ -15,6 +16,10 @@ export type CommitmentPlan = {
   previewTitle?: string;
   preview: string;
   featured?: boolean;
+  purchaseNote?: string;
+  minPlayers?: number;
+  maxPlayers?: number;
+  unlockLabel?: string;
 };
 
 const PLAN_MAP: Record<PlanTier, CommitmentPlan> = {
@@ -23,38 +28,55 @@ const PLAN_MAP: Record<PlanTier, CommitmentPlan> = {
     name: "Friendly",
     fullName: "Friendly League",
     priceEuros: 5,
+    currencySymbol: "$",
     tone: "Social accountability",
     message: "Commit together. Give together.",
-    quickDifference: "No winner. All to charity.",
-    summary: "All contributions go to charity.",
+    quickDifference: "No winner. All to charity. Up to 20 players.",
+    summary: "100% of net league revenue goes to charity.",
+    secondarySummary: "Friendly is the charity-first option.",
     cta: "Easy start",
     preview: "",
+    purchaseNote: "Store purchase required on iOS and Android before the league starts.",
+    maxPlayers: 20,
   },
   B: {
     tier: "B",
     name: "Competitive",
     fullName: "Competitive League",
     priceEuros: 10,
+    currencySymbol: "$",
     tone: "Balanced competition",
     message: "Show up. Or pay up.",
-    quickDifference: "Winner takes most of the pot.",
-    summary: "70% to winner · 30% to charity",
+    quickDifference: "Minimum 2 players. Maximum 20 players.",
+    summary: "Reward ladder: 2-3 players USD10, 4-6 USD22, 7-10 USD40, 11-15 USD65, 16-20 USD95.",
+    secondarySummary: "A symbolic portion also supports charity. Bigger leagues unlock bigger rewards.",
     cta: "Most popular",
-    previewTitle: "Example with 4 players",
-    preview: "Winner ≈ \u20AC25",
+    previewTitle: "Competitive reward ladder",
+    preview: "Invite more friends to unlock the next reward band.",
     featured: true,
+    purchaseNote: "Store purchase required on iOS and Android before you can participate.",
+    minPlayers: 2,
+    maxPlayers: 20,
+    unlockLabel: "Reward unlocks once 2 paid players join.",
   },
   C: {
     tier: "C",
     name: "Elite",
     fullName: "Elite League",
     priceEuros: 20,
+    currencySymbol: "$",
     tone: "Serious commitment",
     message: "Highest stakes. Biggest reward.",
-    quickDifference: "Highest stakes. Biggest reward.",
-    summary: "80% to winner · 20% to charity",
+    quickDifference: "Minimum 3 players. Maximum 20 players. Elite requires 20 active days to qualify.",
+    summary: "Reward ladder: 3-4 players USD28, 5-7 USD55, 8-10 USD95, 11-15 USD145, 16-20 USD200.",
+    secondarySummary: "A symbolic portion also supports charity. Bigger leagues unlock bigger rewards.",
     cta: "Highest commitment",
-    preview: "",
+    previewTitle: "Elite reward ladder",
+    preview: "Bigger leagues unlock bigger rewards.",
+    purchaseNote: "Store purchase required on iOS and Android before you can participate.",
+    minPlayers: 3,
+    maxPlayers: 20,
+    unlockLabel: "Reward unlocks once 3 paid players join.",
   },
 };
 

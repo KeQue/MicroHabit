@@ -3,9 +3,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { useAuth } from "../../features/auth/useAuth";
+import { getUserTierLabel, type UserTier } from "../../features/leagues/plans";
 import { supabase } from "../../lib/supabase";
-
-type Tier = "free" | "A" | "B" | "C";
 
 export default function PaywallScreen() {
   const router = useRouter();
@@ -16,7 +15,7 @@ export default function PaywallScreen() {
   const uid = user?.id;
 
   const [loading, setLoading] = useState(true);
-  const [tier, setTier] = useState<Tier>("free");
+  const [tier, setTier] = useState<UserTier>("free");
   const [error, setError] = useState<string | null>(null);
 
   const [paywallEnabled, setPaywallEnabled] = useState<boolean>(true);
@@ -48,7 +47,7 @@ export default function PaywallScreen() {
 
       if (e && status !== 406) throw e;
 
-      const t = ((data?.plan_tier ?? "free") as Tier) || "free";
+      const t = ((data?.plan_tier ?? "free") as UserTier) || "free";
       setTier(t);
 
       // 3) If user already paid => exit paywall
@@ -97,7 +96,7 @@ export default function PaywallScreen() {
     if (!paywallEnabled) {
       router.push({
         pathname: "/(app)/league/choose-plan",
-        params: code ? { code } : {},
+        params: code ? { source: "paywall", code } : { source: "paywall" },
       });
       return;
     }
@@ -105,7 +104,7 @@ export default function PaywallScreen() {
     // Paywall ON => do NOT route to choose-plan (it only shows Free and causes loop)
     Alert.alert(
       "Purchase not implemented",
-      "Payments are not wired yet. For now you can disable the paywall toggle to test A/B/C.",
+      "Payments are not wired yet. For now you can disable the paywall toggle to test Friendly, Competitive, and Elite.",
       [{ text: "OK" }]
     );
   };
@@ -115,8 +114,27 @@ export default function PaywallScreen() {
       <Text style={{ fontSize: 34, fontWeight: "900", color: "white" }}>Upgrade required</Text>
 
       <Text style={{ marginTop: 10, fontSize: 16, color: "#A7B0BC" }}>
-        This action requires a paid plan.
+        This action requires a commitment plan after the free trial month.
       </Text>
+
+      <View
+        style={{
+          marginTop: 18,
+          padding: 16,
+          borderRadius: 16,
+          backgroundColor: "#101826",
+          borderWidth: 1,
+          borderColor: "#0F172A",
+          gap: 8,
+        }}
+      >
+        <Text style={{ color: "white", fontSize: 17, fontWeight: "800" }}>
+          Friendly EUR5 • Competitive EUR10 • Elite EUR20
+        </Text>
+        <Text style={{ color: "#A7B0BC", lineHeight: 20 }}>
+          Choose your commitment level to keep the league going when the month resets.
+        </Text>
+      </View>
 
       {error ? <Text style={{ marginTop: 12, color: "#FCA5A5" }}>{error}</Text> : null}
 
@@ -133,7 +151,7 @@ export default function PaywallScreen() {
         }}
       >
         <Text style={{ color: "white", fontSize: 18, fontWeight: "800" }}>
-          {paywallEnabled ? "Purchase a paid plan" : "Choose a paid plan (testing)"}
+          {paywallEnabled ? "Choose a commitment plan" : "Choose a commitment plan (testing)"}
         </Text>
       </Pressable>
 
@@ -141,7 +159,7 @@ export default function PaywallScreen() {
         <Text style={{ textAlign: "center", color: "#A7B0BC" }}>Back</Text>
       </Pressable>
 
-      <Text style={{ marginTop: 16, color: "#334155" }}>Current tier: {tier}</Text>
+      <Text style={{ marginTop: 16, color: "#334155" }}>Current tier: {getUserTierLabel(tier)}</Text>
       <Text style={{ marginTop: 6, color: "#334155" }}>
         Paywall enabled: {String(paywallEnabled)}
       </Text>

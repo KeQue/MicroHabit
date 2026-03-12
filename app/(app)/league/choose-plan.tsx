@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { PLAN_ORDER, getCommitmentPlan, type PlanTier } from "../../../features/leagues/plans";
 import { useAuth } from "../../../features/auth/useAuth";
 import { supabase } from "../../../lib/supabase";
 
-type Tier = "free" | "A" | "B" | "C";
+type Tier = "free" | PlanTier;
 type Source = "create" | "paywall";
 
 export default function ChoosePlanScreen() {
@@ -60,11 +61,7 @@ export default function ChoosePlanScreen() {
 
       if (!uid) throw new Error("Not authenticated");
 
-      const { error: e } = await supabase
-        .from("profiles")
-        .update({ plan_tier: tier })
-        .eq("id", uid);
-
+      const { error: e } = await supabase.from("profiles").update({ plan_tier: tier }).eq("id", uid);
       if (e) throw e;
 
       router.back();
@@ -76,16 +73,20 @@ export default function ChoosePlanScreen() {
   }
 
   const subtitle = useMemo(() => {
-    if (source === "create") {
-      return "Pick the kind of league you want to start.";
-    }
-    return "Choose the plan that unlocks your next league tier.";
+    if (source === "create") return "Choose your commitment level.";
+    return "Pick the level you want to continue with after your trial month.";
   }, [source]);
 
   return (
-    <View style={styles.screen}>
-      <Text style={styles.title}>Choose a plan</Text>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+      bounces
+    >
+      <Text style={styles.title}>Choose your commitment level</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
+      <Text style={styles.helper}>Leagues run for 30 days</Text>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -96,38 +97,30 @@ export default function ChoosePlanScreen() {
         </View>
       ) : (
         <View style={styles.list}>
-          <PlanCard
-            title="Free"
-            subtitle="Start with one league and keep the habit simple."
-            badge="FREE"
-            accent="free"
-            onPress={() => setPlan("free")}
-          />
-
           {showPaidForTesting ? (
-            <>
-              <PlanCard
-                title="Plus"
-                subtitle="Create more leagues and keep multiple groups active."
-                accent="plus"
-                onPress={() => setPlan("A")}
-              />
-              <PlanCard
-                title="Circle"
-                subtitle="A cleaner fit for more serious accountability groups."
-                accent="circle"
-                onPress={() => setPlan("B")}
-              />
-              <PlanCard
-                title="Team"
-                subtitle="Best for several active leagues running at once."
-                accent="team"
-                onPress={() => setPlan("C")}
-              />
-            </>
+            PLAN_ORDER.map((tier) => {
+              const plan = getCommitmentPlan(tier);
+              return (
+                <PlanCard
+                  key={tier}
+                  title={plan.fullName}
+                  price={`\u20AC${plan.priceEuros} per person`}
+                  message={plan.message}
+                  quickDifference={plan.quickDifference}
+                  summary={plan.summary}
+                  secondarySummary={plan.secondarySummary}
+                  previewTitle={plan.previewTitle}
+                  preview={plan.preview}
+                  badge={plan.cta}
+                  accent={tier}
+                  featured={plan.featured}
+                  onPress={() => setPlan(tier)}
+                />
+              );
+            })
           ) : (
             <Text style={styles.lockedText}>
-              Paid plans will appear here once purchases are enabled.
+              Payments are not wired yet. Disable the paywall toggle to test Friendly, Competitive, and Elite.
             </Text>
           )}
         </View>
@@ -136,51 +129,61 @@ export default function ChoosePlanScreen() {
       <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
         <Text style={styles.cancelText}>Cancel</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
 function PlanCard({
   title,
-  subtitle,
+  price,
+  message,
+  quickDifference,
+  summary,
+  secondarySummary,
+  previewTitle,
+  preview,
   badge,
   accent,
+  featured,
   onPress,
 }: {
   title: string;
-  subtitle: string;
-  badge?: string;
-  accent: "free" | "plus" | "circle" | "team";
+  price: string;
+  message: string;
+  quickDifference: string;
+  summary: string;
+  secondarySummary?: string;
+  previewTitle?: string;
+  preview?: string;
+  badge: string;
+  accent: PlanTier;
+  featured?: boolean;
   onPress: () => void;
 }) {
   const accentMap = {
-    free: {
-      border: "rgba(41,208,171,0.34)",
-      bg: "rgba(14,48,42,0.45)",
-      badgeBg: "rgba(10,55,48,0.9)",
-      badgeBorder: "rgba(41,208,171,0.72)",
-      badgeText: "#8FF9E7",
+    A: {
+      border: "rgba(83,211,169,0.34)",
+      bg: "rgba(8,45,39,0.72)",
+      badgeBg: "rgba(83,211,169,0.12)",
+      badgeBorder: "rgba(83,211,169,0.34)",
+      badgeText: "#9AF4D7",
+      glow: "rgba(83,211,169,0.12)",
     },
-    plus: {
-      border: "rgba(162,89,255,0.26)",
-      bg: "rgba(25,17,44,0.82)",
-      badgeBg: "rgba(162,89,255,0.12)",
-      badgeBorder: "rgba(162,89,255,0.34)",
-      badgeText: "#D8C0FF",
-    },
-    circle: {
-      border: "rgba(96,165,250,0.24)",
-      bg: "rgba(17,24,39,0.82)",
-      badgeBg: "rgba(96,165,250,0.12)",
-      badgeBorder: "rgba(96,165,250,0.3)",
+    B: {
+      border: "rgba(96,165,250,0.28)",
+      bg: "rgba(17,24,39,0.9)",
+      badgeBg: "rgba(96,165,250,0.14)",
+      badgeBorder: "rgba(96,165,250,0.38)",
       badgeText: "#BFDBFE",
+      glow: "rgba(96,165,250,0.2)",
     },
-    team: {
-      border: "rgba(245,158,11,0.24)",
-      bg: "rgba(28,21,12,0.72)",
-      badgeBg: "rgba(245,158,11,0.12)",
-      badgeBorder: "rgba(245,158,11,0.28)",
-      badgeText: "#FCD38D",
+    C: {
+      border: "rgba(248,113,113,0.26)",
+      bg: "rgba(43,17,17,0.82)",
+      badgeBg: "rgba(248,113,113,0.12)",
+      badgeBorder: "rgba(248,113,113,0.3)",
+      badgeText: "#FECACA",
+      glow: "rgba(248,113,113,0.12)",
     },
   } as const;
 
@@ -195,26 +198,50 @@ function PlanCard({
           backgroundColor: colors.bg,
           borderColor: colors.border,
         },
+        featured && {
+          borderWidth: 1.5,
+          shadowColor: colors.glow,
+          shadowOpacity: 0.35,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 8,
+        },
         pressed && styles.cardPressed,
       ]}
     >
       <View style={styles.cardTop}>
-        <Text style={styles.cardTitle}>{title}</Text>
-        {badge ? (
-          <View
-            style={[
-              styles.badge,
-              {
-                backgroundColor: colors.badgeBg,
-                borderColor: colors.badgeBorder,
-              },
-            ]}
-          >
-            <Text style={[styles.badgeText, { color: colors.badgeText }]}>{badge}</Text>
-          </View>
-        ) : null}
+        <View style={styles.cardTitleWrap}>
+          <Text style={styles.cardTitle}>{title}</Text>
+          <Text style={styles.cardPrice}>{price}</Text>
+        </View>
+        <View
+          style={[
+            styles.badge,
+            {
+              backgroundColor: colors.badgeBg,
+              borderColor: colors.badgeBorder,
+            },
+          ]}
+        >
+          <Text style={[styles.badgeText, { color: colors.badgeText }]}>{badge}</Text>
+        </View>
       </View>
-      <Text style={styles.cardSubtitle}>{subtitle}</Text>
+
+      <Text style={styles.cardMessage}>{message}</Text>
+      <Text style={styles.quickDifference}>{quickDifference}</Text>
+
+      <View style={styles.summaryBlock}>
+        <Text style={styles.cardSummary}>{summary}</Text>
+        {secondarySummary ? <Text style={styles.cardSummary}>{secondarySummary}</Text> : null}
+      </View>
+
+      {preview ? (
+        <View style={styles.previewBlock}>
+          {previewTitle ? <Text style={styles.previewTitle}>{previewTitle}</Text> : null}
+          <Text style={styles.cardPreview}>{preview}</Text>
+        </View>
+      ) : null}
+
       <Text style={styles.cardHint}>Tap to continue</Text>
     </Pressable>
   );
@@ -223,9 +250,12 @@ function PlanCard({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: "#0B0F14",
+  },
+  content: {
     padding: 20,
     paddingTop: 70,
-    backgroundColor: "#0B0F14",
+    paddingBottom: 36,
   },
   title: {
     fontSize: 36,
@@ -238,6 +268,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 23,
     color: "#A7B0BC",
+  },
+  helper: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 19,
+    color: "#718096",
+    fontWeight: "600",
   },
   error: {
     marginTop: 12,
@@ -281,9 +318,14 @@ const styles = StyleSheet.create({
   },
   cardTop: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
+  },
+  cardTitleWrap: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
   },
   cardTitle: {
     color: "white",
@@ -291,24 +333,65 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: -0.4,
   },
+  cardPrice: {
+    color: "#E5E7EB",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   badge: {
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
+    flexShrink: 0,
   },
   badgeText: {
     fontWeight: "900",
-    letterSpacing: 0.6,
+    letterSpacing: 0.3,
+    fontSize: 12,
   },
-  cardSubtitle: {
-    marginTop: 9,
-    color: "#C0C8D6",
+  cardMessage: {
+    marginTop: 14,
+    color: "#F8FAFC",
     fontSize: 15,
     lineHeight: 22,
+    fontWeight: "700",
+  },
+  quickDifference: {
+    marginTop: 8,
+    color: "#CBD5E1",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+  },
+  summaryBlock: {
+    marginTop: 10,
+    gap: 4,
+  },
+  cardSummary: {
+    color: "#C0C8D6",
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  previewBlock: {
+    marginTop: 12,
+    gap: 2,
+  },
+  previewTitle: {
+    color: "#94A3B8",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  cardPreview: {
+    color: "#E2E8F0",
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "700",
   },
   cardHint: {
-    marginTop: 12,
+    marginTop: 14,
     color: "rgba(237,231,255,0.5)",
     fontSize: 12,
     fontWeight: "600",

@@ -1,10 +1,9 @@
 import { supabase } from "../../lib/supabase";
+import type { PlanTier } from "./plans";
 
 /**
  * Data types
  */
-export type PlanTier = "A" | "B" | "C";
-
 export type LeagueStatus = "active" | "payment_required" | "completed" | string;
 
 export type League = {
@@ -14,6 +13,11 @@ export type League = {
 
   plan_tier?: PlanTier | null;
   month_key?: string | null;
+  entry_fee_cents?: number | null;
+  platform_fee_cents?: number | null;
+  winner_share_bps?: number | null;
+  charity_share_bps?: number | null;
+  qualification_days_min?: number | null;
 
   // NEW
   is_free?: boolean | null;
@@ -40,6 +44,29 @@ export type LeagueMember = {
   display_name: string; // what the UI should show
   has_profile: boolean;
 };
+
+const LEAGUE_SELECT_BASE = "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at";
+const LEAGUE_SELECT_WITH_ECONOMICS =
+  "id,name,activity,plan_tier,month_key,is_free,entry_fee_cents,platform_fee_cents,winner_share_bps,charity_share_bps,qualification_days_min,status,invite_code,created_at";
+
+function isMissingEconomicsColumnError(error: any) {
+  const message = String(error?.message ?? "").toLowerCase();
+  return (
+    message.includes("entry_fee_cents") ||
+    message.includes("platform_fee_cents") ||
+    message.includes("winner_share_bps") ||
+    message.includes("charity_share_bps") ||
+    message.includes("qualification_days_min")
+  );
+}
+
+async function selectLeaguesWithFallback(
+  build: (selectClause: string) => any
+) {
+  let result = await build(LEAGUE_SELECT_WITH_ECONOMICS);
+  if (!result.error || !isMissingEconomicsColumnError(result.error)) return result;
+  return build(LEAGUE_SELECT_BASE);
+}
 
 /**
  * Helpers
@@ -75,12 +102,12 @@ function currentMonthBoundsISO(): { start: string; end: string } {
  * My leagues (for current logged-in user)
  */
 export async function getMyLeagues(userId: string): Promise<League[]> {
-  const { data, error } = await supabase
-    .from("league_members")
-    .select(
-      "league:leagues(id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at)"
-    )
-    .eq("user_id", userId);
+  const { data, error } = await selectLeaguesWithFallback((selectClause) =>
+    supabase
+      .from("league_members")
+      .select(`league:leagues(${selectClause})`)
+      .eq("user_id", userId)
+  );
 
   if (error) throw error;
 
@@ -140,11 +167,15 @@ export async function createLeague({
   // 2) Fetch league row (consistent return shape)
   const { data: league, error: leagueErr } = await supabase
     .from("leagues")
-    .select(
-      "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at"
-    )
+    .select(LEAGUE_SELECT_WITH_ECONOMICS)
     .eq("id", leagueId)
     .single();
+
+  if (leagueErr && isMissingEconomicsColumnError(leagueErr)) {
+    const fallback = await supabase.from("leagues").select(LEAGUE_SELECT_BASE).eq("id", leagueId).single();
+    if (fallback.error) throw fallback.error;
+    return fallback.data as League;
+  }
 
   if (leagueErr) throw leagueErr;
   return league as League;
@@ -223,13 +254,9 @@ export async function getLeagueMembers(
  * League info (for header title + activity subtitle)
  */
 export async function getLeague(leagueId: string): Promise<League> {
-  const { data, error } = await supabase
-    .from("leagues")
-    .select(
-      "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at"
-    )
-    .eq("id", leagueId)
-    .single();
+  const { data, error } = await selectLeaguesWithFallback((selectClause) =>
+    supabase.from("leagues").select(selectClause).eq("id", leagueId).single()
+  );
 
   if (error) throw error;
   return data as League;

@@ -1,31 +1,55 @@
-import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
 
+import { trackEvent } from "../analytics";
 import { getGentleNotificationCopy } from "./copy";
 
 const CHANNEL_ID = "gentle-reminders";
 const REMINDER_KIND = "gentle-daily-reminder";
 
 let configured = false;
+let notificationsModulePromise: Promise<typeof import("expo-notifications")> | null = null;
+
+function notificationsUnsupportedInCurrentRuntime() {
+  return Platform.OS === "android" && Constants.executionEnvironment === "storeClient";
+}
+
+async function getNotificationsModule() {
+  if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return null;
+
+  if (!notificationsModulePromise) {
+    notificationsModulePromise = import("expo-notifications");
+  }
+
+  return notificationsModulePromise;
+}
 
 export function configureNotifications() {
-  if (configured || Platform.OS === "web") return;
+  if (configured || Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return;
 
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+  void (async () => {
+    const Notifications = await getNotificationsModule();
+    if (!Notifications) return;
 
-  configured = true;
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+
+    configured = true;
+  })();
 }
 
 async function ensureChannel() {
   if (Platform.OS !== "android") return;
+
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return;
 
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: "Gentle reminders",
@@ -37,18 +61,29 @@ async function ensureChannel() {
 }
 
 async function hasPermission() {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return false;
+
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
+  const wasGranted = status === "granted";
 
   if (status !== "granted" && existing.canAskAgain) {
     const requested = await Notifications.requestPermissionsAsync();
     status = requested.status;
   }
 
+  if (!wasGranted && status === "granted") {
+    void trackEvent("notification_permission_granted");
+  }
+
   return status === "granted";
 }
 
 async function cancelMatchingReminders() {
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return;
+
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
 
   const matches = scheduled.filter(
@@ -65,9 +100,12 @@ async function cancelMatchingReminders() {
 }
 
 export async function ensureGentleDailyReminder() {
-  if (Platform.OS === "web") return false;
+  if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return false;
 
   configureNotifications();
+
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return false;
 
   const permitted = await hasPermission();
   if (!permitted) return false;
@@ -88,12 +126,12 @@ export async function ensureGentleDailyReminder() {
   const weekdayIndex = new Date().getDay();
   const reminderBody = getGentleNotificationCopy("light_encouragement", weekdayIndex);
 
-  const trigger: Notifications.NotificationTriggerInput = {
+  const trigger = {
     type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
     hour: 17,
     minute: 0,
     repeats: true,
-  };
+  } as const;
 
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -105,18 +143,22 @@ export async function ensureGentleDailyReminder() {
     trigger,
   });
 
+  void trackEvent("reminder_enabled");
   return true;
 }
 
 export async function cancelGentleDailyReminder() {
-  if (Platform.OS === "web") return;
+  if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return;
   await cancelMatchingReminders();
 }
 
 export async function scheduleGentleTestNotification() {
-  if (Platform.OS === "web") return false;
+  if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return false;
 
   configureNotifications();
+
+  const Notifications = await getNotificationsModule();
+  if (!Notifications) return false;
 
   const permitted = await hasPermission();
   if (!permitted) return false;

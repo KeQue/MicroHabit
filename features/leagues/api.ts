@@ -94,8 +94,8 @@ function emailPrefix(email: string | null) {
 function displayNameFromProfile(p: Profile | null) {
   if (!p) return "User";
   return (
-    p.username?.trim() ||
     p.name?.trim() ||
+    p.username?.trim() ||
     emailPrefix(p.email)?.trim() ||
     "User"
   );

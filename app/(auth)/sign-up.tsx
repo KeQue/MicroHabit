@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { trackEvent } from "../../features/analytics";
 import { useAuth } from "../../features/auth/useAuth";
 import { supabase } from "../../lib/supabase";
 
@@ -81,7 +82,9 @@ export default function SignUpScreen() {
                     throw new Error("Password must be at least 6 characters");
                   }
 
+                  await trackEvent("sign_up_started", { email_domain: e.split("@")[1] ?? null });
                   await signUp(e, password);
+                  await trackEvent("sign_up_completed");
 
                   const { data } = await supabase.auth.getSession();
                   const hasSession = !!data.session;
@@ -89,7 +92,10 @@ export default function SignUpScreen() {
                   if (hasSession) {
                     router.replace("/(app)");
                   } else {
-                    router.replace("/(auth)/sign-in");
+                    router.replace({
+                      pathname: "/(auth)/check-email",
+                      params: { email: e },
+                    });
                   }
                 } catch (e: any) {
                   setError(e?.message ?? "Sign-up failed");

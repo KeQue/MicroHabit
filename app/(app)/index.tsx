@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { isCurrentUserAdmin } from "../../features/auth/admin";
+import { trackEvent } from "../../features/analytics";
 import { ensureProfileForCurrentUser } from "../../features/auth/profile";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
 import { getCommitmentPlan, getPlanName, type PlanTier } from "../../features/leagues/plans";
@@ -144,6 +145,11 @@ export default function LeaguesScreen() {
       setIsFreeSelected(false);
 
       await load();
+      await trackEvent("league_created", {
+        league_id: league.id,
+        is_free: isFreeSelected,
+        plan_tier: league.plan_tier ?? null,
+      });
 
       if (!isFreeSelected && league.status === "payment_required") {
         router.push({

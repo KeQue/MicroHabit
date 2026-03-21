@@ -1,5 +1,6 @@
 import type { Session, User } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { buildAuthRedirectUrl } from "./links";
 import { ensureProfileForUser } from "./profile";
 import { supabase } from "../../lib/supabase";
 
@@ -12,6 +13,10 @@ type AuthContextValue = {
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  resendSignUpConfirmation: (email: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -71,7 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- actions ---
   async function signUp(email: string, password: string) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: buildAuthRedirectUrl("/sign-in"),
+      },
+    });
     if (error) throw error;
     if (data.user) {
       await ensureProfileForUser(data.user);
@@ -91,6 +102,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   }
 
+  async function resetPassword(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: buildAuthRedirectUrl("/update-password"),
+    });
+    if (error) throw error;
+  }
+
+  async function updatePassword(password: string) {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+  }
+
+  async function resendSignUpConfirmation(email: string) {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: {
+        emailRedirectTo: buildAuthRedirectUrl("/sign-in"),
+      },
+    });
+    if (error) throw error;
+  }
+
+  async function deleteAccount() {
+    const { error } = await supabase.rpc("delete_my_account");
+    if (error) throw error;
+    await supabase.auth.signOut().catch(() => undefined);
+  }
+
   const value = useMemo(
     () => ({
       user,
@@ -99,6 +139,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       signIn,
       signOut,
+      resetPassword,
+      updatePassword,
+      resendSignUpConfirmation,
+      deleteAccount,
     }),
     [user, session, initializing]
   );

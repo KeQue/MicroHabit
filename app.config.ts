@@ -3,9 +3,7 @@ import type { ExpoConfig } from "@expo/config-types";
 const config: ExpoConfig = {
   name: "MicroHabit",
   slug: "microhabit",
-
-  // App Store "version" (1.0.1 etc) should live here too if you want it controlled by app.config.ts
-  // version: "1.0.1",
+  version: "1.0.1",
 
   ios: {
     bundleIdentifier: "com.sadik.microhabit",
@@ -13,7 +11,7 @@ const config: ExpoConfig = {
 
     // IMPORTANT: increment this every TestFlight/App Store upload
     // Must be higher than the last uploaded build number
-      buildNumber: "5",
+    buildNumber: "5",
 
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -22,8 +20,7 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.sadik.microhabit",
-    // OPTIONAL but recommended: increment for every Play upload
-    // versionCode: 2,
+    versionCode: 1,
   },
 
   scheme: "microhabit",

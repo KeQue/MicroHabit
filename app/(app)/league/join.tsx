@@ -1,4 +1,5 @@
 import { getPlanFullName, type PlanTier } from "@/features/leagues/plans";
+import { trackEvent } from "@/features/analytics";
 import { supabase } from "@/lib/supabase";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -76,6 +77,11 @@ export default function JoinLeagueScreen() {
       if (!leagueId) throw new Error("Join failed");
 
       const info = await fetchLeagueInfo(leagueId);
+      await trackEvent("league_joined", {
+        league_id: leagueId,
+        is_free: !!info.is_free,
+        plan_tier: info.plan_tier ?? null,
+      });
       setLeagueInfo(info);
       setJoinedLeagueId(leagueId);
     } catch (e: any) {

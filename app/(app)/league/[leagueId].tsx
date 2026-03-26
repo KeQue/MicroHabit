@@ -721,14 +721,21 @@ Install Commito, tap Join, and enter the code.`;
         const above = ranked[idx - 1];
         const below = ranked[idx + 1];
         const daysLeft = Math.max(monthDays - (todayIndex + 1), 0);
+        const daysLeftLabel = `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`;
 
         let rivalLabel: string | undefined;
         if (idx === 0 && below) {
           const delta = entry.s - below.s;
-          rivalLabel = delta <= 0 ? `Tied · ${daysLeft} left` : `${delta} ahead · ${daysLeft} left`;
+          rivalLabel =
+            delta <= 0
+              ? `Tied · ${daysLeftLabel}`
+              : `${delta} day${delta === 1 ? "" : "s"} ahead · ${daysLeftLabel}`;
         } else if (above) {
           const delta = above.s - entry.s;
-          rivalLabel = delta <= 0 ? `Tied · ${daysLeft} left` : `${delta} behind · ${daysLeft} left`;
+          rivalLabel =
+            delta <= 0
+              ? `Tied · ${daysLeftLabel}`
+              : `${delta} day${delta === 1 ? "" : "s"} behind · ${daysLeftLabel}`;
         }
 
         return {

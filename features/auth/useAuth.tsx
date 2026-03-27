@@ -1,8 +1,13 @@
 import type { Session, User } from "@supabase/supabase-js";
+import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { buildAuthRedirectUrl } from "./links";
+import { buildAuthRedirectUrl, consumeAuthCallbackUrl } from "./links";
 import { ensureProfileForUser } from "./profile";
 import { supabase } from "../../lib/supabase";
+
+WebBrowser.maybeCompleteAuthSession();
+
+export type SocialAuthProvider = "google" | "apple";
 
 type AuthContextValue = {
   user: User | null;
@@ -12,6 +17,7 @@ type AuthContextValue = {
   // actions
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithProvider: (provider: SocialAuthProvider) => Promise<"signed-in" | "cancelled">;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -31,7 +37,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const syncRealtimeAuth = (nextSession: Session | null) => {
       const token = nextSession?.access_token;
-      if (!token) return;
+      if (!token) {
+        void supabase.removeAllChannels();
+        return;
+      }
       void supabase.realtime.setAuth(token);
     };
 
@@ -97,6 +106,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function signInWithProvider(provider: SocialAuthProvider) {
+    const redirectTo = buildAuthRedirectUrl("/sign-in");
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    if (error) throw error;
+
+    const authUrl = data?.url;
+    if (!authUrl) {
+      throw new Error("Could not start social sign-in");
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
+    if (result.type !== "success" || !result.url) {
+      return "cancelled";
+    }
+
+    const callbackResult = await consumeAuthCallbackUrl(result.url);
+    if (callbackResult.kind === "error") {
+      throw new Error(callbackResult.message);
+    }
+    if (callbackResult.kind === "none") {
+      throw new Error("Could not complete social sign-in");
+    }
+
+    const {
+      data: { user: nextUser },
+    } = await supabase.auth.getUser();
+    if (nextUser) {
+      await ensureProfileForUser(nextUser);
+    }
+
+    return "signed-in";
+  }
+
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
@@ -138,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       initializing,
       signUp,
       signIn,
+      signInWithProvider,
       signOut,
       resetPassword,
       updatePassword,

@@ -2,6 +2,7 @@ import * as Linking from "expo-linking";
 import { supabase } from "../../lib/supabase";
 
 export type ParsedAuthCallback = {
+  path?: string;
   code?: string;
   accessToken?: string;
   refreshToken?: string;
@@ -18,6 +19,8 @@ type AuthCallbackResult =
 function normalizedPath(path: string) {
   return path.startsWith("/") ? path : `/${path}`;
 }
+
+const ALLOWED_AUTH_CALLBACK_PATHS = new Set(["/sign-in", "/update-password"]);
 
 function collectParams(url: string) {
   const parsed = Linking.parse(url);
@@ -47,7 +50,10 @@ export const buildAuthRedirectUrl = createAuthRedirectUrl;
 
 export function parseAuthCallbackUrl(url: string): ParsedAuthCallback {
   const params = collectParams(url);
+  const parsed = Linking.parse(url);
+  const path = normalizedPath(parsed.path ?? "/");
   return {
+    path,
     code: params.get("code") ?? undefined,
     accessToken: params.get("access_token") ?? undefined,
     refreshToken: params.get("refresh_token") ?? undefined,
@@ -58,6 +64,8 @@ export function parseAuthCallbackUrl(url: string): ParsedAuthCallback {
 
 export function isAuthCallbackUrl(url: string) {
   const params = parseAuthCallbackUrl(url);
+  if (!params.path || !ALLOWED_AUTH_CALLBACK_PATHS.has(params.path)) return false;
+
   return (
     !!params.code ||
     !!params.accessToken ||
@@ -69,6 +77,9 @@ export function isAuthCallbackUrl(url: string) {
 
 export async function consumeAuthCallbackUrl(url: string): Promise<AuthCallbackResult> {
   const params = parseAuthCallbackUrl(url);
+  if (!params.path || !ALLOWED_AUTH_CALLBACK_PATHS.has(params.path)) {
+    return { kind: "none" };
+  }
 
   const errorDescription = params.errorDescription;
   if (errorDescription) {

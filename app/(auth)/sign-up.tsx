@@ -21,12 +21,30 @@ const PLACEHOLDER = "rgba(255,255,255,0.44)";
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, signInWithProvider } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<"google" | "apple" | null>(null);
+
+  const handleSocialSignIn = async (provider: "google" | "apple") => {
+    try {
+      setError(null);
+      setSocialLoading(provider);
+      await trackEvent("sign_up_started", { method: provider });
+      const result = await signInWithProvider(provider);
+      if (result === "signed-in") {
+        await trackEvent("sign_up_completed", { method: provider });
+        router.replace("/(app)");
+      }
+    } catch (e: any) {
+      setError(e?.message ?? "Social sign-in failed");
+    } finally {
+      setSocialLoading(null);
+    }
+  };
 
   return (
     <LinearGradient
@@ -47,6 +65,44 @@ export default function SignUpScreen() {
           </View>
 
           <View style={styles.card}>
+            <View style={styles.socialStack}>
+              <Pressable
+                disabled={loading || !!socialLoading}
+                onPress={() => void handleSocialSignIn("google")}
+                style={({ pressed }) => [
+                  styles.socialBtn,
+                  pressed && !socialLoading && !loading && styles.socialBtnPressed,
+                  socialLoading === "google" && styles.socialBtnDisabled,
+                ]}
+              >
+                <Text style={styles.socialBtnText}>
+                  {socialLoading === "google" ? "Connecting Google..." : "Continue with Google"}
+                </Text>
+              </Pressable>
+
+              {Platform.OS === "ios" ? (
+                <Pressable
+                  disabled={loading || !!socialLoading}
+                  onPress={() => void handleSocialSignIn("apple")}
+                  style={({ pressed }) => [
+                    styles.socialBtn,
+                    pressed && !socialLoading && !loading && styles.socialBtnPressed,
+                    socialLoading === "apple" && styles.socialBtnDisabled,
+                  ]}
+                >
+                  <Text style={styles.socialBtnText}>
+                    {socialLoading === "apple" ? "Connecting Apple..." : "Continue with Apple"}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR CREATE WITH EMAIL</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
             <TextInput
               placeholder="Email"
               placeholderTextColor={PLACEHOLDER}
@@ -70,7 +126,7 @@ export default function SignUpScreen() {
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
-              disabled={loading}
+              disabled={loading || !!socialLoading}
               onPress={async () => {
                 try {
                   setError(null);
@@ -113,7 +169,8 @@ export default function SignUpScreen() {
             </Pressable>
 
             <Text style={styles.helperText}>
-              If email confirmation is enabled, you will continue after confirming your inbox.
+              Email sign-up keeps the inbox verification flow, so you can confirm ownership before
+              continuing.
             </Text>
 
             <Link href="/(auth)/sign-in" style={styles.secondaryLink}>
@@ -169,6 +226,46 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(14,18,29,0.88)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
+  },
+  socialStack: {
+    gap: 10,
+  },
+  socialBtn: {
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  socialBtnPressed: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  socialBtnDisabled: {
+    opacity: 0.7,
+  },
+  socialBtnText: {
+    color: TEXT,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 2,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  dividerText: {
+    color: "rgba(237,231,255,0.44)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
   },
   input: {
     borderWidth: 1,

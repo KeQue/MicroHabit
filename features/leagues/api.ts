@@ -311,25 +311,14 @@ export async function toggleDay(params: {
   dateISO: string; // 'YYYY-MM-DD'
   on: boolean;
 }) {
-  const { leagueId, userId, dateISO, on } = params;
+  const { leagueId, dateISO, on } = params;
 
-  if (on) {
-    const { error } = await supabase
-      .from("daily_logs")
-      .upsert(
-        { league_id: leagueId, user_id: userId, log_date: dateISO },
-        { onConflict: "league_id,user_id,log_date" }
-      );
-    if (error) throw error;
-  } else {
-    const { error } = await supabase
-      .from("daily_logs")
-      .delete()
-      .eq("league_id", leagueId)
-      .eq("user_id", userId)
-      .eq("log_date", dateISO);
-    if (error) throw error;
-  }
+  const { error } = await supabase.rpc("toggle_daily_log", {
+    p_league_id: leagueId,
+    p_log_date: dateISO,
+    p_completed: on,
+  });
+  if (error) throw error;
 }
 
 /**

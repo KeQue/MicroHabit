@@ -1,4 +1,4 @@
-import { getConfiguredAdminUserId, isCurrentUserAdmin } from "@/features/auth/admin";
+import { isCurrentUserAdmin } from "@/features/auth/admin";
 import {
   getLeaguesAwaitingCompletion,
   getMonthlyCharityTotals,
@@ -96,9 +96,7 @@ export default function ReportsScreen() {
       {!loading && !isAdmin ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>
-            {getConfiguredAdminUserId()
-              ? "This screen is only available to the configured admin user."
-              : "Set EXPO_PUBLIC_ADMIN_USER_ID to your user ID to enable the reports screen."}
+            This screen is only available to platform admins.
           </Text>
         </View>
       ) : null}

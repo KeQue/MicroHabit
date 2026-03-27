@@ -60,7 +60,7 @@ async function ensureChannel() {
   });
 }
 
-async function hasPermission() {
+async function hasPermission(requestIfNeeded = true) {
   const Notifications = await getNotificationsModule();
   if (!Notifications) return false;
 
@@ -68,7 +68,7 @@ async function hasPermission() {
   let status = existing.status;
   const wasGranted = status === "granted";
 
-  if (status !== "granted" && existing.canAskAgain) {
+  if (requestIfNeeded && status !== "granted" && existing.canAskAgain) {
     const requested = await Notifications.requestPermissionsAsync();
     status = requested.status;
   }
@@ -100,6 +100,12 @@ async function cancelMatchingReminders() {
 }
 
 export async function ensureGentleDailyReminder() {
+  return ensureGentleDailyReminderWithOptions({ requestPermission: true });
+}
+
+export async function ensureGentleDailyReminderWithOptions(options?: {
+  requestPermission?: boolean;
+}) {
   if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return false;
 
   configureNotifications();
@@ -107,7 +113,7 @@ export async function ensureGentleDailyReminder() {
   const Notifications = await getNotificationsModule();
   if (!Notifications) return false;
 
-  const permitted = await hasPermission();
+  const permitted = await hasPermission(options?.requestPermission ?? true);
   if (!permitted) return false;
 
   await ensureChannel();

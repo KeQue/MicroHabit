@@ -8,7 +8,7 @@ import { consumeAuthCallbackUrl, isAuthCallbackUrl } from "../features/auth/link
 import {
   cancelGentleDailyReminder,
   configureNotifications,
-  ensureGentleDailyReminder,
+  ensureGentleDailyReminderWithOptions,
 } from "../features/notifications/local";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
 
@@ -86,7 +86,7 @@ function RouteGate() {
       return;
     }
 
-    void ensureGentleDailyReminder();
+    void ensureGentleDailyReminderWithOptions({ requestPermission: false });
   }, [user, initializing]);
 
   return (

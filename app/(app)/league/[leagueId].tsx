@@ -789,18 +789,13 @@ Install Commito, tap Join, and enter the code.`;
         )
       );
 
-      const { error } = await supabase.from("daily_logs").upsert(
-        {
-          league_id: leagueId,
-          user_id: myId,
-          log_date,
-          completed: next,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "league_id,user_id,log_date" }
-      );
+        const { error } = await supabase.rpc("toggle_daily_log", {
+          p_league_id: leagueId,
+          p_log_date: log_date,
+          p_completed: next,
+        });
 
-      // revert if failed
+        // revert if failed
         if (error) {
           setMembers((prev) =>
             prev.map((x) =>
@@ -809,12 +804,13 @@ Install Commito, tap Join, and enter the code.`;
                 : { ...x, days: x.days.map((v, i) => (i === day ? current : v)) }
             )
           );
+          setError(error.message ?? "Could not update your check-in");
         } else if (!current && !hadAnyCheckIn) {
           void trackEvent("first_check_in", { league_id: leagueId });
         }
-    },
-    [leagueId, leagueIsFree, leaguePlanTier, members, monthDays, myId, myPaymentStatus, year, month, todayIndex]
-  );
+      },
+      [leagueId, leagueIsFree, leaguePlanTier, members, monthDays, myId, myPaymentStatus, year, month, todayIndex]
+    );
 
   const canParticipate =
     leagueIsFree || !leaguePlanTier || myPaymentStatus === "paid" || myPaymentStatus === "free";

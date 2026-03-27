@@ -4,6 +4,25 @@ const config: ExpoConfig = {
   name: "MicroHabit",
   slug: "microhabit",
   version: "1.0.1",
+  plugins: [
+    "expo-router",
+    "@sentry/react-native",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/images/splash-icon.png",
+        imageWidth: 200,
+        resizeMode: "contain",
+        backgroundColor: "#ffffff",
+        dark: {
+          backgroundColor: "#000000",
+        },
+      },
+    ],
+    "expo-font",
+    "expo-notifications",
+    "expo-secure-store",
+  ],
 
   ios: {
     bundleIdentifier: "com.sadik.microhabit",

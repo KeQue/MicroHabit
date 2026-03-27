@@ -1,18 +1,16 @@
-# Microhabit Terms of Service
+# Commito Terms of Service
 
 Last updated: March 20, 2026
 
-This draft is a starting point for Microhabit's public terms. Replace bracketed placeholders before publishing.
-
 ## Acceptance
 
-By creating an account or using Microhabit, you agree to these Terms of Service.
+By creating an account or using Commito, you agree to these Terms of Service.
 
 If you do not agree, do not use the app.
 
 ## The Service
 
-Microhabit allows users to create or join accountability leagues, track daily habit activity, and receive reminders and related app features.
+Commito allows users to create or join accountability leagues, track daily habit activity, and receive reminders and related app features.
 
 ## Eligibility
 
@@ -45,7 +43,7 @@ You represent that the information you provide does not violate applicable law o
 
 ## Paid Features
 
-If Microhabit offers paid plans, purchases may be processed through Apple App Store, Google Play, or another authorized payment provider.
+If Commito offers paid plans, purchases may be processed through Apple App Store, Google Play, or another authorized payment provider.
 
 Pricing, billing terms, refunds, and subscription handling may be subject to the rules of the platform through which the purchase was made.
 
@@ -63,19 +61,19 @@ We may suspend or terminate access if you violate these terms or misuse the serv
 
 ## Disclaimers
 
-Microhabit is provided on an "as is" and "as available" basis.
+Commito is provided on an "as is" and "as available" basis.
 
 To the fullest extent permitted by law, we disclaim warranties of merchantability, fitness for a particular purpose, and non-infringement.
 
-Microhabit is not medical, mental health, or financial advice.
+Commito is not medical, mental health, or financial advice.
 
 ## Limitation of Liability
 
-To the fullest extent permitted by law, Microhabit and its operators will not be liable for indirect, incidental, special, consequential, or punitive damages, or for loss of data, revenue, profits, or goodwill arising from your use of the service.
+To the fullest extent permitted by law, Commito and its operators will not be liable for indirect, incidental, special, consequential, or punitive damages, or for loss of data, revenue, profits, or goodwill arising from your use of the service.
 
 ## Governing Law
 
-These terms are governed by the laws of [jurisdiction], without regard to conflict-of-law principles.
+These terms are governed by the laws of `REPLACE_WITH_JURISDICTION`, without regard to conflict-of-law principles.
 
 ## Changes to the Terms
 
@@ -83,4 +81,4 @@ We may update these terms from time to time. Continued use of the service after 
 
 ## Contact
 
-For support or legal questions, contact: [support email]
+For support or legal questions, contact: `REPLACE_WITH_SUPPORT_EMAIL`

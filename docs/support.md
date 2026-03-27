@@ -1,6 +1,6 @@
-# Microhabit Support
+# Commito Support
 
-Support email: [support email]
+Support email: `REPLACE_WITH_SUPPORT_EMAIL`
 
 ## Common Help Topics
 
@@ -19,7 +19,7 @@ Support email: [support email]
 ### I want to delete my account
 
 - Open the in-app menu and use the Delete Account option
-- If that flow fails, contact [support email]
+- If that flow fails, contact `REPLACE_WITH_SUPPORT_EMAIL`
 
 ### Notifications are not working
 
@@ -29,4 +29,4 @@ Support email: [support email]
 
 ## Response Time
 
-We aim to respond to support requests within [timeframe].
+We aim to respond to support requests within `REPLACE_WITH_RESPONSE_TIME`.

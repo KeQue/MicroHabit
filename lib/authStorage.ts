@@ -21,8 +21,13 @@ export const authStorage = {
   async getItem(key: string) {
     const namespacedKey = secureKey(key);
     if (await canUseSecureStore()) {
-      const value = await SecureStore.getItemAsync(namespacedKey);
-      if (value != null) return value;
+      try {
+        const value = await SecureStore.getItemAsync(namespacedKey);
+        if (value != null) return value;
+      } catch {
+        // Fall back to AsyncStorage instead of failing app startup if the secure store
+        // is unavailable or the keychain entry cannot be read on a specific device.
+      }
     }
     return AsyncStorage.getItem(namespacedKey);
   },
@@ -30,18 +35,22 @@ export const authStorage = {
   async setItem(key: string, value: string) {
     const namespacedKey = secureKey(key);
     if (await canUseSecureStore()) {
-      await SecureStore.setItemAsync(namespacedKey, value);
-      await AsyncStorage.removeItem(namespacedKey).catch(() => undefined);
-      return;
+      try {
+        await SecureStore.setItemAsync(namespacedKey, value);
+        await AsyncStorage.removeItem(namespacedKey).catch(() => undefined);
+        return;
+      } catch {
+        // Fall through to AsyncStorage if writing to the secure store fails.
+      }
     }
     await AsyncStorage.setItem(namespacedKey, value);
   },
 
   async removeItem(key: string) {
     const namespacedKey = secureKey(key);
-    await Promise.allSettled([
-      SecureStore.deleteItemAsync(namespacedKey),
-      AsyncStorage.removeItem(namespacedKey),
-    ]);
+    if (await canUseSecureStore()) {
+      await SecureStore.deleteItemAsync(namespacedKey).catch(() => undefined);
+    }
+    await AsyncStorage.removeItem(namespacedKey).catch(() => undefined);
   },
 };

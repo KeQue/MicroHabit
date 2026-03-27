@@ -30,7 +30,7 @@ const config: ExpoConfig = {
 
     // IMPORTANT: increment this every TestFlight/App Store upload
     // Must be higher than the last uploaded build number
-    buildNumber: "6",
+    buildNumber: "7",
 
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -39,7 +39,7 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.sadik.microhabit",
-    versionCode: 2,
+    versionCode: 3,
   },
 
   scheme: "microhabit",

@@ -1,5 +1,4 @@
 import type { Session, User } from "@supabase/supabase-js";
-import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { buildAuthRedirectUrl, consumeAuthCallbackUrl } from "./links";
 import { ensureProfileForUser } from "./profile";
@@ -121,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Could not start social sign-in");
     }
 
+    const WebBrowser = await import("expo-web-browser");
     const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
     if (result.type !== "success" || !result.url) {
       return "cancelled";

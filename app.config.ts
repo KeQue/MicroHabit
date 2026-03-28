@@ -4,7 +4,7 @@ const config: ExpoConfig = {
   name: "MicroHabit",
   slug: "microhabit",
   version: "1.0.1",
-  newArchEnabled: false,
+  newArchEnabled: true,
   plugins: [
     "expo-router",
     "@sentry/react-native",
@@ -31,7 +31,7 @@ const config: ExpoConfig = {
 
     // IMPORTANT: increment this every TestFlight/App Store upload
     // Must be higher than the last uploaded build number
-    buildNumber: "9",
+    buildNumber: "10",
 
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -40,7 +40,7 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.sadik.microhabit",
-    versionCode: 5,
+    versionCode: 6,
   },
 
   scheme: "microhabit",

@@ -55,7 +55,7 @@ function RouteGate() {
   useEffect(() => {
     if (initializing) return;
 
-    const group = segments[0]; // "(auth)" | "(app)" | etc.
+    const group = segments[0];
     const inAuthGroup = group === "(auth)";
     const inAppGroup = group === "(app)";
     const currentPath = segments.join("/");
@@ -78,7 +78,7 @@ function RouteGate() {
   );
 }
 
-function RootLayout() {
+export default function RootLayout() {
   return (
     <ThemeProvider value={DarkTheme}>
       <AuthProvider>
@@ -87,5 +87,3 @@ function RootLayout() {
     </ThemeProvider>
   );
 }
-
-export default RootLayout;

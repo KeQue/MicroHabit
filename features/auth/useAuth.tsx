@@ -5,8 +5,6 @@ import { buildAuthRedirectUrl, consumeAuthCallbackUrl } from "./links";
 import { ensureProfileForUser } from "./profile";
 import { supabase } from "../../lib/supabase";
 
-WebBrowser.maybeCompleteAuthSession();
-
 export type SocialAuthProvider = "google" | "apple";
 
 type AuthContextValue = {

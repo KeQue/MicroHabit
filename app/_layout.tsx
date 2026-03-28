@@ -1,18 +1,9 @@
-import { initMonitoring, Sentry } from "../lib/monitoring";
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import * as Linking from "expo-linking";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef } from "react";
-import { trackEvent } from "../features/analytics";
 import { consumeAuthCallbackUrl, isAuthCallbackUrl } from "../features/auth/links";
-import {
-  cancelGentleDailyReminder,
-  configureNotifications,
-  ensureGentleDailyReminderWithOptions,
-} from "../features/notifications/local";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
-
-initMonitoring();
 
 function RouteGate() {
   const { user, initializing } = useAuth();
@@ -78,17 +69,6 @@ function RouteGate() {
     if (!inAppGroup && !allowSignedInAuthScreen) router.replace("/(app)");
   }, [user, initializing, segments, router]);
 
-  useEffect(() => {
-    if (initializing) return;
-
-    if (!user) {
-      void cancelGentleDailyReminder();
-      return;
-    }
-
-    void ensureGentleDailyReminderWithOptions({ requestPermission: false });
-  }, [user, initializing]);
-
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
@@ -99,11 +79,6 @@ function RouteGate() {
 }
 
 function RootLayout() {
-  useEffect(() => {
-    configureNotifications();
-    void trackEvent("app_open");
-  }, []);
-
   return (
     <ThemeProvider value={DarkTheme}>
       <AuthProvider>
@@ -113,4 +88,4 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default RootLayout;

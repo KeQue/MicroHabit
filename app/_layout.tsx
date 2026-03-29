@@ -1,4 +1,3 @@
-import { initMonitoring, Sentry } from "../lib/monitoring";
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import * as Linking from "expo-linking";
 import { Stack, useRouter, useSegments } from "expo-router";
@@ -11,8 +10,6 @@ import {
   ensureGentleDailyReminderWithOptions,
 } from "../features/notifications/local";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
-
-initMonitoring();
 
 function RouteGate() {
   const { user, initializing } = useAuth();
@@ -98,7 +95,7 @@ function RouteGate() {
   );
 }
 
-function RootLayout() {
+export default function RootLayout() {
   useEffect(() => {
     configureNotifications();
     void trackEvent("app_open");
@@ -112,5 +109,3 @@ function RootLayout() {
     </ThemeProvider>
   );
 }
-
-export default Sentry.wrap(RootLayout);

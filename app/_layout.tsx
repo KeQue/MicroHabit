@@ -1,17 +1,70 @@
+import { initMonitoring, Sentry } from "../lib/monitoring";
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
+import * as Linking from "expo-linking";
 import { Stack, useRouter, useSegments } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
+import { trackEvent } from "../features/analytics";
+import { consumeAuthCallbackUrl, isAuthCallbackUrl } from "../features/auth/links";
+import {
+  cancelGentleDailyReminder,
+  configureNotifications,
+  ensureGentleDailyReminderWithOptions,
+} from "../features/notifications/local";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
+
+initMonitoring();
 
 function RouteGate() {
   const { user, initializing } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const lastHandledUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const handleAuthUrl = async (url: string) => {
+      if (!isAuthCallbackUrl(url) || lastHandledUrlRef.current === url) return;
+      lastHandledUrlRef.current = url;
+
+      const result = await consumeAuthCallbackUrl(url);
+      if (!active || result.kind === "none") return;
+
+      if (result.kind === "error") {
+        router.replace({
+          pathname: "/(auth)/sign-in",
+          params: { error: result.message },
+        });
+        return;
+      }
+
+      if (result.kind === "recovery") {
+        router.replace("/(auth)/update-password");
+        return;
+      }
+
+      router.replace("/(app)");
+    };
+
+    void Linking.getInitialURL().then((url) => {
+      if (!active || !url) return;
+      void handleAuthUrl(url);
+    });
+
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      void handleAuthUrl(url);
+    });
+
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, [router]);
 
   useEffect(() => {
     if (initializing) return;
 
-    const group = segments[0];
+    const group = segments[0]; // "(auth)" | "(app)" | etc.
     const inAuthGroup = group === "(auth)";
     const inAppGroup = group === "(app)";
     const currentPath = segments.join("/");
@@ -25,6 +78,17 @@ function RouteGate() {
     if (!inAppGroup && !allowSignedInAuthScreen) router.replace("/(app)");
   }, [user, initializing, segments, router]);
 
+  useEffect(() => {
+    if (initializing) return;
+
+    if (!user) {
+      void cancelGentleDailyReminder();
+      return;
+    }
+
+    void ensureGentleDailyReminderWithOptions({ requestPermission: false });
+  }, [user, initializing]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
@@ -34,7 +98,12 @@ function RouteGate() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
+  useEffect(() => {
+    configureNotifications();
+    void trackEvent("app_open");
+  }, []);
+
   return (
     <ThemeProvider value={DarkTheme}>
       <AuthProvider>
@@ -43,3 +112,5 @@ export default function RootLayout() {
     </ThemeProvider>
   );
 }
+
+export default Sentry.wrap(RootLayout);

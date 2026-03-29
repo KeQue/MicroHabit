@@ -1,8 +1,11 @@
 import type { Session, User } from "@supabase/supabase-js";
-import React, { createContext, useContext, useMemo, useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { buildAuthRedirectUrl, consumeAuthCallbackUrl } from "./links";
 import { ensureProfileForUser } from "./profile";
 import { supabase } from "../../lib/supabase";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export type SocialAuthProvider = "google" | "apple";
 
@@ -27,7 +30,58 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [initializing] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const syncRealtimeAuth = (nextSession: Session | null) => {
+      const token = nextSession?.access_token;
+      if (!token) {
+        void supabase.removeAllChannels();
+        return;
+      }
+      void supabase.realtime.setAuth(token);
+    };
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!mounted) return;
+
+        const s = data.session ?? null;
+        syncRealtimeAuth(s);
+        setSession(s);
+        setUser(s?.user ?? null);
+        if (s?.user) {
+          void ensureProfileForUser(s.user).catch((err) => {
+            console.log("ensureProfileForUser(init) failed", err);
+          });
+        }
+      } finally {
+        if (mounted) setInitializing(false);
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
+      syncRealtimeAuth(newSession ?? null);
+      setSession(newSession ?? null);
+      setUser(newSession?.user ?? null);
+      if (newSession?.user) {
+        void ensureProfileForUser(newSession.user).catch((err) => {
+          console.log("ensureProfileForUser(auth change) failed", err);
+        });
+      }
+      setInitializing(false);
+    });
+
+    return () => {
+      mounted = false;
+      sub?.subscription?.unsubscribe();
+    };
+  }, []);
 
   // --- actions ---
   async function signUp(email: string, password: string) {
@@ -69,7 +123,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Could not start social sign-in");
     }
 
-    const WebBrowser = await import("expo-web-browser");
     const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
     if (result.type !== "success" || !result.url) {
       return "cancelled";

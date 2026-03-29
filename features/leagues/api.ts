@@ -1,11 +1,11 @@
 import { supabase } from "../../lib/supabase";
-import type { PlanTier } from "./plans";
 
 /**
  * Data types
  */
+export type PlanTier = "A" | "B" | "C";
+
 export type LeagueStatus = "active" | "payment_required" | "completed" | string;
-export type LeaguePaymentStatus = "free" | "trial" | "unpaid" | "agreed" | "paid" | string;
 
 export type League = {
   id: string;
@@ -14,24 +14,14 @@ export type League = {
 
   plan_tier?: PlanTier | null;
   month_key?: string | null;
-  entry_fee_cents?: number | null;
-  platform_fee_cents?: number | null;
-  winner_share_bps?: number | null;
-  charity_share_bps?: number | null;
-  qualification_days_min?: number | null;
-  players_count?: number | null;
-  gross_revenue_cents?: number | null;
-  estimated_store_fee_cents?: number | null;
-  net_revenue_cents?: number | null;
-  prize_amount_cents?: number | null;
-  charity_amount_cents?: number | null;
-  commito_margin_cents?: number | null;
-  max_players?: number | null;
 
+  // NEW
   is_free?: boolean | null;
   status?: LeagueStatus | null;
-  my_payment_status?: LeaguePaymentStatus | null;
+
+  // Invite code (NEW)
   invite_code?: string | null;
+
   created_at?: string | null;
 };
 
@@ -51,37 +41,6 @@ export type LeagueMember = {
   has_profile: boolean;
 };
 
-const LEAGUE_SELECT_BASE = "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at";
-const LEAGUE_SELECT_WITH_ECONOMICS =
-  "id,name,activity,plan_tier,month_key,is_free,entry_fee_cents,platform_fee_cents,winner_share_bps,charity_share_bps,qualification_days_min,players_count,gross_revenue_cents,estimated_store_fee_cents,net_revenue_cents,prize_amount_cents,charity_amount_cents,commito_margin_cents,max_players,status,invite_code,created_at";
-
-function isMissingEconomicsColumnError(error: any) {
-  const message = String(error?.message ?? "").toLowerCase();
-  return (
-    message.includes("entry_fee_cents") ||
-    message.includes("platform_fee_cents") ||
-    message.includes("winner_share_bps") ||
-    message.includes("charity_share_bps") ||
-    message.includes("qualification_days_min") ||
-    message.includes("players_count") ||
-    message.includes("gross_revenue_cents") ||
-    message.includes("estimated_store_fee_cents") ||
-    message.includes("net_revenue_cents") ||
-    message.includes("prize_amount_cents") ||
-    message.includes("charity_amount_cents") ||
-    message.includes("commito_margin_cents") ||
-    message.includes("max_players")
-  );
-}
-
-async function selectLeaguesWithFallback(
-  build: (selectClause: string) => any
-) {
-  let result = await build(LEAGUE_SELECT_WITH_ECONOMICS);
-  if (!result.error || !isMissingEconomicsColumnError(result.error)) return result;
-  return build(LEAGUE_SELECT_BASE);
-}
-
 /**
  * Helpers
  */
@@ -94,8 +53,8 @@ function emailPrefix(email: string | null) {
 function displayNameFromProfile(p: Profile | null) {
   if (!p) return "User";
   return (
-    p.name?.trim() ||
     p.username?.trim() ||
+    p.name?.trim() ||
     emailPrefix(p.email)?.trim() ||
     "User"
   );
@@ -116,24 +75,16 @@ function currentMonthBoundsISO(): { start: string; end: string } {
  * My leagues (for current logged-in user)
  */
 export async function getMyLeagues(userId: string): Promise<League[]> {
-  const { data, error } = await selectLeaguesWithFallback((selectClause) =>
-    supabase
-      .from("league_members")
-      .select(`payment_status,league:leagues(${selectClause})`)
-      .eq("user_id", userId)
-  );
+  const { data, error } = await supabase
+    .from("league_members")
+    .select(
+      "league:leagues(id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at)"
+    )
+    .eq("user_id", userId);
 
   if (error) throw error;
 
-  const leagues = (data ?? [])
-    .map((row: any) => {
-      if (!row.league) return null;
-      return {
-        ...row.league,
-        my_payment_status: (row.payment_status as LeaguePaymentStatus) ?? null,
-      } as League;
-    })
-    .filter(Boolean);
+  const leagues = (data ?? []).map((row: any) => row.league).filter(Boolean);
   return leagues as League[];
 }
 
@@ -189,15 +140,11 @@ export async function createLeague({
   // 2) Fetch league row (consistent return shape)
   const { data: league, error: leagueErr } = await supabase
     .from("leagues")
-    .select(LEAGUE_SELECT_WITH_ECONOMICS)
+    .select(
+      "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at"
+    )
     .eq("id", leagueId)
     .single();
-
-  if (leagueErr && isMissingEconomicsColumnError(leagueErr)) {
-    const fallback = await supabase.from("leagues").select(LEAGUE_SELECT_BASE).eq("id", leagueId).single();
-    if (fallback.error) throw fallback.error;
-    return fallback.data as League;
-  }
 
   if (leagueErr) throw leagueErr;
   return league as League;
@@ -276,9 +223,13 @@ export async function getLeagueMembers(
  * League info (for header title + activity subtitle)
  */
 export async function getLeague(leagueId: string): Promise<League> {
-  const { data, error } = await selectLeaguesWithFallback((selectClause) =>
-    supabase.from("leagues").select(selectClause).eq("id", leagueId).single()
-  );
+  const { data, error } = await supabase
+    .from("leagues")
+    .select(
+      "id,name,activity,plan_tier,month_key,is_free,status,invite_code,created_at"
+    )
+    .eq("id", leagueId)
+    .single();
 
   if (error) throw error;
   return data as League;
@@ -311,14 +262,25 @@ export async function toggleDay(params: {
   dateISO: string; // 'YYYY-MM-DD'
   on: boolean;
 }) {
-  const { leagueId, dateISO, on } = params;
+  const { leagueId, userId, dateISO, on } = params;
 
-  const { error } = await supabase.rpc("toggle_daily_log", {
-    p_league_id: leagueId,
-    p_log_date: dateISO,
-    p_completed: on,
-  });
-  if (error) throw error;
+  if (on) {
+    const { error } = await supabase
+      .from("daily_logs")
+      .upsert(
+        { league_id: leagueId, user_id: userId, log_date: dateISO },
+        { onConflict: "league_id,user_id,log_date" }
+      );
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("daily_logs")
+      .delete()
+      .eq("league_id", leagueId)
+      .eq("user_id", userId)
+      .eq("log_date", dateISO);
+    if (error) throw error;
+  }
 }
 
 /**

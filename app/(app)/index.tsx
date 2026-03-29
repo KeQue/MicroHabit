@@ -2,21 +2,21 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { isCurrentUserAdmin } from "../../features/auth/admin";
-import { trackEvent } from "../../features/analytics";
 import { ensureProfileForCurrentUser } from "../../features/auth/profile";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
-import { getCommitmentPlan, getPlanName, type PlanTier } from "../../features/leagues/plans";
 import { supabase } from "../../lib/supabase";
+
+type PlanTier = "A" | "B" | "C";
+type UserTier = "free" | "A" | "B" | "C";
 
 const getMonthKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -28,8 +28,11 @@ function normalizeErr(e: any): string {
 }
 
 function planLabel(isFreeSelected: boolean, selectedPlanTier: PlanTier | null) {
-  if (isFreeSelected) return "Free trial";
-  return getPlanName(selectedPlanTier);
+  if (isFreeSelected) return "Free";
+  if (selectedPlanTier === "A") return "Plus";
+  if (selectedPlanTier === "B") return "Circle";
+  if (selectedPlanTier === "C") return "Team";
+  return "Choose a plan";
 }
 
 export default function LeaguesScreen() {
@@ -56,7 +59,6 @@ export default function LeaguesScreen() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newActivity, setNewActivity] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
 
   async function resolveUser() {
     const u = await ensureProfileForCurrentUser();
@@ -65,15 +67,26 @@ export default function LeaguesScreen() {
     return u.id;
   }
 
+  async function getMyTier(uid: string): Promise<UserTier> {
+    const { data, error, status } = await supabase
+      .from("profiles")
+      .select("plan_tier")
+      .eq("id", uid)
+      .single();
+
+    if (error && status !== 406) throw error;
+    const t = (data?.plan_tier ?? "free") as UserTier;
+    return t || "free";
+  }
+
   async function load() {
     try {
       setError(null);
       setLoading(true);
 
       const uid = userId ?? (await resolveUser());
-      const [data, admin] = await Promise.all([getMyLeagues(uid), isCurrentUserAdmin().catch(() => false)]);
+      const data = await getMyLeagues(uid);
       setLeagues(data);
-      setIsAdmin(admin);
     } catch (e: any) {
       setError(normalizeErr(e) ?? "Failed to load leagues");
     } finally {
@@ -114,10 +127,21 @@ export default function LeaguesScreen() {
       creatingRef.current = true;
 
       if (!isFreeSelected && !selectedPlanTier) {
-        throw new Error("Please choose a commitment level first");
+        throw new Error("Please choose a plan first");
       }
 
-      await (userId ?? resolveUser());
+      const uid = userId ?? (await resolveUser());
+
+      if (!isFreeSelected) {
+        const myTier = await getMyTier(uid);
+        if (myTier === "free") {
+          router.push({
+            pathname: "/(app)/paywall",
+            params: { reason: "upgrade_required", next: "/(app)" },
+          });
+          return;
+        }
+      }
 
       if (!newName.trim()) throw new Error("League name is required");
       if (!newActivity.trim()) throw new Error("Activity is required");
@@ -145,26 +169,17 @@ export default function LeaguesScreen() {
       setIsFreeSelected(false);
 
       await load();
-      await trackEvent("league_created", {
-        league_id: league.id,
-        is_free: isFreeSelected,
-        plan_tier: league.plan_tier ?? null,
-      });
-
-      if (!isFreeSelected && league.status === "payment_required") {
+      router.push(`/(app)/league/${league.id}`);
+    } catch (e: any) {
+      const msg = normalizeErr(e);
+      if (msg.toLowerCase().includes("payment required")) {
         router.push({
-          pathname: "/(app)/league/purchase",
-          params: {
-            leagueId: league.id,
-            next: `/(app)/league/${league.id}`,
-          },
+          pathname: "/(app)/paywall",
+          params: { reason: "upgrade_required", next: "/(app)" },
         });
         return;
       }
-
-      router.push(`/(app)/league/${league.id}`);
-    } catch (e: any) {
-      setError(normalizeErr(e));
+      setError(msg);
     } finally {
       setCreating(false);
       creatingRef.current = false;
@@ -178,7 +193,7 @@ export default function LeaguesScreen() {
 
   function onStartCreate() {
     setError(null);
-    router.push("/league/choose-plan");
+    router.push({ pathname: "/league/choose-plan", params: { source: "create" } });
   }
 
   function resetCreate() {
@@ -190,220 +205,153 @@ export default function LeaguesScreen() {
     setError(null);
   }
 
-  const selectedPlan = !isFreeSelected && selectedPlanTier ? getCommitmentPlan(selectedPlanTier) : null;
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.select({ ios: "padding", android: undefined })}
       style={styles.screen}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.title}>Leagues</Text>
-            <Text style={styles.subtitle}>
-              {showCreate ? "Set up your league details." : "Create or join a commitment league."}
-            </Text>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.title}>Leagues</Text>
+          <Text style={styles.subtitle}>Create or join a league.</Text>
+        </View>
+
+        <Pressable onPress={onSignOut} style={styles.headerGhostBtn}>
+          <Text style={styles.headerGhostText}>Sign out</Text>
+        </Pressable>
+      </View>
+
+      {error ? (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.actionStack}>
+        <Pressable onPress={onStartCreate} style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}>
+          <Text style={styles.actionTitle}>{showCreate ? "Change plan" : "+ Create a league"}</Text>
+          <Text style={styles.actionSubtitle}>
+            {showCreate ? "Pick a different plan before creating." : "Start a new accountability group."}
+          </Text>
+        </Pressable>
+
+        {!showCreate ? (
+          <Pressable
+            onPress={() => router.push("/(app)/league/join")}
+            style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
+          >
+            <Text style={styles.actionTitle}>Join with code</Text>
+            <Text style={styles.actionSubtitle}>Jump into an existing league in seconds.</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {showCreate ? (
+        <View style={styles.createCard}>
+          <View style={styles.createHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.createEyebrow}>CREATE A LEAGUE</Text>
+              <Text style={styles.createTitle}>Name your league</Text>
+            </View>
+
+            <View style={styles.planChip}>
+              <Text style={styles.planChipText}>{planLabel(isFreeSelected, selectedPlanTier)}</Text>
+            </View>
           </View>
 
-          <Pressable onPress={onSignOut} style={styles.headerGhostBtn}>
-            <Text style={styles.headerGhostText}>Sign out</Text>
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>League name</Text>
+            <TextInput
+              value={newName}
+              onChangeText={(t) => {
+                setNewName(t);
+                if (error) setError(null);
+              }}
+              placeholder="e.g. April consistency club"
+              placeholderTextColor="#64748B"
+              autoCapitalize="sentences"
+              style={styles.input}
+            />
+          </View>
+
+          <View style={styles.fieldBlock}>
+            <View style={styles.fieldLabelRow}>
+              <Text style={styles.fieldLabel}>Activity</Text>
+              <Text style={styles.fieldCount}>{newActivity.length}/40</Text>
+            </View>
+            <TextInput
+              value={newActivity}
+              onChangeText={(t) => {
+                setNewActivity(t.slice(0, 40));
+                if (error) setError(null);
+              }}
+              placeholder="e.g. Gym, walking, reading"
+              placeholderTextColor="#64748B"
+              autoCapitalize="sentences"
+              style={styles.input}
+            />
+          </View>
+
+          <Pressable
+            onPress={onCreate}
+            disabled={!canSubmit}
+            style={({ pressed }) => [
+              styles.createBtn,
+              !canSubmit && styles.createBtnDisabled,
+              pressed && canSubmit && styles.createBtnPressed,
+            ]}
+          >
+            <Text style={styles.createBtnText}>{creating ? "Creating..." : "Create league"}</Text>
+          </Pressable>
+
+          <Pressable onPress={resetCreate} style={styles.cancelInlineBtn}>
+            <Text style={styles.cancelInlineText}>Cancel</Text>
           </Pressable>
         </View>
+      ) : null}
 
-        {error ? (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>{error}</Text>
+      <View style={styles.listWrap}>
+        {loading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator />
           </View>
-        ) : null}
-
-        <View style={styles.actionStack}>
-          {showCreate ? (
-            <Pressable
-              onPress={onStartCreate}
-              style={({ pressed }) => [styles.backBtn, pressed && styles.actionPressed]}
-            >
-              <Text style={styles.backBtnText}>Back to plans</Text>
+        ) : leagues.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No leagues yet</Text>
+            <Text style={styles.emptyText}>Your leagues will show up here once you create or join one.</Text>
+            <Pressable onPress={load} style={styles.emptyRefreshBtn}>
+              <Text style={styles.emptyRefreshText}>Refresh</Text>
             </Pressable>
-          ) : (
-            <Pressable
-              onPress={onStartCreate}
-              style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
-            >
-              <Text style={styles.actionTitle}>+ Create a league</Text>
-              <Text style={styles.actionSubtitle}>Start a new accountability group.</Text>
-            </Pressable>
-          )}
-
-          {!showCreate ? (
-            <>
-              <Pressable
-                onPress={() => router.push("/(app)/league/join")}
-                style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
-              >
-                <Text style={styles.actionTitle}>Join with code</Text>
-                <Text style={styles.actionSubtitle}>Jump into an existing league in seconds.</Text>
-              </Pressable>
-
-              {isAdmin ? (
-                <Pressable
-                  onPress={() => router.push("/(app)/reports")}
-                  style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
-                >
-                  <Text style={styles.actionTitle}>League reports</Text>
-                  <Text style={styles.actionSubtitle}>Review pending rewards, charity totals, and leagues awaiting settlement.</Text>
-                </Pressable>
-              ) : null}
-            </>
-          ) : null}
-        </View>
-
-        {showCreate ? (
+          </View>
+        ) : (
           <>
-            {selectedPlan ? (
-              <View style={styles.selectedPlanWrap}>
-                <Text style={styles.selectedPlanLabel}>SELECTED PLAN</Text>
-                <Text style={styles.selectedPlanTitle}>
-                  {selectedPlan.fullName} - ${selectedPlan.priceEuros} per person
-                </Text>
-                <Text style={styles.selectedPlanMessage}>{selectedPlan.message}</Text>
-                <Text style={styles.selectedPlanMeta}>{selectedPlan.quickDifference}</Text>
-                <Text style={styles.selectedPlanMeta}>{selectedPlan.summary}</Text>
-                {selectedPlan.secondarySummary ? (
-                  <Text style={styles.selectedPlanMeta}>{selectedPlan.secondarySummary}</Text>
-                ) : null}
-                {selectedPlan.unlockLabel ? (
-                  <Text style={styles.selectedPlanMetaHighlight}>{selectedPlan.unlockLabel}</Text>
-                ) : null}
-                {selectedPlan.purchaseNote ? (
-                  <Text style={styles.selectedPlanMeta}>{selectedPlan.purchaseNote}</Text>
-                ) : null}
-              </View>
-            ) : null}
-
-            <View style={styles.createCard}>
-              <View style={styles.createHeader}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.createEyebrow}>CREATE A LEAGUE</Text>
-                  <Text style={styles.createTitle}>Fill in your league</Text>
-                  <Text style={styles.createHelper}>Only the fields below are editable.</Text>
-                </View>
-
-                <View style={styles.planChip}>
-                  <Text style={styles.planChipText}>{planLabel(isFreeSelected, selectedPlanTier)}</Text>
-                </View>
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <Text style={styles.fieldLabel}>League name</Text>
-                <TextInput
-                  value={newName}
-                  onChangeText={(t) => {
-                    setNewName(t);
-                    if (error) setError(null);
-                  }}
-                  placeholder="e.g. April consistency club"
-                  placeholderTextColor="#64748B"
-                  autoCapitalize="sentences"
-                  style={styles.input}
-                />
-              </View>
-
-              <View style={styles.fieldBlock}>
-                <View style={styles.fieldLabelRow}>
-                  <Text style={styles.fieldLabel}>What activity are you committing to?</Text>
-                  <Text style={styles.fieldCount}>{newActivity.length}/40</Text>
-                </View>
-                <TextInput
-                  value={newActivity}
-                  onChangeText={(t) => {
-                    setNewActivity(t.slice(0, 40));
-                    if (error) setError(null);
-                  }}
-                  placeholder="e.g. Gym, running, reading"
-                  placeholderTextColor="#64748B"
-                  autoCapitalize="sentences"
-                  style={styles.input}
-                />
-              </View>
-
-              <Pressable
-                onPress={onCreate}
-                disabled={!canSubmit}
-                style={({ pressed }) => [
-                  styles.createBtn,
-                  !canSubmit && styles.createBtnDisabled,
-                  pressed && canSubmit && styles.createBtnPressed,
-                ]}
-              >
-                <Text style={styles.createBtnText}>{creating ? "Creating..." : "Create league"}</Text>
-              </Pressable>
-
-              <Pressable onPress={resetCreate} style={styles.cancelInlineBtn}>
-                <Text style={styles.cancelInlineText}>Cancel</Text>
+            <View style={styles.listHeader}>
+              <Text style={styles.listHeaderText}>Your leagues</Text>
+              <Pressable onPress={load} style={styles.inlineRefreshBtn}>
+                <Text style={styles.inlineRefreshText}>Refresh</Text>
               </Pressable>
             </View>
-          </>
-        ) : null}
 
-        <View style={styles.listWrap}>
-          {loading ? (
-            <View style={styles.loadingState}>
-              <ActivityIndicator />
-            </View>
-          ) : leagues.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No leagues yet</Text>
-              <Text style={styles.emptyText}>Your leagues will show up here once you create or join one.</Text>
-              <Pressable onPress={load} style={styles.emptyRefreshBtn}>
-                <Text style={styles.emptyRefreshText}>Refresh</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <>
-              <View style={styles.listHeader}>
-                <Text style={styles.listHeaderText}>Your leagues</Text>
-                <Pressable onPress={load} style={styles.inlineRefreshBtn}>
-                  <Text style={styles.inlineRefreshText}>Refresh</Text>
+            <FlatList
+              data={leagues}
+              keyExtractor={(l) => l.id}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => router.push(`/(app)/league/${item.id}`)}
+                  style={({ pressed }) => [
+                    styles.leagueCard,
+                    pressed && styles.actionPressed,
+                  ]}
+                >
+                  <Text style={styles.leagueName}>{item.name ?? "Untitled league"}</Text>
+                  {item.activity ? <Text style={styles.leagueActivity}>{item.activity}</Text> : null}
                 </Pressable>
-              </View>
-
-              <View style={styles.listContent}>
-                {leagues.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => {
-                      if (item.my_payment_status === "unpaid" && item.plan_tier) {
-                        router.push({
-                          pathname: "/(app)/league/purchase",
-                          params: {
-                            leagueId: item.id,
-                            next: `/(app)/league/${item.id}`,
-                          },
-                        });
-                        return;
-                      }
-
-                      router.push(`/(app)/league/${item.id}`);
-                    }}
-                    style={({ pressed }) => [styles.leagueCard, pressed && styles.actionPressed]}
-                  >
-                    <Text style={styles.leagueName}>{item.name ?? "Untitled league"}</Text>
-                    {item.activity ? <Text style={styles.leagueActivity}>{item.activity}</Text> : null}
-                    {item.my_payment_status === "unpaid" && item.plan_tier ? (
-                      <Text style={styles.leagueMeta}>Payment required before you can participate.</Text>
-                    ) : null}
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          )}
-        </View>
-      </ScrollView>
+              )}
+            />
+          </>
+        )}
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -411,13 +359,10 @@ export default function LeaguesScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#0B0F14",
-  },
-  scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 70,
     paddingBottom: 20,
-    flexGrow: 1,
+    backgroundColor: "#0B0F14",
   },
   headerRow: {
     flexDirection: "row",
@@ -471,16 +416,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.06)",
     gap: 6,
   },
-  backBtn: {
-    alignSelf: "flex-start",
-    paddingVertical: 8,
-    paddingHorizontal: 2,
-  },
-  backBtnText: {
-    color: "#C8D0DB",
-    fontSize: 15,
-    fontWeight: "700",
-  },
   actionPressed: {
     opacity: 0.92,
   },
@@ -494,44 +429,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  selectedPlanWrap: {
-    marginTop: 12,
-    borderRadius: 16,
-    padding: 12,
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.05)",
-  },
-  selectedPlanLabel: {
-    color: "rgba(237,231,255,0.48)",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-  },
-  selectedPlanTitle: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  selectedPlanMessage: {
-    color: "#D1D5DB",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  selectedPlanMeta: {
-    color: "#94A3B8",
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  selectedPlanMetaHighlight: {
-    color: "#FCD34D",
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "700",
-  },
   createCard: {
-    marginTop: 12,
+    marginTop: 14,
     borderRadius: 22,
     padding: 16,
     gap: 14,
@@ -556,13 +455,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
   },
-  createHelper: {
-    marginTop: 6,
-    color: "#8FA1B7",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
   planChip: {
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -583,13 +475,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
   },
   fieldLabel: {
     color: "#A7B0BC",
     fontSize: 14,
     fontWeight: "600",
-    flex: 1,
   },
   fieldCount: {
     color: "rgba(237,231,255,0.48)",
@@ -637,6 +527,7 @@ const styles = StyleSheet.create({
   },
   listWrap: {
     marginTop: 18,
+    flex: 1,
   },
   loadingState: {
     marginTop: 24,
@@ -716,11 +607,5 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: "#A7B0BC",
     fontSize: 14,
-  },
-  leagueMeta: {
-    marginTop: 6,
-    color: "#FCD34D",
-    fontSize: 12,
-    fontWeight: "600",
   },
 });

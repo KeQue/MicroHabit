@@ -1,4 +1,4 @@
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { trackEvent } from "../../features/analytics";
 import { useAuth } from "../../features/auth/useAuth";
 
 const INPUT_BG = "rgba(255,255,255,0.04)";
@@ -20,30 +19,12 @@ const PLACEHOLDER = "rgba(255,255,255,0.44)";
 
 export default function SignInScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ error?: string; message?: string }>();
-  const { signIn, signInWithProvider } = useAuth();
+  const { signIn } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState<"google" | "apple" | null>(null);
-
-  const handleSocialSignIn = async (provider: "google" | "apple") => {
-    try {
-      setError(null);
-      setSocialLoading(provider);
-      const result = await signInWithProvider(provider);
-      if (result === "signed-in") {
-        await trackEvent("login_completed", { method: provider });
-        router.replace("/(app)");
-      }
-    } catch (e: any) {
-      setError(e?.message ?? "Social sign-in failed");
-    } finally {
-      setSocialLoading(null);
-    }
-  };
 
   return (
     <LinearGradient
@@ -64,44 +45,6 @@ export default function SignInScreen() {
           </View>
 
           <View style={styles.card}>
-            <View style={styles.socialStack}>
-              <Pressable
-                disabled={loading || !!socialLoading}
-                onPress={() => void handleSocialSignIn("google")}
-                style={({ pressed }) => [
-                  styles.socialBtn,
-                  pressed && !socialLoading && !loading && styles.socialBtnPressed,
-                  socialLoading === "google" && styles.socialBtnDisabled,
-                ]}
-              >
-                <Text style={styles.socialBtnText}>
-                  {socialLoading === "google" ? "Connecting Google..." : "Continue with Google"}
-                </Text>
-              </Pressable>
-
-              {Platform.OS === "ios" ? (
-                <Pressable
-                  disabled={loading || !!socialLoading}
-                  onPress={() => void handleSocialSignIn("apple")}
-                  style={({ pressed }) => [
-                    styles.socialBtn,
-                    pressed && !socialLoading && !loading && styles.socialBtnPressed,
-                    socialLoading === "apple" && styles.socialBtnDisabled,
-                  ]}
-                >
-                  <Text style={styles.socialBtnText}>
-                    {socialLoading === "apple" ? "Connecting Apple..." : "Continue with Apple"}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </View>
-
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR USE EMAIL</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
             <TextInput
               placeholder="Email"
               placeholderTextColor={PLACEHOLDER}
@@ -122,12 +65,10 @@ export default function SignInScreen() {
               style={styles.input}
             />
 
-            {params.message ? <Text style={styles.info}>{params.message}</Text> : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {!error && params.error ? <Text style={styles.error}>{params.error}</Text> : null}
 
             <Pressable
-              disabled={loading || !!socialLoading}
+              disabled={loading}
               onPress={async () => {
                 try {
                   setError(null);
@@ -138,7 +79,6 @@ export default function SignInScreen() {
                   if (!password) throw new Error("Password is required");
 
                   await signIn(e, password);
-                  await trackEvent("login_completed");
                   router.replace("/(app)");
                 } catch (e: any) {
                   setError(e?.message ?? "Sign-in failed");
@@ -155,13 +95,7 @@ export default function SignInScreen() {
               <Text style={styles.primaryBtnText}>{loading ? "Signing in..." : "Sign in"}</Text>
             </Pressable>
 
-            <Text style={styles.helperText}>
-              Email sign-in stays available if you prefer a verified inbox and password.
-            </Text>
-
-            <Link href="/(auth)/forgot-password" style={styles.secondaryLink}>
-              Forgot password?
-            </Link>
+            <Text style={styles.helperText}>Email sign-in for now. Social login can come next.</Text>
 
             <Link href="/(auth)/sign-up" style={styles.secondaryLink}>
               Create an account
@@ -217,46 +151,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-  socialStack: {
-    gap: 10,
-  },
-  socialBtn: {
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 14,
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
-  socialBtnPressed: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  socialBtnDisabled: {
-    opacity: 0.7,
-  },
-  socialBtnText: {
-    color: TEXT,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginVertical: 2,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  dividerText: {
-    color: "rgba(237,231,255,0.44)",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
   input: {
     borderWidth: 1,
     borderColor: INPUT_BORDER,
@@ -269,11 +163,6 @@ const styles = StyleSheet.create({
   },
   error: {
     color: "#FF8B8B",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  info: {
-    color: "rgba(140,255,190,0.92)",
     fontSize: 13,
     fontWeight: "600",
   },

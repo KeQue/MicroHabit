@@ -3,26 +3,9 @@ import type { ExpoConfig } from "@expo/config-types";
 const config: ExpoConfig = {
   name: "MicroHabit",
   slug: "microhabit",
-  version: "1.0.1",
-  newArchEnabled: true,
-  plugins: [
-    "expo-router",
-    [
-      "expo-splash-screen",
-      {
-        image: "./assets/images/splash-icon.png",
-        imageWidth: 200,
-        resizeMode: "contain",
-        backgroundColor: "#ffffff",
-        dark: {
-          backgroundColor: "#000000",
-        },
-      },
-    ],
-    "expo-font",
-    "expo-notifications",
-    "expo-secure-store",
-  ],
+
+  // App Store "version" (1.0.1 etc) should live here too if you want it controlled by app.config.ts
+  // version: "1.0.1",
 
   ios: {
     bundleIdentifier: "com.sadik.microhabit",
@@ -30,7 +13,7 @@ const config: ExpoConfig = {
 
     // IMPORTANT: increment this every TestFlight/App Store upload
     // Must be higher than the last uploaded build number
-    buildNumber: "14",
+      buildNumber: "5",
 
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -39,7 +22,8 @@ const config: ExpoConfig = {
 
   android: {
     package: "com.sadik.microhabit",
-    versionCode: 10,
+    // OPTIONAL but recommended: increment for every Play upload
+    // versionCode: 2,
   },
 
   scheme: "microhabit",

@@ -1,9 +1,6 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
-import { trackEvent } from "@/features/analytics";
-import { getMyProfile, updateMyProfile } from "@/features/auth/profile";
-import { useAuth } from "@/features/auth/useAuth";
 import { getLeagueMembers } from "@/features/leagues/api";
 import { scheduleGentleTestNotification } from "@/features/notifications/local";
 import { supabase } from "@/lib/supabase";
@@ -21,7 +18,6 @@ import {
   Share,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -159,44 +155,6 @@ function scoreDays(days: boolean[]) {
   return (days ?? []).reduce((acc, v) => acc + (v === true ? 1 : 0), 0);
 }
 
-function buildProjectionMessage(
-  activeDays: number,
-  elapsedDays: number,
-  monthDays: number,
-  options?: { isFreeLeague?: boolean }
-) {
-  if (activeDays <= 0) {
-    return `A first check-in today gets your month moving`;
-  }
-
-  const projectedTotal = Math.min(
-    monthDays,
-    Math.max(activeDays, Math.round((activeDays / elapsedDays) * monthDays))
-  );
-
-  if (elapsedDays >= 25) {
-    if (options?.isFreeLeague) {
-      return `You're finishing strong. Keep this momentum going into next month`;
-    }
-
-    return `You're finishing strong. You're on pace for ${projectedTotal} check-ins this month`;
-  }
-
-  if (elapsedDays >= 21) {
-    return `3 weeks in: keep this up and you could finish with ${projectedTotal} check-ins`;
-  }
-
-  if (elapsedDays >= 14) {
-    return `2 weeks in: you're on pace for ${projectedTotal} check-ins this month`;
-  }
-
-  return `1 week in: you're on pace for ${projectedTotal} check-ins this month`;
-}
-
-function shouldShowProjectionMessage(elapsedDays: number) {
-  return elapsedDays === 7 || elapsedDays === 14 || elapsedDays === 21 || elapsedDays >= 25;
-}
-
 /**
  * âœ… Edit window rule (MVP):
  * - Allow toggling: today and yesterday only
@@ -211,36 +169,25 @@ function PillButton({
   label,
   onPress,
   size = "md",
-  tone = "default",
 }: {
   label: string;
   onPress: () => void | Promise<void>;
   size?: "md" | "sm" | "xs";
-  tone?: "default" | "destructive" | "ghost";
 }) {
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.pillBtn,
-        tone === "destructive" && styles.pillBtnDestructive,
-        tone === "ghost" && styles.pillBtnGhost,
         size === "sm" && styles.pillBtnSm,
         size === "xs" && styles.pillBtnXs,
-        pressed &&
-          (tone === "destructive"
-            ? { backgroundColor: "rgba(255,120,120,0.18)" }
-            : tone === "ghost"
-              ? { backgroundColor: "rgba(255,255,255,0.07)" }
-              : { backgroundColor: UI.pillBgActive }),
+        pressed && { backgroundColor: UI.pillBgActive },
       ]}
       hitSlop={8}
     >
       <Text
         style={[
           styles.pillBtnText,
-          tone === "destructive" && styles.pillBtnTextDestructive,
-          tone === "ghost" && styles.pillBtnTextGhost,
           size === "sm" && styles.pillBtnTextSm,
           size === "xs" && styles.pillBtnTextXs,
         ]}
@@ -325,38 +272,6 @@ function Segmented({
   );
 }
 
-function ModalActionButton({
-  label,
-  onPress,
-  tone = "secondary",
-}: {
-  label: string;
-  onPress: () => void | Promise<void>;
-  tone?: "primary" | "secondary";
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.modalActionBtn,
-        tone === "primary" ? styles.modalActionBtnPrimary : styles.modalActionBtnSecondary,
-        pressed && (tone === "primary" ? styles.modalActionBtnPrimaryPressed : styles.modalActionBtnPressed),
-      ]}
-    >
-      <Text
-        style={[
-          styles.modalActionBtnText,
-          tone === "primary"
-            ? styles.modalActionBtnTextPrimary
-            : styles.modalActionBtnTextSecondary,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function MemberCardSkeleton() {
   return (
     <View style={styles.skeletonCard}>
@@ -381,13 +296,13 @@ function MemberCardSkeleton() {
 export default function LeagueDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { deleteAccount } = useAuth();
   const params = useLocalSearchParams<{ leagueId: string }>();
   const leagueId = typeof params.leagueId === "string" ? params.leagueId : "";
 
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
+  const todayWeekday = today.getDay();
   const todayIndex = today.getDate() - 1;
   const monthDays = useMemo(() => new Date(year, month + 1, 0).getDate(), [year, month]);
 
@@ -404,21 +319,13 @@ export default function LeagueDetailScreen() {
   const [leagueName, setLeagueName] = useState<string>("League");
   const [leagueActivity, setLeagueActivity] = useState<string>("");
   const [leaguePlanTier, setLeaguePlanTier] = useState<PlanTier | null>(null);
+
   const [leagueIsFree, setLeagueIsFree] = useState<boolean>(false);
-  const [leagueStatus, setLeagueStatus] = useState<string>("active");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
-  const [myPaymentStatus, setMyPaymentStatus] = useState<string>("free");
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [editNameOpen, setEditNameOpen] = useState(false);
-  const [displayNameInput, setDisplayNameInput] = useState("");
-  const [savingName, setSavingName] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
-  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
-  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
-  const [deletingAccount, setDeletingAccount] = useState(false);
   const listAnim = useRef(new Animated.Value(1)).current;
 
   async function onSignOut() {
@@ -427,9 +334,10 @@ export default function LeagueDetailScreen() {
   }
 
   function buildInviteMessage(code: string) {
-    return `Join my Commito league
+    // Canonical template (no links)
+    return `Join my MicroHabit league ðŸ’ª
 Invite code: ${code}
-Install Commito, tap Join, and enter the code.`;
+Open MicroHabit â†’ Join â†’ Paste the code`;
   }
 
   function onInvite() {
@@ -439,52 +347,6 @@ Install Commito, tap Join, and enter the code.`;
 
   function onMenu() {
     setMenuOpen(true);
-  }
-
-  async function openEditName() {
-    try {
-      setNameError(null);
-      const profile = await getMyProfile();
-      setDisplayNameInput(profile?.name?.trim() || profile?.username?.trim() || "");
-      setEditNameOpen(true);
-    } catch (e: any) {
-      setNameError(e?.message ?? "Could not load your profile");
-      setEditNameOpen(true);
-    }
-  }
-
-  async function onSaveDisplayName() {
-    const trimmedName = displayNameInput.trim();
-    if (!trimmedName) {
-      setNameError("Please enter a display name");
-      return;
-    }
-
-    try {
-      setSavingName(true);
-      setNameError(null);
-      await updateMyProfile({ name: trimmedName });
-      await load();
-      setEditNameOpen(false);
-    } catch (e: any) {
-      setNameError(e?.message ?? "Could not update your name");
-    } finally {
-      setSavingName(false);
-    }
-  }
-
-  async function onDeleteAccount() {
-    try {
-      setDeletingAccount(true);
-      setDeleteAccountError(null);
-      await deleteAccount();
-      setDeleteAccountOpen(false);
-      router.replace("/(auth)/sign-in");
-    } catch (e: any) {
-      setDeleteAccountError(e?.message ?? "Could not delete account");
-    } finally {
-      setDeletingAccount(false);
-    }
   }
 
   async function onCopyCode() {
@@ -531,7 +393,7 @@ Install Commito, tap Join, and enter the code.`;
 
       const { data: leagueRow, error: leagueErr } = await supabase
         .from("leagues")
-        .select("id,name,activity,plan_tier,is_free,status,invite_code")
+        .select("id,name,activity,plan_tier,is_free,invite_code")
         .eq("id", leagueId)
         .single();
       if (leagueErr) throw leagueErr;
@@ -539,24 +401,14 @@ Install Commito, tap Join, and enter the code.`;
       setLeagueName(leagueRow?.name ?? "League");
       setLeagueActivity(leagueRow?.activity ?? "");
       setLeaguePlanTier((leagueRow?.plan_tier as PlanTier) ?? null);
+
       setLeagueIsFree(!!leagueRow?.is_free);
-      setLeagueStatus((leagueRow?.status as string) ?? "active");
       setInviteCode((leagueRow?.invite_code as string) ?? null);
 
       const rows = await getLeagueMembers(leagueId);
 
       const me = rows.find((r: any) => r.user_id === user.id);
       setMyRole((me?.role as string) ?? "member");
-
-      const { data: membershipRow, error: membershipErr, status: membershipStatus } = await supabase
-        .from("league_members")
-        .select("payment_status")
-        .eq("league_id", leagueId)
-        .eq("user_id", user.id)
-        .single();
-
-      if (membershipErr && membershipStatus !== 406) throw membershipErr;
-      setMyPaymentStatus((membershipRow?.payment_status as string) ?? "free");
 
       const roleRank = (role?: string) => (role === "owner" ? 0 : role === "admin" ? 1 : 2);
 
@@ -720,22 +572,16 @@ Install Commito, tap Join, and enter the code.`;
       return ranked.map((entry, idx) => {
         const above = ranked[idx - 1];
         const below = ranked[idx + 1];
-        const daysLeft = Math.max(monthDays - (todayIndex + 1), 0);
-        const daysLeftLabel = `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`;
 
         let rivalLabel: string | undefined;
         if (idx === 0 && below) {
           const delta = entry.s - below.s;
           rivalLabel =
-            delta <= 0
-              ? `Tied · ${daysLeftLabel}`
-              : `${delta} day${delta === 1 ? "" : "s"} ahead · ${daysLeftLabel}`;
+            delta <= 0 ? `Tied with ${below.m.name}` : `+${delta} days ahead of ${below.m.name}`;
         } else if (above) {
           const delta = above.s - entry.s;
           rivalLabel =
-            delta <= 0
-              ? `Tied · ${daysLeftLabel}`
-              : `${delta} day${delta === 1 ? "" : "s"} behind · ${daysLeftLabel}`;
+            delta <= 0 ? `Tied with ${above.m.name}` : `${delta} days behind ${above.m.name}`;
         }
 
         return {
@@ -757,11 +603,6 @@ Install Commito, tap Join, and enter the code.`;
     async (memberId: string, dayIndex: string | number) => {
       const day = typeof dayIndex === "number" ? dayIndex : Number(dayIndex);
 
-      const canParticipate =
-        leagueIsFree || !leaguePlanTier || myPaymentStatus === "paid" || myPaymentStatus === "free";
-
-      if (!canParticipate) return;
-
       // only allow self
       if (!myId || memberId !== myId) return;
 
@@ -777,9 +618,7 @@ Install Commito, tap Join, and enter the code.`;
       const d = new Date(year, month, day + 1);
       const log_date = toDateOnlyLocal(d);
 
-      const myDays = members.find((m) => m.id === myId)?.days ?? [];
-      const current = myDays[day] ?? false;
-      const hadAnyCheckIn = myDays.some(Boolean);
+      const current = members.find((m) => m.id === myId)?.days?.[day] ?? false;
       const next = !current;
 
       // optimistic UI
@@ -789,38 +628,38 @@ Install Commito, tap Join, and enter the code.`;
         )
       );
 
-        const { error } = await supabase.rpc("toggle_daily_log", {
-          p_league_id: leagueId,
-          p_log_date: log_date,
-          p_completed: next,
-        });
+      const { error } = await supabase.from("daily_logs").upsert(
+        {
+          league_id: leagueId,
+          user_id: myId,
+          log_date,
+          completed: next,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "league_id,user_id,log_date" }
+      );
 
-        // revert if failed
-        if (error) {
-          setMembers((prev) =>
-            prev.map((x) =>
-              x.id !== memberId
-                ? x
-                : { ...x, days: x.days.map((v, i) => (i === day ? current : v)) }
-            )
-          );
-          setError(error.message ?? "Could not update your check-in");
-        } else if (!current && !hadAnyCheckIn) {
-          void trackEvent("first_check_in", { league_id: leagueId });
-        }
-      },
-      [leagueId, leagueIsFree, leaguePlanTier, members, monthDays, myId, myPaymentStatus, year, month, todayIndex]
-    );
+      // revert if failed
+      if (error) {
+        setMembers((prev) =>
+          prev.map((x) =>
+            x.id !== memberId
+              ? x
+              : { ...x, days: x.days.map((v, i) => (i === day ? current : v)) }
+          )
+        );
+      }
+    },
+    [leagueId, members, monthDays, myId, year, month, todayIndex]
+  );
 
-  const canParticipate =
-    leagueIsFree || !leaguePlanTier || myPaymentStatus === "paid" || myPaymentStatus === "free";
-  const showInvite =
-    canParticipate && (myRole === "owner" || myRole === "admin" || myRole === "member");
-  const elapsedDays = Math.max(Math.min(todayIndex + 1, monthDays), 1);
+  const showInvite = myRole === "owner" || myRole === "admin" || myRole === "member";
   const bgColors =
     viewMode === "Ranking"
       ? (["#11041F", "#1D0D38", "#160A2D"] as const)
       : ([UI.bgTop, UI.bgBottom] as const);
+
+  const inviteMessage = inviteCode ? buildInviteMessage(inviteCode) : "";
 
   return (
     <ThemedView style={styles.container}>
@@ -837,34 +676,29 @@ Install Commito, tap Join, and enter the code.`;
           animationType="fade"
           onRequestClose={() => setInviteOpen(false)}
         >
-              <Pressable style={styles.modalOverlay} onPress={() => setInviteOpen(false)}>
-                <Pressable style={styles.modalCard} onPress={() => {}}>
-                  <Text style={styles.modalEyebrow}>COMMITO LINK</Text>
-                  <Text style={styles.modalTitle}>Invite a friend</Text>
-                  <Text style={styles.inviteSubtitle}>Share this code so someone can join your league in Commito.</Text>
+          <Pressable style={styles.modalOverlay} onPress={() => setInviteOpen(false)}>
+            <Pressable style={styles.modalCard} onPress={() => {}}>
+              <Text style={styles.modalTitle}>Invite code</Text>
 
-                  <View style={styles.inviteCodeRow}>
-                    <View style={[styles.codeBox, styles.codeBoxInline]}>
-                    <Text style={styles.codeText}>{inviteCode ?? "-"}</Text>
-                  </View>
-                  <PillButton label={copied ? "Copied" : "Copy"} size="sm" onPress={onCopyCode} />
-                </View>
+              <View style={styles.codeBox}>
+                <Text style={styles.codeText}>{inviteCode ?? "â€”"}</Text>
+              </View>
 
-                <Text style={styles.inviteInstruction}>
-                  Install Commito, tap Join, and enter this code.
-                </Text>
+              <Text style={styles.modalMessageLabel}>Message</Text>
+              <View style={styles.messageBox}>
+                <Text style={styles.messageText}>{inviteMessage}</Text>
+              </View>
 
-                <View style={styles.inviteActions}>
-                  <ModalActionButton label="Share invite" tone="primary" onPress={onShareInvite} />
-                  <ModalActionButton
-                    label="Close"
-                    tone="secondary"
-                    onPress={() => setInviteOpen(false)}
-                  />
-                </View>
+              {copied ? <Text style={styles.copiedText}>Copied</Text> : <View style={{ height: 18 }} />}
 
-                {!inviteCode ? (
-                  <Text style={styles.modalHint}>No invite code found for this league.</Text>
+              <View style={styles.modalActions}>
+                <PillButton label="Copy code" size="sm" onPress={onCopyCode} />
+                <PillButton label="Share" size="sm" onPress={onShareInvite} />
+                <PillButton label="Close" size="sm" onPress={() => setInviteOpen(false)} />
+              </View>
+
+              {!inviteCode ? (
+                <Text style={styles.modalHint}>No invite code found for this league.</Text>
               ) : null}
             </Pressable>
           </Pressable>
@@ -874,163 +708,38 @@ Install Commito, tap Join, and enter the code.`;
           visible={menuOpen}
           transparent
           animationType="fade"
-            onRequestClose={() => setMenuOpen(false)}
-            >
-              <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
-                <Pressable style={styles.menuCard} onPress={() => {}}>
-                  <Text style={styles.modalEyebrow}>CONTROL PANEL</Text>
-                  <Text style={styles.menuTitle}>Menu</Text>
-                  <View style={styles.menuActions}>
-                  <PillButton
-                    label="Edit name"
-                    size="sm"
-                    onPress={async () => {
-                      setMenuOpen(false);
-                      await openEditName();
-                    }}
-                  />
-                  <PillButton
-                    label="Back"
-                    size="sm"
-                    onPress={() => {
-                      setMenuOpen(false);
-                      router.back();
-                    }}
-                  />
-                  <PillButton
-                    label="Sign out"
-                    size="sm"
-                    onPress={async () => {
-                      setMenuOpen(false);
-                      await onSignOut();
-                    }}
-                  />
-                </View>
-                {__DEV__ ? (
-                  <View style={styles.menuDevSection}>
-                    <Text style={styles.menuSectionLabel}>Dev</Text>
-                    <PillButton
-                      label="Test notification"
-                      size="sm"
-                      onPress={async () => {
-                        setMenuOpen(false);
-                        await scheduleGentleTestNotification();
-                      }}
-                    />
-                  </View>
-                ) : null}
-                <View style={styles.menuFooter}>
-                  <PillButton
-                    label="Delete account"
-                    size="sm"
-                    tone="destructive"
-                    onPress={() => {
-                      setMenuOpen(false);
-                      setDeleteAccountError(null);
-                      setDeleteAccountOpen(true);
-                    }}
-                  />
-                  <ModalActionButton
-                    label="Close"
-                    tone="secondary"
-                    onPress={() => setMenuOpen(false)}
-                  />
-                </View>
-              </Pressable>
-            </Pressable>
-          </Modal>
-
-        <Modal
-          visible={deleteAccountOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            if (deletingAccount) return;
-            setDeleteAccountOpen(false);
-          }}
+          onRequestClose={() => setMenuOpen(false)}
         >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => {
-              if (deletingAccount) return;
-              setDeleteAccountOpen(false);
-            }}
-          >
-            <Pressable style={styles.modalCard} onPress={() => {}}>
-              <Text style={styles.modalTitle}>Delete account</Text>
-              <Text style={styles.messageText}>
-                This permanently removes your account and any leagues you created. This cannot be undone.
-              </Text>
-              {deleteAccountError ? <Text style={styles.modalError}>{deleteAccountError}</Text> : null}
-              <View style={styles.modalActions}>
-                <PillButton
-                  label={deletingAccount ? "Deleting..." : "Delete account"}
-                  size="sm"
-                  onPress={onDeleteAccount}
-                />
-                <PillButton
-                  label="Cancel"
-                  size="sm"
-                  onPress={() => {
-                    if (deletingAccount) return;
-                    setDeleteAccountOpen(false);
-                  }}
-                />
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
-
-        <Modal
-          visible={editNameOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            if (savingName) return;
-            setEditNameOpen(false);
-          }}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => {
-              if (savingName) return;
-              setEditNameOpen(false);
-            }}
-          >
-            <Pressable style={styles.modalCard} onPress={() => {}}>
-              <Text style={styles.modalTitle}>Edit display name</Text>
-              <Text style={styles.modalMessageLabel}>What should people in the league see?</Text>
-              <TextInput
-                value={displayNameInput}
-                onChangeText={(value) => {
-                  setDisplayNameInput(value);
-                  if (nameError) setNameError(null);
+          <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
+            <Pressable style={styles.menuCard} onPress={() => {}}>
+              <Text style={styles.menuTitle}>Menu</Text>
+              <PillButton
+                label="Back"
+                size="sm"
+                onPress={() => {
+                  setMenuOpen(false);
+                  router.back();
                 }}
-                placeholder="Your name"
-                placeholderTextColor="rgba(237,231,255,0.38)"
-                autoCapitalize="words"
-                autoCorrect={false}
-                editable={!savingName}
-                maxLength={24}
-                style={styles.nameInput}
               />
-              {nameError ? <Text style={styles.modalError}>{nameError}</Text> : null}
-              <Text style={styles.modalHint}>This updates the name shown in league cards.</Text>
-              <View style={styles.modalActions}>
+              <PillButton
+                label="Sign out"
+                size="sm"
+                onPress={async () => {
+                  setMenuOpen(false);
+                  await onSignOut();
+                }}
+              />
+              {__DEV__ ? (
                 <PillButton
-                  label={savingName ? "Saving..." : "Save"}
+                  label="Test notification"
                   size="sm"
-                  onPress={onSaveDisplayName}
-                />
-                <PillButton
-                  label="Cancel"
-                  size="sm"
-                  onPress={() => {
-                    if (savingName) return;
-                    setEditNameOpen(false);
+                  onPress={async () => {
+                    setMenuOpen(false);
+                    await scheduleGentleTestNotification();
                   }}
                 />
-              </View>
+              ) : null}
+              <PillButton label="Close" size="sm" onPress={() => setMenuOpen(false)} />
             </Pressable>
           </Pressable>
         </Modal>
@@ -1141,35 +850,10 @@ Install Commito, tap Join, and enter the code.`;
             ) : null}
           </View>
 
-          {!canParticipate && leaguePlanTier ? (
-            <View style={styles.paymentNotice}>
-              <Text style={styles.paymentNoticeTitle}>Payment required</Text>
-              <Text style={styles.paymentNoticeText}>
-                Complete league entry purchase before logging activity or inviting others.
-              </Text>
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: "/(app)/league/purchase",
-                    params: {
-                      leagueId,
-                      next: `/(app)/league/${leagueId}`,
-                    },
-                  })
-                }
-                style={styles.paymentNoticeBtn}
-              >
-                <Text style={styles.paymentNoticeBtnText}>
-                  {leagueStatus === "payment_required" ? "Continue to payment" : "Open payment"}
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-
           {false ? (
             <View style={styles.activityChip}>
               <Text style={styles.activityChipEmoji}>{emojiForActivity(leagueActivity)}</Text>
-              <Text style={styles.metaDivider}>-</Text>
+              <Text style={styles.metaDivider}>Â·</Text>
               <Text style={styles.activityChipText}>{leagueActivity}</Text>
             </View>
           ) : null}
@@ -1209,26 +893,17 @@ Install Commito, tap Join, and enter the code.`;
                         <View style={styles.othersDividerLine} />
                       </View>
                     ) : null}
-                    <View style={styles.memberCardWrap}>
-                      <UserCard
-                        name={viewMode !== "Ranking" && index === 0 ? "You" : member.name}
-                        subtitle={member.subtitle}
-                        paceMessage={
-                          viewMode !== "Ranking" &&
-                          member.id === myId &&
-                          shouldShowProjectionMessage(elapsedDays)
-                            ? buildProjectionMessage(scoreDays(member.days), elapsedDays, monthDays, {
-                                isFreeLeague: leagueIsFree,
-                              })
-                            : undefined
-                        }
-                        days={member.days}
-                        colorDark={member.colorDark}
-                        accentActive={member.accentActive}
-                        todayIndex={todayIndex}
-                      disabled={!canParticipate || (!!myId && member.id !== myId)}
-                      onToggle={(i) => toggleDayForMember(member.id, i)}
-                      showRank={viewMode === "Ranking"}
+                  <View style={styles.memberCardWrap}>
+                    <UserCard
+                      name={viewMode !== "Ranking" && index === 0 ? "You" : member.name}
+                      subtitle={member.subtitle}
+                      days={member.days}
+                      colorDark={member.colorDark}
+                    accentActive={member.accentActive}
+                    todayIndex={todayIndex}
+                    disabled={!!myId && member.id !== myId}
+                    onToggle={(i) => toggleDayForMember(member.id, i)}
+                    showRank={viewMode === "Ranking"}
                       rank={rank}
                       rivalLabel={rivalLabel}
                     />
@@ -1308,14 +983,6 @@ const styles = StyleSheet.create({
     borderColor: UI.pillBorder,
     backgroundColor: UI.pillBg,
   },
-  pillBtnDestructive: {
-    borderColor: "rgba(255,120,120,0.34)",
-    backgroundColor: "rgba(255,120,120,0.1)",
-  },
-  pillBtnGhost: {
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "transparent",
-  },
   pillBtnSm: {
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -1325,8 +992,6 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   pillBtnText: { color: UI.text, fontSize: 16, fontWeight: "700" },
-  pillBtnTextDestructive: { color: "#FFB4B4" },
-  pillBtnTextGhost: { color: "rgba(237,231,255,0.72)" },
   pillBtnTextSm: { fontSize: 14 },
   pillBtnTextXs: { fontSize: 14, fontWeight: "800" },
 
@@ -1353,40 +1018,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 17,
     textAlign: "center",
-  },
-  paymentNotice: {
-    marginTop: 12,
-    marginBottom: 6,
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(245,158,11,0.28)",
-    backgroundColor: "rgba(120,53,15,0.22)",
-    gap: 8,
-  },
-  paymentNoticeTitle: {
-    color: "#FDE68A",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  paymentNoticeText: {
-    color: "rgba(254,243,199,0.88)",
-    lineHeight: 20,
-    fontSize: 13,
-  },
-  paymentNoticeBtn: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(245,158,11,0.35)",
-    backgroundColor: "rgba(245,158,11,0.14)",
-  },
-  paymentNoticeBtnText: {
-    color: "#FEF3C7",
-    fontSize: 13,
-    fontWeight: "800",
   },
   activitySpacer: {
     width: 0,
@@ -1634,121 +1265,34 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 520,
-    borderRadius: 24,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(144,108,255,0.42)",
-    backgroundColor: "rgba(16,7,34,0.985)",
-    padding: 20,
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.34,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-  },
-  modalEyebrow: {
-    color: "rgba(176,150,255,0.82)",
-    fontSize: 10.5,
-    fontWeight: "800",
-    letterSpacing: 2.2,
-    textTransform: "uppercase",
-    textAlign: "center",
-    marginBottom: 10,
+    borderColor: UI.cardBorder,
+    backgroundColor: UI.cardBg,
+    padding: 16,
   },
   modalTitle: {
     color: UI.text,
-    fontSize: 23,
+    fontSize: 18,
     fontWeight: "800",
-    letterSpacing: -0.4,
     textAlign: "center",
-    marginBottom: 10,
-  },
-  inviteSubtitle: {
-    marginTop: -1,
-    marginBottom: 16,
-    color: "rgba(237,231,255,0.72)",
-    fontSize: 13,
-    fontWeight: "600",
-    lineHeight: 20,
-    textAlign: "center",
-  },
-  inviteCodeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    marginBottom: 12,
   },
   codeBox: {
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(164,132,255,0.26)",
-    backgroundColor: "rgba(255,255,255,0.045)",
-    paddingVertical: 18,
-    paddingHorizontal: 16,
+    borderColor: UI.border,
+    backgroundColor: UI.codeBg,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  codeBoxInline: {
-    flex: 1,
   },
   codeText: {
     color: UI.text,
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: "900",
-    letterSpacing: 3.4,
-  },
-  inviteInstruction: {
-    marginTop: 13,
-    color: "rgba(237,231,255,0.6)",
-    fontSize: 12.5,
-    fontWeight: "600",
-    lineHeight: 18,
-    textAlign: "center",
-  },
-  inviteActions: {
-    marginTop: 16,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 10,
-  },
-  modalActionBtn: {
-    minWidth: 112,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    paddingVertical: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalActionBtnPrimary: {
-    borderColor: "rgba(158,124,255,0.72)",
-    backgroundColor: "rgba(114,73,255,0.24)",
-    shadowColor: "#8B5CF6",
-    shadowOpacity: 0.32,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  modalActionBtnSecondary: {
-    borderColor: "rgba(164,132,255,0.18)",
-    backgroundColor: "rgba(255,255,255,0.035)",
-  },
-  modalActionBtnPressed: {
-    backgroundColor: "rgba(255,255,255,0.07)",
-  },
-  modalActionBtnPrimaryPressed: {
-    backgroundColor: "rgba(114,73,255,0.34)",
-  },
-  modalActionBtnText: {
-    fontSize: 14,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
-  modalActionBtnTextPrimary: {
-    color: "#F5F0FF",
-  },
-  modalActionBtnTextSecondary: {
-    color: "rgba(237,231,255,0.82)",
+    letterSpacing: 3,
   },
   modalMessageLabel: {
     marginTop: 14,
@@ -1791,71 +1335,22 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
-  modalError: {
-    marginTop: 10,
-    color: UI.error,
-    fontSize: 12.5,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  nameInput: {
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 14,
-    color: UI.text,
-    fontSize: 16,
-    fontWeight: "600",
-  },
   menuCard: {
     width: "100%",
-    maxWidth: 300,
-    borderRadius: 24,
+    maxWidth: 280,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(144,108,255,0.42)",
-    backgroundColor: "rgba(16,7,34,0.985)",
-    padding: 18,
-    gap: 12,
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
+    borderColor: UI.cardBorder,
+    backgroundColor: UI.cardBg,
+    padding: 16,
+    gap: 10,
   },
   menuTitle: {
     color: UI.text,
-    fontSize: 23,
+    fontSize: 18,
     fontWeight: "800",
-    letterSpacing: -0.4,
     textAlign: "center",
-    marginBottom: 2,
-  },
-  menuActions: {
-    gap: 12,
-  },
-  menuDevSection: {
-    marginTop: 2,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(164,132,255,0.18)",
-    gap: 10,
-  },
-  menuSectionLabel: {
-    color: "rgba(176,150,255,0.66)",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-    textAlign: "center",
-  },
-  menuFooter: {
-    marginTop: 4,
-    paddingTop: 13,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(164,132,255,0.18)",
-    gap: 10,
+    marginBottom: 4,
   },
 });
 

@@ -1,21 +1,14 @@
-{
+﻿{
   "cli": { "version": ">= 12.0.0" },
   "build": {
     "production": {
-      "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
-      },
-      "ios": { "resourceClass": "m-medium" },
-      "android": { "buildType": "app-bundle" }
+      "ios": { "resourceClass": "m-medium" }
     }
   },
   "submit": {
     "production": {
       "ios": {
         "ascAppId": "6759626676"
-      },
-      "android": {
-        "track": "internal"
       }
     }
   }

@@ -1,117 +1,186 @@
-import { useRouter } from "expo-router";
-import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { PLAN_ORDER, getCommitmentPlan, type PlanTier } from "../../../features/leagues/plans";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useAuth } from "../../../features/auth/useAuth";
+import { supabase } from "../../../lib/supabase";
+
+type Tier = "free" | "A" | "B" | "C";
+type Source = "create" | "paywall";
 
 export default function ChoosePlanScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ source?: string }>();
+  const source: Source = params.source === "paywall" ? "paywall" : "create";
 
-  function onSelect(tier: PlanTier) {
-    router.replace({ pathname: "/(app)", params: { planTier: tier } });
+  const { user } = useAuth();
+  const uid = user?.id;
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [enabledLoading, setEnabledLoading] = useState(true);
+  const [paywallEnabled, setPaywallEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        setEnabledLoading(true);
+        const { data, error: e } = await supabase.rpc("get_paywall_enabled");
+        if (e) throw e;
+        if (!mounted) return;
+        setPaywallEnabled(Boolean(data));
+      } catch {
+        if (mounted) setPaywallEnabled(true);
+      } finally {
+        if (mounted) setEnabledLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const showPaidForTesting = !paywallEnabled;
+
+  async function setPlan(tier: Tier) {
+    try {
+      setError(null);
+      setSaving(true);
+
+      if (source === "create") {
+        if (tier === "free") {
+          router.replace({ pathname: "/(app)", params: { isFree: "1" } });
+        } else {
+          router.replace({ pathname: "/(app)", params: { planTier: tier } });
+        }
+        return;
+      }
+
+      if (!uid) throw new Error("Not authenticated");
+
+      const { error: e } = await supabase
+        .from("profiles")
+        .update({ plan_tier: tier })
+        .eq("id", uid);
+
+      if (e) throw e;
+
+      router.back();
+    } catch (err: any) {
+      setError(err?.message ?? "Failed to update plan");
+    } finally {
+      setSaving(false);
+    }
   }
 
+  const subtitle = useMemo(() => {
+    if (source === "create") {
+      return "Pick the kind of league you want to start.";
+    }
+    return "Choose the plan that unlocks your next league tier.";
+  }, [source]);
+
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      bounces
-    >
-      <Text style={styles.title}>Choose your commitment level</Text>
-      <Text style={styles.subtitle}>Pick a plan first. Payment happens on the next step.</Text>
-      <Text style={styles.helper}>Leagues run for 30 days</Text>
+    <View style={styles.screen}>
+      <Text style={styles.title}>Choose a plan</Text>
+      <Text style={styles.subtitle}>{subtitle}</Text>
 
-      <View style={styles.notice}>
-        <Text style={styles.noticeTitle}>Store-billed leagues</Text>
-        <Text style={styles.noticeText}>
-          League entry is purchased per league on iOS and Android. Commito funds rewards and charity from league revenue.
-        </Text>
-      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={styles.list}>
-        {PLAN_ORDER.map((tier) => {
-          const plan = getCommitmentPlan(tier);
-          return (
-            <PlanCard
-              key={tier}
-              title={plan.fullName}
-              price={`${plan.currencySymbol}${plan.priceEuros} per person`}
-              message={plan.message}
-              quickDifference={plan.quickDifference}
-              summary={plan.summary}
-              secondarySummary={plan.secondarySummary}
-              previewTitle={plan.previewTitle}
-              preview={plan.preview}
-              unlockLabel={plan.unlockLabel}
-              badge={plan.cta}
-              accent={tier}
-              featured={plan.featured}
-              onPress={() => onSelect(tier)}
-            />
-          );
-        })}
-      </View>
+      {enabledLoading || saving ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator />
+          <Text style={styles.loadingText}>{saving ? "Saving..." : "Loading..."}</Text>
+        </View>
+      ) : (
+        <View style={styles.list}>
+          <PlanCard
+            title="Free"
+            subtitle="Start with one league and keep the habit simple."
+            badge="FREE"
+            accent="free"
+            onPress={() => setPlan("free")}
+          />
+
+          {showPaidForTesting ? (
+            <>
+              <PlanCard
+                title="Plus"
+                subtitle="Create more leagues and keep multiple groups active."
+                accent="plus"
+                onPress={() => setPlan("A")}
+              />
+              <PlanCard
+                title="Circle"
+                subtitle="A cleaner fit for more serious accountability groups."
+                accent="circle"
+                onPress={() => setPlan("B")}
+              />
+              <PlanCard
+                title="Team"
+                subtitle="Best for several active leagues running at once."
+                accent="team"
+                onPress={() => setPlan("C")}
+              />
+            </>
+          ) : (
+            <Text style={styles.lockedText}>
+              Paid plans will appear here once purchases are enabled.
+            </Text>
+          )}
+        </View>
+      )}
 
       <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
         <Text style={styles.cancelText}>Cancel</Text>
       </Pressable>
-    </ScrollView>
+    </View>
   );
 }
 
 function PlanCard({
   title,
-  price,
-  message,
-  quickDifference,
-  summary,
-  secondarySummary,
-  previewTitle,
-  preview,
-  unlockLabel,
+  subtitle,
   badge,
   accent,
-  featured,
   onPress,
 }: {
   title: string;
-  price: string;
-  message: string;
-  quickDifference: string;
-  summary: string;
-  secondarySummary?: string;
-  previewTitle?: string;
-  preview?: string;
-  unlockLabel?: string;
-  badge: string;
-  accent: PlanTier;
-  featured?: boolean;
+  subtitle: string;
+  badge?: string;
+  accent: "free" | "plus" | "circle" | "team";
   onPress: () => void;
 }) {
   const accentMap = {
-    A: {
-      border: "rgba(83,211,169,0.34)",
-      bg: "rgba(8,45,39,0.72)",
-      badgeBg: "rgba(83,211,169,0.12)",
-      badgeBorder: "rgba(83,211,169,0.34)",
-      badgeText: "#9AF4D7",
-      glow: "rgba(83,211,169,0.12)",
+    free: {
+      border: "rgba(41,208,171,0.34)",
+      bg: "rgba(14,48,42,0.45)",
+      badgeBg: "rgba(10,55,48,0.9)",
+      badgeBorder: "rgba(41,208,171,0.72)",
+      badgeText: "#8FF9E7",
     },
-    B: {
-      border: "rgba(96,165,250,0.28)",
-      bg: "rgba(17,24,39,0.9)",
-      badgeBg: "rgba(96,165,250,0.14)",
-      badgeBorder: "rgba(96,165,250,0.38)",
+    plus: {
+      border: "rgba(162,89,255,0.26)",
+      bg: "rgba(25,17,44,0.82)",
+      badgeBg: "rgba(162,89,255,0.12)",
+      badgeBorder: "rgba(162,89,255,0.34)",
+      badgeText: "#D8C0FF",
+    },
+    circle: {
+      border: "rgba(96,165,250,0.24)",
+      bg: "rgba(17,24,39,0.82)",
+      badgeBg: "rgba(96,165,250,0.12)",
+      badgeBorder: "rgba(96,165,250,0.3)",
       badgeText: "#BFDBFE",
-      glow: "rgba(96,165,250,0.2)",
     },
-    C: {
-      border: "rgba(248,113,113,0.26)",
-      bg: "rgba(43,17,17,0.82)",
-      badgeBg: "rgba(248,113,113,0.12)",
-      badgeBorder: "rgba(248,113,113,0.3)",
-      badgeText: "#FECACA",
-      glow: "rgba(248,113,113,0.12)",
+    team: {
+      border: "rgba(245,158,11,0.24)",
+      bg: "rgba(28,21,12,0.72)",
+      badgeBg: "rgba(245,158,11,0.12)",
+      badgeBorder: "rgba(245,158,11,0.28)",
+      badgeText: "#FCD38D",
     },
   } as const;
 
@@ -126,52 +195,26 @@ function PlanCard({
           backgroundColor: colors.bg,
           borderColor: colors.border,
         },
-        featured && {
-          borderWidth: 1.5,
-          shadowColor: colors.glow,
-          shadowOpacity: 0.35,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 8,
-        },
         pressed && styles.cardPressed,
       ]}
     >
       <View style={styles.cardTop}>
-        <View style={styles.cardTitleWrap}>
-          <Text style={styles.cardTitle}>{title}</Text>
-          <Text style={styles.cardPrice}>{price}</Text>
-        </View>
-        <View
-          style={[
-            styles.badge,
-            {
-              backgroundColor: colors.badgeBg,
-              borderColor: colors.badgeBorder,
-            },
-          ]}
-        >
-          <Text style={[styles.badgeText, { color: colors.badgeText }]}>{badge}</Text>
-        </View>
+        <Text style={styles.cardTitle}>{title}</Text>
+        {badge ? (
+          <View
+            style={[
+              styles.badge,
+              {
+                backgroundColor: colors.badgeBg,
+                borderColor: colors.badgeBorder,
+              },
+            ]}
+          >
+            <Text style={[styles.badgeText, { color: colors.badgeText }]}>{badge}</Text>
+          </View>
+        ) : null}
       </View>
-
-      <Text style={styles.cardMessage}>{message}</Text>
-      <Text style={styles.quickDifference}>{quickDifference}</Text>
-
-      <View style={styles.summaryBlock}>
-        <Text style={styles.cardSummary}>{summary}</Text>
-        {secondarySummary ? <Text style={styles.cardSummary}>{secondarySummary}</Text> : null}
-      </View>
-
-      {preview ? (
-        <View style={styles.previewBlock}>
-          {previewTitle ? <Text style={styles.previewTitle}>{previewTitle}</Text> : null}
-          <Text style={styles.cardPreview}>{preview}</Text>
-        </View>
-      ) : null}
-
-      {unlockLabel ? <Text style={styles.unlockLabel}>{unlockLabel}</Text> : null}
-
+      <Text style={styles.cardSubtitle}>{subtitle}</Text>
       <Text style={styles.cardHint}>Tap to continue</Text>
     </Pressable>
   );
@@ -180,12 +223,9 @@ function PlanCard({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#0B0F14",
-  },
-  content: {
     padding: 20,
     paddingTop: 70,
-    paddingBottom: 36,
+    backgroundColor: "#0B0F14",
   },
   title: {
     fontSize: 36,
@@ -199,34 +239,27 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     color: "#A7B0BC",
   },
-  helper: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 19,
-    color: "#718096",
+  error: {
+    marginTop: 12,
+    color: "#FCA5A5",
     fontWeight: "600",
   },
-  notice: {
-    marginTop: 18,
-    padding: 14,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    backgroundColor: "#101826",
-    gap: 6,
+  loadingWrap: {
+    marginTop: 28,
+    alignItems: "center",
   },
-  noticeTitle: {
-    color: "white",
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  noticeText: {
+  loadingText: {
+    marginTop: 10,
     color: "#A7B0BC",
-    lineHeight: 20,
   },
   list: {
-    marginTop: 22,
+    marginTop: 28,
     gap: 14,
+  },
+  lockedText: {
+    color: "#A7B0BC",
+    marginTop: 6,
+    lineHeight: 20,
   },
   cancelBtn: {
     marginTop: 22,
@@ -248,14 +281,9 @@ const styles = StyleSheet.create({
   },
   cardTop: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-  },
-  cardTitleWrap: {
-    flex: 1,
-    gap: 4,
-    minWidth: 0,
   },
   cardTitle: {
     color: "white",
@@ -263,72 +291,24 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: -0.4,
   },
-  cardPrice: {
-    color: "#E5E7EB",
-    fontSize: 14,
-    fontWeight: "700",
-  },
   badge: {
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
-    flexShrink: 0,
   },
   badgeText: {
     fontWeight: "900",
-    letterSpacing: 0.3,
-    fontSize: 12,
+    letterSpacing: 0.6,
   },
-  cardMessage: {
-    marginTop: 14,
-    color: "#F8FAFC",
+  cardSubtitle: {
+    marginTop: 9,
+    color: "#C0C8D6",
     fontSize: 15,
     lineHeight: 22,
-    fontWeight: "700",
-  },
-  quickDifference: {
-    marginTop: 8,
-    color: "#CBD5E1",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
-  },
-  summaryBlock: {
-    marginTop: 10,
-    gap: 4,
-  },
-  cardSummary: {
-    color: "#C0C8D6",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  previewBlock: {
-    marginTop: 12,
-    gap: 2,
-  },
-  previewTitle: {
-    color: "#94A3B8",
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  cardPreview: {
-    color: "#E2E8F0",
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: "700",
-  },
-  unlockLabel: {
-    marginTop: 10,
-    color: "#FCD34D",
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "700",
   },
   cardHint: {
-    marginTop: 14,
+    marginTop: 12,
     color: "rgba(237,231,255,0.5)",
     fontSize: 12,
     fontWeight: "600",

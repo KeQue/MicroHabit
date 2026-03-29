@@ -1,55 +1,31 @@
-import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
-import { trackEvent } from "../analytics";
 import { getGentleNotificationCopy } from "./copy";
 
 const CHANNEL_ID = "gentle-reminders";
 const REMINDER_KIND = "gentle-daily-reminder";
 
 let configured = false;
-let notificationsModulePromise: Promise<typeof import("expo-notifications")> | null = null;
-
-function notificationsUnsupportedInCurrentRuntime() {
-  return Platform.OS === "android" && Constants.executionEnvironment === "storeClient";
-}
-
-async function getNotificationsModule() {
-  if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return null;
-
-  if (!notificationsModulePromise) {
-    notificationsModulePromise = import("expo-notifications");
-  }
-
-  return notificationsModulePromise;
-}
 
 export function configureNotifications() {
-  if (configured || Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return;
+  if (configured || Platform.OS === "web") return;
 
-  void (async () => {
-    const Notifications = await getNotificationsModule();
-    if (!Notifications) return;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
 
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
-    });
-
-    configured = true;
-  })();
+  configured = true;
 }
 
 async function ensureChannel() {
   if (Platform.OS !== "android") return;
-
-  const Notifications = await getNotificationsModule();
-  if (!Notifications) return;
 
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: "Gentle reminders",
@@ -60,30 +36,19 @@ async function ensureChannel() {
   });
 }
 
-async function hasPermission(requestIfNeeded = true) {
-  const Notifications = await getNotificationsModule();
-  if (!Notifications) return false;
-
+async function hasPermission() {
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
-  const wasGranted = status === "granted";
 
-  if (requestIfNeeded && status !== "granted" && existing.canAskAgain) {
+  if (status !== "granted" && existing.canAskAgain) {
     const requested = await Notifications.requestPermissionsAsync();
     status = requested.status;
-  }
-
-  if (!wasGranted && status === "granted") {
-    void trackEvent("notification_permission_granted");
   }
 
   return status === "granted";
 }
 
 async function cancelMatchingReminders() {
-  const Notifications = await getNotificationsModule();
-  if (!Notifications) return;
-
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
 
   const matches = scheduled.filter(
@@ -100,20 +65,11 @@ async function cancelMatchingReminders() {
 }
 
 export async function ensureGentleDailyReminder() {
-  return ensureGentleDailyReminderWithOptions({ requestPermission: true });
-}
-
-export async function ensureGentleDailyReminderWithOptions(options?: {
-  requestPermission?: boolean;
-}) {
-  if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return false;
+  if (Platform.OS === "web") return false;
 
   configureNotifications();
 
-  const Notifications = await getNotificationsModule();
-  if (!Notifications) return false;
-
-  const permitted = await hasPermission(options?.requestPermission ?? true);
+  const permitted = await hasPermission();
   if (!permitted) return false;
 
   await ensureChannel();
@@ -132,12 +88,12 @@ export async function ensureGentleDailyReminderWithOptions(options?: {
   const weekdayIndex = new Date().getDay();
   const reminderBody = getGentleNotificationCopy("light_encouragement", weekdayIndex);
 
-  const trigger = {
+  const trigger: Notifications.NotificationTriggerInput = {
     type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
     hour: 17,
     minute: 0,
     repeats: true,
-  } as const;
+  };
 
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -149,22 +105,18 @@ export async function ensureGentleDailyReminderWithOptions(options?: {
     trigger,
   });
 
-  void trackEvent("reminder_enabled");
   return true;
 }
 
 export async function cancelGentleDailyReminder() {
-  if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return;
+  if (Platform.OS === "web") return;
   await cancelMatchingReminders();
 }
 
 export async function scheduleGentleTestNotification() {
-  if (Platform.OS === "web" || notificationsUnsupportedInCurrentRuntime()) return false;
+  if (Platform.OS === "web") return false;
 
   configureNotifications();
-
-  const Notifications = await getNotificationsModule();
-  if (!Notifications) return false;
 
   const permitted = await hasPermission();
   if (!permitted) return false;

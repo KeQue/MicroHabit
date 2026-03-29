@@ -7,7 +7,6 @@ import { Animated, Easing, StyleSheet, View } from "react-native";
 type Props = {
   name: string;
   subtitle?: string;
-  paceMessage?: string;
   days: boolean[];
 
   colorDark: string;
@@ -200,7 +199,6 @@ function streakMood(streak: number) {
 export function UserCard({
   name,
   subtitle,
-  paceMessage,
   days,
   colorDark,
   accentActive,
@@ -423,12 +421,6 @@ export function UserCard({
       {subtitle ? (
         <ThemedText style={styles.sub} numberOfLines={1} ellipsizeMode="tail">
           {subtitle}
-        </ThemedText>
-      ) : null}
-
-      {!showRank && paceMessage ? (
-        <ThemedText style={styles.paceMessage} numberOfLines={2} ellipsizeMode="tail">
-          {paceMessage}
         </ThemedText>
       ) : null}
 
@@ -658,13 +650,6 @@ const styles = StyleSheet.create({
     opacity: 0.46,
     fontSize: 14,
     fontWeight: "500",
-  },
-  paceMessage: {
-    color: "rgba(244,238,255,0.7)",
-    fontSize: 12.5,
-    fontWeight: "600",
-    lineHeight: 18,
-    marginTop: -2,
   },
   emptyRow: {
     flexDirection: "row",

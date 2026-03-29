@@ -2,7 +2,7 @@
   "expo": {
     "name": "microhabit",
     "slug": "microhabit",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "microhabit",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
   "supportsTablet": true,
-  "buildNumber": "15"
+  "buildNumber": "16"
 },
     "android": {
       "adaptiveIcon": {

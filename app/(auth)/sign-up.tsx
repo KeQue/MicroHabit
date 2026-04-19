@@ -20,12 +20,13 @@ const PLACEHOLDER = "rgba(255,255,255,0.44)";
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, signInWithProvider } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   return (
     <LinearGradient
@@ -46,6 +47,39 @@ export default function SignUpScreen() {
           </View>
 
           <View style={styles.card}>
+            <Pressable
+              disabled={loading || googleLoading}
+              onPress={async () => {
+                try {
+                  setError(null);
+                  setGoogleLoading(true);
+                  const result = await signInWithProvider("google");
+                  if (result === "signed-in") {
+                    router.replace("/(app)");
+                  }
+                } catch (e: any) {
+                  setError(e?.message ?? "Google sign-in failed");
+                } finally {
+                  setGoogleLoading(false);
+                }
+              }}
+              style={({ pressed }) => [
+                styles.socialBtn,
+                (loading || googleLoading) && styles.socialBtnDisabled,
+                pressed && !loading && !googleLoading && styles.socialBtnPressed,
+              ]}
+            >
+              <Text style={styles.socialBtnText}>
+                {googleLoading ? "Connecting Google..." : "Continue with Google"}
+              </Text>
+            </Pressable>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR CREATE WITH EMAIL</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
             <TextInput
               placeholder="Email"
               placeholderTextColor={PLACEHOLDER}
@@ -69,7 +103,7 @@ export default function SignUpScreen() {
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
-              disabled={loading}
+              disabled={loading || googleLoading}
               onPress={async () => {
                 try {
                   setError(null);
@@ -103,7 +137,7 @@ export default function SignUpScreen() {
               style={({ pressed }) => [
                 styles.primaryBtn,
                 loading && styles.primaryBtnDisabled,
-                pressed && !loading && styles.primaryBtnPressed,
+                pressed && !loading && !googleLoading && styles.primaryBtnPressed,
               ]}
             >
               <Text style={styles.primaryBtnText}>{loading ? "Creating..." : "Create account"}</Text>
@@ -166,6 +200,43 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(14,18,29,0.88)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
+  },
+  socialBtn: {
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  socialBtnPressed: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  socialBtnDisabled: {
+    opacity: 0.7,
+  },
+  socialBtnText: {
+    color: TEXT,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 2,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  dividerText: {
+    color: "rgba(237,231,255,0.44)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1,
   },
   input: {
     borderWidth: 1,

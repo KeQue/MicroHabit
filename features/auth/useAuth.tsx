@@ -1,8 +1,13 @@
 import type { Session, User } from "@supabase/supabase-js";
+import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { buildAuthRedirectUrl } from "./links";
+import { buildAuthRedirectUrl, consumeAuthCallbackUrl } from "./links";
 import { ensureProfileForUser } from "./profile";
 import { supabase } from "../../lib/supabase";
+
+WebBrowser.maybeCompleteAuthSession();
+
+export type SocialAuthProvider = "google";
 
 type AuthContextValue = {
   user: User | null;
@@ -12,6 +17,7 @@ type AuthContextValue = {
   // actions
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithProvider: (provider: SocialAuthProvider) => Promise<"signed-in" | "cancelled">;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   resendSignUpConfirmation: (email: string) => Promise<void>;
@@ -118,6 +124,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  async function signInWithProvider(provider: SocialAuthProvider) {
+    const redirectTo = buildAuthRedirectUrl("/sign-in");
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+      },
+    });
+
+    if (error) throw new Error(normalizeAuthErrorMessage(error.message));
+
+    const authUrl = data?.url;
+    if (!authUrl) {
+      throw new Error("Could not start Google sign-in.");
+    }
+
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
+    if (result.type !== "success" || !result.url) {
+      return "cancelled";
+    }
+
+    const callbackResult = await consumeAuthCallbackUrl(result.url);
+    if (callbackResult.kind === "error") {
+      throw new Error(normalizeAuthErrorMessage(callbackResult.message));
+    }
+    if (callbackResult.kind === "none") {
+      throw new Error("Could not complete Google sign-in.");
+    }
+
+    const {
+      data: { user: nextUser },
+    } = await supabase.auth.getUser();
+    if (nextUser) {
+      await ensureProfileForUser(nextUser);
+    }
+
+    return "signed-in";
+  }
+
   async function resetPassword(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: buildAuthRedirectUrl("/update-password"),
@@ -153,6 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       initializing,
       signUp,
       signIn,
+      signInWithProvider,
       resetPassword,
       updatePassword,
       resendSignUpConfirmation,

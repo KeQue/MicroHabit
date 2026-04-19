@@ -40,7 +40,9 @@ export function buildAuthRedirectUrl(path: string) {
 function parseAuthCallbackUrl(url: string) {
   const params = collectParams(url);
   const parsed = Linking.parse(url);
-  const path = normalizedPath(parsed.path ?? "/");
+  const host = typeof parsed.hostname === "string" ? parsed.hostname : undefined;
+  const rawPath = parsed.path ?? host ?? "/";
+  const path = normalizedPath(rawPath);
 
   return {
     path,

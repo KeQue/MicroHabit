@@ -1,4 +1,4 @@
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -17,13 +17,11 @@ const INPUT_BORDER = "rgba(255,255,255,0.12)";
 const TEXT = "#FFFFFF";
 const PLACEHOLDER = "rgba(255,255,255,0.44)";
 
-export default function SignInScreen() {
+export default function UpdatePasswordScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ error?: string; message?: string }>();
-  const { signIn } = useAuth();
-
-  const [email, setEmail] = useState("");
+  const { updatePassword } = useAuth();
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -41,24 +39,13 @@ export default function SignInScreen() {
         <View style={styles.shell}>
           <View style={styles.hero}>
             <Text style={styles.eyebrow}>MICROHABIT</Text>
-            <Text style={styles.title}>Sign in</Text>
-            <Text style={styles.subtitle}>Small groups. Real consistency.</Text>
+            <Text style={styles.title}>Choose a new password</Text>
+            <Text style={styles.subtitle}>Use at least 6 characters.</Text>
           </View>
 
           <View style={styles.card}>
             <TextInput
-              placeholder="Email"
-              placeholderTextColor={PLACEHOLDER}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoCorrect={false}
-              value={email}
-              onChangeText={setEmail}
-              style={styles.input}
-            />
-
-            <TextInput
-              placeholder="Password"
+              placeholder="New password"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
               value={password}
@@ -66,9 +53,16 @@ export default function SignInScreen() {
               style={styles.input}
             />
 
-            {params.message ? <Text style={styles.info}>{params.message}</Text> : null}
+            <TextInput
+              placeholder="Confirm password"
+              placeholderTextColor={PLACEHOLDER}
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              style={styles.input}
+            />
+
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {!error && params.error ? <Text style={styles.error}>{params.error}</Text> : null}
 
             <Pressable
               disabled={loading}
@@ -77,14 +71,20 @@ export default function SignInScreen() {
                   setError(null);
                   setLoading(true);
 
-                  const e = email.trim();
-                  if (!e) throw new Error("Email is required");
-                  if (!password) throw new Error("Password is required");
+                  if (!password || password.length < 6) {
+                    throw new Error("Password must be at least 6 characters");
+                  }
+                  if (password !== confirmPassword) {
+                    throw new Error("Passwords do not match");
+                  }
 
-                  await signIn(e, password);
-                  router.replace("/(app)");
+                  await updatePassword(password);
+                  router.replace({
+                    pathname: "/(auth)/sign-in",
+                    params: { message: "Password updated. Sign in with your new password." },
+                  });
                 } catch (e: any) {
-                  setError(e?.message ?? "Sign-in failed");
+                  setError(e?.message ?? "Could not update password");
                 } finally {
                   setLoading(false);
                 }
@@ -95,18 +95,10 @@ export default function SignInScreen() {
                 pressed && !loading && styles.primaryBtnPressed,
               ]}
             >
-              <Text style={styles.primaryBtnText}>{loading ? "Signing in..." : "Sign in"}</Text>
+              <Text style={styles.primaryBtnText}>
+                {loading ? "Saving..." : "Update password"}
+              </Text>
             </Pressable>
-
-            <Text style={styles.helperText}>Email sign-in for now. Social login can come next.</Text>
-
-            <Link href="/(auth)/forgot-password" style={styles.secondaryLink}>
-              Forgot password?
-            </Link>
-
-            <Link href="/(auth)/sign-up" style={styles.secondaryLink}>
-              Create an account
-            </Link>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -115,12 +107,8 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
+  flex: { flex: 1 },
   shell: {
     flex: 1,
     paddingHorizontal: 22,
@@ -129,9 +117,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 26,
   },
-  hero: {
-    gap: 8,
-  },
+  hero: { gap: 8 },
   eyebrow: {
     color: "rgba(237,231,255,0.58)",
     fontSize: 12,
@@ -140,7 +126,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: TEXT,
-    fontSize: 40,
+    fontSize: 36,
     fontWeight: "900",
     letterSpacing: -0.6,
   },
@@ -173,11 +159,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-  info: {
-    color: "rgba(140,255,190,0.92)",
-    fontSize: 13,
-    fontWeight: "600",
-  },
   primaryBtn: {
     marginTop: 2,
     borderRadius: 16,
@@ -197,19 +178,5 @@ const styles = StyleSheet.create({
     color: TEXT,
     fontSize: 17,
     fontWeight: "800",
-  },
-  helperText: {
-    color: "rgba(237,231,255,0.5)",
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 17,
-    textAlign: "center",
-  },
-  secondaryLink: {
-    marginTop: 2,
-    color: "rgba(237,231,255,0.82)",
-    fontSize: 15,
-    fontWeight: "600",
-    textAlign: "center",
   },
 });

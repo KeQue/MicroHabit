@@ -1,4 +1,4 @@
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -17,14 +17,12 @@ const INPUT_BORDER = "rgba(255,255,255,0.12)";
 const TEXT = "#FFFFFF";
 const PLACEHOLDER = "rgba(255,255,255,0.44)";
 
-export default function SignInScreen() {
+export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ error?: string; message?: string }>();
-  const { signIn } = useAuth();
-
+  const { resetPassword } = useAuth();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   return (
@@ -41,8 +39,8 @@ export default function SignInScreen() {
         <View style={styles.shell}>
           <View style={styles.hero}>
             <Text style={styles.eyebrow}>MICROHABIT</Text>
-            <Text style={styles.title}>Sign in</Text>
-            <Text style={styles.subtitle}>Small groups. Real consistency.</Text>
+            <Text style={styles.title}>Reset password</Text>
+            <Text style={styles.subtitle}>We will send a secure reset link to your email.</Text>
           </View>
 
           <View style={styles.card}>
@@ -57,34 +55,24 @@ export default function SignInScreen() {
               style={styles.input}
             />
 
-            <TextInput
-              placeholder="Password"
-              placeholderTextColor={PLACEHOLDER}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              style={styles.input}
-            />
-
-            {params.message ? <Text style={styles.info}>{params.message}</Text> : null}
+            {sent ? <Text style={styles.info}>Reset email sent. Open the link on this device.</Text> : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {!error && params.error ? <Text style={styles.error}>{params.error}</Text> : null}
 
             <Pressable
               disabled={loading}
               onPress={async () => {
                 try {
                   setError(null);
+                  setSent(false);
                   setLoading(true);
 
-                  const e = email.trim();
-                  if (!e) throw new Error("Email is required");
-                  if (!password) throw new Error("Password is required");
+                  const nextEmail = email.trim();
+                  if (!nextEmail) throw new Error("Email is required");
 
-                  await signIn(e, password);
-                  router.replace("/(app)");
+                  await resetPassword(nextEmail);
+                  setSent(true);
                 } catch (e: any) {
-                  setError(e?.message ?? "Sign-in failed");
+                  setError(e?.message ?? "Could not send reset email");
                 } finally {
                   setLoading(false);
                 }
@@ -95,14 +83,21 @@ export default function SignInScreen() {
                 pressed && !loading && styles.primaryBtnPressed,
               ]}
             >
-              <Text style={styles.primaryBtnText}>{loading ? "Signing in..." : "Sign in"}</Text>
+              <Text style={styles.primaryBtnText}>
+                {loading ? "Sending..." : "Send reset email"}
+              </Text>
             </Pressable>
 
-            <Text style={styles.helperText}>Email sign-in for now. Social login can come next.</Text>
-
-            <Link href="/(auth)/forgot-password" style={styles.secondaryLink}>
-              Forgot password?
-            </Link>
+            <Pressable
+              onPress={() =>
+                router.replace({
+                  pathname: "/(auth)/sign-in",
+                  params: { message: sent ? "Password reset email sent." : undefined },
+                })
+              }
+            >
+              <Text style={styles.secondaryLink}>Back to sign in</Text>
+            </Pressable>
 
             <Link href="/(auth)/sign-up" style={styles.secondaryLink}>
               Create an account
@@ -115,12 +110,8 @@ export default function SignInScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
+  screen: { flex: 1 },
+  flex: { flex: 1 },
   shell: {
     flex: 1,
     paddingHorizontal: 22,
@@ -129,9 +120,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 26,
   },
-  hero: {
-    gap: 8,
-  },
+  hero: { gap: 8 },
   eyebrow: {
     color: "rgba(237,231,255,0.58)",
     fontSize: 12,
@@ -177,6 +166,7 @@ const styles = StyleSheet.create({
     color: "rgba(140,255,190,0.92)",
     fontSize: 13,
     fontWeight: "600",
+    lineHeight: 18,
   },
   primaryBtn: {
     marginTop: 2,
@@ -197,13 +187,6 @@ const styles = StyleSheet.create({
     color: TEXT,
     fontSize: 17,
     fontWeight: "800",
-  },
-  helperText: {
-    color: "rgba(237,231,255,0.5)",
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 17,
-    textAlign: "center",
   },
   secondaryLink: {
     marginTop: 2,

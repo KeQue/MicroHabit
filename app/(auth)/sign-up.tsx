@@ -89,7 +89,10 @@ export default function SignUpScreen() {
                   if (hasSession) {
                     router.replace("/(app)");
                   } else {
-                    router.replace("/(auth)/sign-in");
+                    router.replace({
+                      pathname: "/(auth)/check-email",
+                      params: { email: e },
+                    });
                   }
                 } catch (e: any) {
                   setError(e?.message ?? "Sign-up failed");

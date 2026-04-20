@@ -26,7 +26,22 @@ export default function SignInScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<"google" | "apple" | null>(null);
+
+  const handleSocialSignIn = async (provider: "google" | "apple") => {
+    try {
+      setError(null);
+      setSocialLoading(provider);
+      const result = await signInWithProvider(provider);
+      if (result === "signed-in") {
+        router.replace("/(app)");
+      }
+    } catch (e: any) {
+      setError(e?.message ?? `${provider === "apple" ? "Apple" : "Google"} sign-in failed`);
+    } finally {
+      setSocialLoading(null);
+    }
+  };
 
   return (
     <LinearGradient
@@ -48,31 +63,34 @@ export default function SignInScreen() {
 
           <View style={styles.card}>
             <Pressable
-              disabled={loading || googleLoading}
-              onPress={async () => {
-                try {
-                  setError(null);
-                  setGoogleLoading(true);
-                  const result = await signInWithProvider("google");
-                  if (result === "signed-in") {
-                    router.replace("/(app)");
-                  }
-                } catch (e: any) {
-                  setError(e?.message ?? "Google sign-in failed");
-                } finally {
-                  setGoogleLoading(false);
-                }
-              }}
+              disabled={loading || !!socialLoading}
+              onPress={() => void handleSocialSignIn("google")}
               style={({ pressed }) => [
                 styles.socialBtn,
-                (loading || googleLoading) && styles.socialBtnDisabled,
-                pressed && !loading && !googleLoading && styles.socialBtnPressed,
+                (loading || !!socialLoading) && styles.socialBtnDisabled,
+                pressed && !loading && !socialLoading && styles.socialBtnPressed,
               ]}
             >
               <Text style={styles.socialBtnText}>
-                {googleLoading ? "Connecting Google..." : "Continue with Google"}
+                {socialLoading === "google" ? "Connecting Google..." : "Continue with Google"}
               </Text>
             </Pressable>
+
+            {Platform.OS === "ios" ? (
+              <Pressable
+                disabled={loading || !!socialLoading}
+                onPress={() => void handleSocialSignIn("apple")}
+                style={({ pressed }) => [
+                  styles.socialBtn,
+                  (loading || !!socialLoading) && styles.socialBtnDisabled,
+                  pressed && !loading && !socialLoading && styles.socialBtnPressed,
+                ]}
+              >
+                <Text style={styles.socialBtnText}>
+                  {socialLoading === "apple" ? "Connecting Apple..." : "Continue with Apple"}
+                </Text>
+              </Pressable>
+            ) : null}
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
@@ -105,7 +123,7 @@ export default function SignInScreen() {
             {!error && params.error ? <Text style={styles.error}>{params.error}</Text> : null}
 
             <Pressable
-              disabled={loading || googleLoading}
+              disabled={loading || !!socialLoading}
               onPress={async () => {
                 try {
                   setError(null);
@@ -126,7 +144,7 @@ export default function SignInScreen() {
               style={({ pressed }) => [
                 styles.primaryBtn,
                 loading && styles.primaryBtnDisabled,
-                pressed && !loading && !googleLoading && styles.primaryBtnPressed,
+                pressed && !loading && !socialLoading && styles.primaryBtnPressed,
               ]}
             >
               <Text style={styles.primaryBtnText}>{loading ? "Signing in..." : "Sign in"}</Text>

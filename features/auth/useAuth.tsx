@@ -7,7 +7,7 @@ import { supabase } from "../../lib/supabase";
 
 WebBrowser.maybeCompleteAuthSession();
 
-export type SocialAuthProvider = "google";
+export type SocialAuthProvider = "google" | "apple";
 
 type AuthContextValue = {
   user: User | null;
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const authUrl = data?.url;
     if (!authUrl) {
-      throw new Error("Could not start Google sign-in.");
+      throw new Error(`Could not start ${provider === "apple" ? "Apple" : "Google"} sign-in.`);
     }
 
     const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
@@ -151,7 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(normalizeAuthErrorMessage(callbackResult.message));
     }
     if (callbackResult.kind === "none") {
-      throw new Error("Could not complete Google sign-in.");
+      throw new Error(`Could not complete ${provider === "apple" ? "Apple" : "Google"} sign-in.`);
     }
 
     const {

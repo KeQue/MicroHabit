@@ -641,6 +641,15 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
 
       // revert if failed
       if (error) {
+        console.log("[toggleDayForMember] daily_logs upsert failed", {
+          leagueId,
+          memberId,
+          myId,
+          log_date,
+          next,
+          message: error.message,
+          code: (error as any).code,
+        });
         setMembers((prev) =>
           prev.map((x) =>
             x.id !== memberId

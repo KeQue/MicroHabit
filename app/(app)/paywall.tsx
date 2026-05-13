@@ -97,7 +97,7 @@ export default function PaywallScreen() {
     if (!paywallEnabled) {
       router.push({
         pathname: "/(app)/league/choose-plan",
-        params: code ? { code } : {},
+        params: code ? { source: "paywall", code } : { source: "paywall" },
       });
       return;
     }

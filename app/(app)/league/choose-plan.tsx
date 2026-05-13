@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { PLAN_COPY, type PlanTier } from "../../../constants/plans";
 import { useAuth } from "../../../features/auth/useAuth";
 import { supabase } from "../../../lib/supabase";
@@ -84,7 +84,11 @@ export default function ChoosePlanScreen() {
   }, [source]);
 
   return (
-    <View style={styles.screen}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
       <Text style={styles.title}>Choose a plan</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
 
@@ -143,7 +147,7 @@ export default function ChoosePlanScreen() {
       <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
         <Text style={styles.cancelText}>Cancel</Text>
       </Pressable>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -236,9 +240,12 @@ function PlanCard({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: "#0B0F14",
+  },
+  content: {
     padding: 20,
     paddingTop: 70,
-    backgroundColor: "#0B0F14",
+    paddingBottom: 36,
   },
   title: {
     fontSize: 36,

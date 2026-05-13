@@ -249,7 +249,7 @@ export default function JoinLeagueScreen() {
               {needsAcceptance ? (
                 <>
                   <Text style={{ color: "#A7B0BC" }}>
-                    Accept the owner's plan to enter this league.
+                    Accept the owner plan to enter this league.
                   </Text>
                   <Text style={{ color: "#6B7280", fontSize: 12 }}>
                     Your tier: {userTier === "free" ? "Free" : planName(userTier)} - Required: {planName(requiredTier)}

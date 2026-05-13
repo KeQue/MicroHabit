@@ -20,6 +20,7 @@ type Props = {
   showRank?: boolean;
   rank?: number;
   rivalLabel?: string;
+  titleAccessory?: React.ReactNode;
 };
 
 function clamp01(n: number) {
@@ -208,6 +209,7 @@ export function UserCard({
   showRank = false,
   rank,
   rivalLabel,
+  titleAccessory,
 }: Props) {
   const totalDays = days.length;
   const activeDays = useMemo(() => (days ?? []).filter(Boolean).length, [days]);
@@ -371,6 +373,7 @@ export function UserCard({
             >
               {name}
             </ThemedText>
+            {titleAccessory}
         </View>
       </View>
 

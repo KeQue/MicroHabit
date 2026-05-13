@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { ensureProfileForCurrentUser } from "@/features/auth/profile";
+import { planName } from "@/constants/plans";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
@@ -157,7 +158,7 @@ export default function JoinLeagueScreen() {
   const planLabel = useMemo(() => {
     if (!leagueInfo) return null;
     if (leagueInfo.is_free) return "Free league";
-    if (leagueInfo.plan_tier) return `Plan chosen by owner: ${leagueInfo.plan_tier}`;
+    if (leagueInfo.plan_tier) return `Plan chosen by owner: ${planName(leagueInfo.plan_tier)}`;
     return "Plan: —";
   }, [leagueInfo]);
 

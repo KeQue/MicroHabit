@@ -18,6 +18,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -325,6 +326,10 @@ export default function LeagueDetailScreen() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editNameOpen, setEditNameOpen] = useState(false);
+  const [draftDisplayName, setDraftDisplayName] = useState("");
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const listAnim = useRef(new Animated.Value(1)).current;
 
@@ -335,9 +340,9 @@ export default function LeagueDetailScreen() {
 
   function buildInviteMessage(code: string) {
     // Canonical template (no links)
-    return `Join my MicroHabit league ðŸ’ª
+    return `Join my Commito league \u{1F4AA}
 Invite code: ${code}
-Open MicroHabit â†’ Join â†’ Paste the code`;
+Open Commito \u2192 Join \u2192 Paste the code`;
   }
 
   function onInvite() {
@@ -361,6 +366,63 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
     if (!inviteCode) return;
     const message = buildInviteMessage(inviteCode);
     await Share.share({ message });
+  }
+
+  const myDisplayName = useMemo(
+    () => members.find((member) => member.id === myId)?.name ?? "",
+    [members, myId]
+  );
+
+  function onOpenEditName() {
+    setDraftDisplayName(myDisplayName);
+    setDisplayNameError(null);
+    setEditNameOpen(true);
+  }
+
+  async function onSaveDisplayName() {
+    if (!myId) return;
+
+    const trimmed = draftDisplayName.trim();
+    if (!trimmed) {
+      setDisplayNameError("Name is required");
+      return;
+    }
+
+    if (trimmed.length < 3) {
+      setDisplayNameError("Name must be at least 3 characters");
+      return;
+    }
+
+    if (trimmed.length > 20) {
+      setDisplayNameError("Name must be 20 characters or fewer");
+      return;
+    }
+
+    try {
+      setSavingDisplayName(true);
+      setDisplayNameError(null);
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ username: trimmed, name: trimmed })
+        .eq("id", myId);
+
+      if (error) throw error;
+
+      setMembers((prev) =>
+        prev.map((member) => (member.id === myId ? { ...member, name: trimmed } : member))
+      );
+      setEditNameOpen(false);
+    } catch (e: any) {
+      const message = e?.message ?? "Could not update your name";
+      if (typeof message === "string" && message.toLowerCase().includes("profiles_username_unique")) {
+        setDisplayNameError("That name is already taken");
+      } else {
+        setDisplayNameError(message);
+      }
+    } finally {
+      setSavingDisplayName(false);
+    }
   }
 
   async function fetchMonthLogs(league_id: string, from: string, to: string) {
@@ -753,6 +815,42 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
           </Pressable>
         </Modal>
 
+        <Modal
+          visible={editNameOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEditNameOpen(false)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setEditNameOpen(false)}>
+            <Pressable style={styles.menuCard} onPress={() => {}}>
+              <Text style={styles.menuTitle}>Edit display name</Text>
+
+              <TextInput
+                value={draftDisplayName}
+                onChangeText={(value) => {
+                  setDraftDisplayName(value);
+                  if (displayNameError) setDisplayNameError(null);
+                }}
+                placeholder="Your name"
+                placeholderTextColor="rgba(237,231,255,0.35)"
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={20}
+                style={styles.nameInput}
+              />
+
+              {displayNameError ? <Text style={styles.modalErrorText}>{displayNameError}</Text> : null}
+
+              <PillButton
+                label={savingDisplayName ? "Saving..." : "Save"}
+                size="sm"
+                onPress={onSaveDisplayName}
+              />
+              <PillButton label="Close" size="sm" onPress={() => setEditNameOpen(false)} />
+            </Pressable>
+          </Pressable>
+        </Modal>
+
         {/* HEADER */}
         {false ? (
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -908,13 +1006,28 @@ Open MicroHabit â†’ Join â†’ Paste the code`;
                       subtitle={member.subtitle}
                       days={member.days}
                       colorDark={member.colorDark}
-                    accentActive={member.accentActive}
-                    todayIndex={todayIndex}
-                    disabled={!!myId && member.id !== myId}
-                    onToggle={(i) => toggleDayForMember(member.id, i)}
-                    showRank={viewMode === "Ranking"}
+                      accentActive={member.accentActive}
+                      todayIndex={todayIndex}
+                      disabled={!!myId && member.id !== myId}
+                      onToggle={(i) => toggleDayForMember(member.id, i)}
+                      showRank={viewMode === "Ranking"}
                       rank={rank}
                       rivalLabel={rivalLabel}
+                      titleAccessory={
+                        viewMode === "Ranking" && member.id === myId ? (
+                          <Pressable
+                            onPress={onOpenEditName}
+                            style={({ pressed }) => [
+                              styles.editNameBtn,
+                              styles.rankEditNameBtn,
+                              pressed && styles.editNameBtnPressed,
+                            ]}
+                            hitSlop={8}
+                          >
+                            <Ionicons name="pencil" size={12} color={UI.text} />
+                          </Pressable>
+                        ) : undefined
+                      }
                     />
                   </View>
                   </React.Fragment>
@@ -1027,6 +1140,22 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 17,
     textAlign: "center",
+  },
+  editNameBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(162,89,255,0.45)",
+    backgroundColor: "rgba(162,89,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  editNameBtnPressed: {
+    backgroundColor: "rgba(162,89,255,0.2)",
+  },
+  rankEditNameBtn: {
+    marginLeft: 2,
   },
   activitySpacer: {
     width: 0,
@@ -1360,6 +1489,23 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center",
     marginBottom: 4,
+  },
+  nameInput: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: UI.border,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: UI.text,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalErrorText: {
+    color: UI.error,
+    fontSize: 13,
+    fontWeight: "700",
+    textAlign: "center",
   },
 });
 

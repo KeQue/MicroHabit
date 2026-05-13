@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { PLAN_COPY, type PlanTier } from "../../../constants/plans";
 import { useAuth } from "../../../features/auth/useAuth";
 import { supabase } from "../../../lib/supabase";
 
-type Tier = "free" | "A" | "B" | "C";
+type Tier = "free" | PlanTier;
 type Source = "create" | "paywall";
 
 export default function ChoosePlanScreen() {
@@ -107,20 +108,26 @@ export default function ChoosePlanScreen() {
           {showPaidForTesting ? (
             <>
               <PlanCard
-                title="Plus"
-                subtitle="Create more leagues and keep multiple groups active."
+                title={PLAN_COPY.A.name}
+                price={PLAN_COPY.A.price}
+                subtitle={PLAN_COPY.A.subtitle}
+                example={PLAN_COPY.A.example}
                 accent="plus"
                 onPress={() => setPlan("A")}
               />
               <PlanCard
-                title="Circle"
-                subtitle="A cleaner fit for more serious accountability groups."
+                title={PLAN_COPY.B.name}
+                price={PLAN_COPY.B.price}
+                subtitle={PLAN_COPY.B.subtitle}
+                example={PLAN_COPY.B.example}
                 accent="circle"
                 onPress={() => setPlan("B")}
               />
               <PlanCard
-                title="Team"
-                subtitle="Best for several active leagues running at once."
+                title={PLAN_COPY.C.name}
+                price={PLAN_COPY.C.price}
+                subtitle={PLAN_COPY.C.subtitle}
+                example={PLAN_COPY.C.example}
                 accent="team"
                 onPress={() => setPlan("C")}
               />
@@ -142,13 +149,17 @@ export default function ChoosePlanScreen() {
 
 function PlanCard({
   title,
+  price,
   subtitle,
+  example,
   badge,
   accent,
   onPress,
 }: {
   title: string;
+  price?: string;
   subtitle: string;
+  example?: string;
   badge?: string;
   accent: "free" | "plus" | "circle" | "team";
   onPress: () => void;
@@ -214,7 +225,9 @@ function PlanCard({
           </View>
         ) : null}
       </View>
+      {price ? <Text style={styles.cardPrice}>{price}</Text> : null}
       <Text style={styles.cardSubtitle}>{subtitle}</Text>
+      {example ? <Text style={styles.cardExample}>{example}</Text> : null}
       <Text style={styles.cardHint}>Tap to continue</Text>
     </Pressable>
   );
@@ -306,6 +319,19 @@ const styles = StyleSheet.create({
     color: "#C0C8D6",
     fontSize: 15,
     lineHeight: 22,
+  },
+  cardPrice: {
+    marginTop: 8,
+    color: "white",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  cardExample: {
+    marginTop: 8,
+    color: "rgba(237,231,255,0.7)",
+    fontSize: 13,
+    fontWeight: "700",
+    lineHeight: 19,
   },
   cardHint: {
     marginTop: 12,

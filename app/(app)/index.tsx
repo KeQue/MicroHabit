@@ -14,9 +14,7 @@ import {
 import { ensureProfileForCurrentUser } from "../../features/auth/profile";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
 import { supabase } from "../../lib/supabase";
-
-type PlanTier = "A" | "B" | "C";
-type UserTier = "free" | "A" | "B" | "C";
+import { planLabel, type PlanTier, type UserTier } from "../../constants/plans";
 
 const getMonthKey = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -25,14 +23,6 @@ function normalizeErr(e: any): string {
   if (!e) return "Unknown error";
   if (typeof e === "string") return e;
   return e?.message || e?.error_description || e?.hint || JSON.stringify(e);
-}
-
-function planLabel(isFreeSelected: boolean, selectedPlanTier: PlanTier | null) {
-  if (isFreeSelected) return "Free";
-  if (selectedPlanTier === "A") return "Plus";
-  if (selectedPlanTier === "B") return "Circle";
-  if (selectedPlanTier === "C") return "Team";
-  return "Choose a plan";
 }
 
 export default function LeaguesScreen() {

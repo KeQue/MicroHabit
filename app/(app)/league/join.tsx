@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { ensureProfileForCurrentUser } from "@/features/auth/profile";
+import { planName } from "@/constants/plans";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
@@ -71,6 +72,19 @@ export default function JoinLeagueScreen() {
     return t || "free";
   }
 
+  function requiredTierForLeague(info: LeagueInfo): UserTier {
+    if (info.is_free) return "free";
+    return (info.plan_tier ?? "free") as UserTier;
+  }
+
+  async function markInviteAccepted(leagueId: string) {
+    const { error } = await supabase.rpc("accept_invite_and_agree", {
+      p_league_id: leagueId,
+    });
+
+    if (error) throw error;
+  }
+
   async function acceptRequiredTier(required: UserTier) {
     try {
       setError(null);
@@ -86,6 +100,10 @@ export default function JoinLeagueScreen() {
 
       const refreshed = await fetchMyTier(uid);
       setUserTier(refreshed);
+
+      if (joinedLeagueId && required !== "free") {
+        await markInviteAccepted(joinedLeagueId);
+      }
     } catch (e: any) {
       setError(e?.message ?? "Failed to accept plan");
     } finally {
@@ -121,6 +139,11 @@ export default function JoinLeagueScreen() {
       const uid = await getAuthedUserId();
       const info = await fetchLeagueInfo(leagueId);
       const myTier = await fetchMyTier(uid);
+      const required = requiredTierForLeague(info);
+
+      if (required !== "free" && myTier === required) {
+        await markInviteAccepted(leagueId);
+      }
 
       setLeagueInfo(info);
       setJoinedLeagueId(leagueId);
@@ -142,10 +165,28 @@ export default function JoinLeagueScreen() {
   }
   }
 
+  async function continueToLeague() {
+    if (!joinedLeagueId || needsAcceptance) return;
+
+    try {
+      setError(null);
+      setAccepting(true);
+
+      if (requiredTier !== "free") {
+        await markInviteAccepted(joinedLeagueId);
+      }
+
+      router.replace(`/league/${joinedLeagueId}`);
+    } catch (e: any) {
+      setError(e?.message ?? "Could not enter league");
+    } finally {
+      setAccepting(false);
+    }
+  }
+
   const requiredTier: UserTier = useMemo(() => {
     if (!leagueInfo) return "free";
-    if (leagueInfo.is_free) return "free";
-    return (leagueInfo.plan_tier ?? "free") as UserTier;
+    return requiredTierForLeague(leagueInfo);
   }, [leagueInfo]);
 
   const needsAcceptance = useMemo(() => {
@@ -157,7 +198,7 @@ export default function JoinLeagueScreen() {
   const planLabel = useMemo(() => {
     if (!leagueInfo) return null;
     if (leagueInfo.is_free) return "Free league";
-    if (leagueInfo.plan_tier) return `Plan chosen by owner: ${leagueInfo.plan_tier}`;
+    if (leagueInfo.plan_tier) return `Plan chosen by owner: ${planName(leagueInfo.plan_tier)}`;
     return "Plan: —";
   }, [leagueInfo]);
 
@@ -205,33 +246,34 @@ export default function JoinLeagueScreen() {
           {/* Paid league acceptance gate based on profiles.plan_tier */}
           {requiredTier !== "free" ? (
             <View style={{ gap: 10, marginTop: 6 }}>
-              <Text style={{ color: "#A7B0BC" }}>
-                To join this league, you must accept the plan chosen by the owner. Payment will be enabled later.
-              </Text>
-
-              <Text style={{ color: "#6B7280", fontSize: 12 }}>
-                Your tier: {userTier} • Required: {requiredTier}
-              </Text>
-
               {needsAcceptance ? (
-                <Pressable
-                  onPress={() => acceptRequiredTier(requiredTier)}
-                  disabled={accepting || loading}
-                  style={{
-                    padding: 14,
-                    borderRadius: 12,
-                    backgroundColor: "#1A2430",
-                    borderWidth: 1,
-                    borderColor: "#1F2937",
-                    opacity: accepting || loading ? 0.65 : 1,
-                  }}
-                >
-                  <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
-                    {accepting ? "Accepting..." : `Accept plan ${requiredTier}`}
+                <>
+                  <Text style={{ color: "#A7B0BC" }}>
+                    Accept the owner plan to enter this league.
                   </Text>
-                </Pressable>
+                  <Text style={{ color: "#6B7280", fontSize: 12 }}>
+                    Your tier: {userTier === "free" ? "Free" : planName(userTier)} - Required: {planName(requiredTier)}
+                  </Text>
+
+                  <Pressable
+                    onPress={() => acceptRequiredTier(requiredTier)}
+                    disabled={accepting || loading}
+                    style={{
+                      padding: 14,
+                      borderRadius: 12,
+                      backgroundColor: "#1A2430",
+                      borderWidth: 1,
+                      borderColor: "#1F2937",
+                      opacity: accepting || loading ? 0.65 : 1,
+                    }}
+                  >
+                    <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
+                      {accepting ? "Accepting..." : `Accept ${planName(requiredTier)}`}
+                    </Text>
+                  </Pressable>
+                </>
               ) : (
-                <Text style={{ color: "#A7B0BC" }}>Plan accepted. You can continue.</Text>
+                <Text style={{ color: "#A7B0BC" }}>Ready to join. You can continue.</Text>
               )}
             </View>
           ) : (
@@ -239,10 +281,7 @@ export default function JoinLeagueScreen() {
           )}
 
           <Pressable
-            onPress={() => {
-              if (!joinedLeagueId) return;
-              router.replace(`/league/${joinedLeagueId}`);
-            }}
+            onPress={continueToLeague}
             disabled={continueDisabled}
             style={{
               marginTop: 8,
@@ -267,6 +306,7 @@ export default function JoinLeagueScreen() {
         </View>
       ) : null}
 
+      {!leagueInfo ? (
       <View style={{ marginTop: 18, gap: 12 }}>
         <TextInput
           value={code}
@@ -310,6 +350,11 @@ export default function JoinLeagueScreen() {
           <Text style={{ color: "#A7B0BC" }}>Back</Text>
         </Pressable>
       </View>
+      ) : (
+        <Pressable onPress={() => router.back()} disabled={loading || accepting} style={{ marginTop: 18 }}>
+          <Text style={{ color: "#A7B0BC" }}>Back</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { PAID_LEAGUES_AVAILABLE } from "../../../constants/launch";
 import { PLAN_COPY, type PlanTier } from "../../../constants/plans";
 import { useAuth } from "../../../features/auth/useAuth";
 import { supabase } from "../../../lib/supabase";
@@ -18,37 +19,15 @@ export default function ChoosePlanScreen() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [enabledLoading, setEnabledLoading] = useState(true);
-  const [paywallEnabled, setPaywallEnabled] = useState<boolean>(false);
-
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      try {
-        setEnabledLoading(true);
-        const { data, error: e } = await supabase.rpc("get_paywall_enabled");
-        if (e) throw e;
-        if (!mounted) return;
-        setPaywallEnabled(Boolean(data));
-      } catch {
-        if (mounted) setPaywallEnabled(true);
-      } finally {
-        if (mounted) setEnabledLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const showPaidForTesting = !paywallEnabled;
 
   async function setPlan(tier: Tier) {
     try {
       setError(null);
       setSaving(true);
+
+      if (tier !== "free" && !PAID_LEAGUES_AVAILABLE) {
+        throw new Error("Paid leagues are coming soon in the next version.");
+      }
 
       if (source === "create") {
         if (tier === "free") {
@@ -77,6 +56,10 @@ export default function ChoosePlanScreen() {
   }
 
   const subtitle = useMemo(() => {
+    if (!PAID_LEAGUES_AVAILABLE) {
+      return "Start with a free league and build consistency with friends.";
+    }
+
     if (source === "create") {
       return "Pick the kind of league you want to start.";
     }
@@ -94,10 +77,10 @@ export default function ChoosePlanScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {enabledLoading || saving ? (
+      {saving ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator />
-          <Text style={styles.loadingText}>{saving ? "Saving..." : "Loading..."}</Text>
+          <Text style={styles.loadingText}>Saving...</Text>
         </View>
       ) : (
         <View style={styles.list}>
@@ -109,7 +92,7 @@ export default function ChoosePlanScreen() {
             onPress={() => setPlan("free")}
           />
 
-          {showPaidForTesting ? (
+          {PAID_LEAGUES_AVAILABLE ? (
             <>
               <PlanCard
                 title={PLAN_COPY.A.name}
@@ -136,11 +119,7 @@ export default function ChoosePlanScreen() {
                 onPress={() => setPlan("C")}
               />
             </>
-          ) : (
-            <Text style={styles.lockedText}>
-              Paid plans will appear here once purchases are enabled.
-            </Text>
-          )}
+          ) : null}
         </View>
       )}
 
@@ -158,6 +137,7 @@ function PlanCard({
   example,
   badge,
   accent,
+  disabled = false,
   onPress,
 }: {
   title: string;
@@ -166,6 +146,7 @@ function PlanCard({
   example?: string;
   badge?: string;
   accent: "free" | "plus" | "circle" | "team";
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const accentMap = {
@@ -204,12 +185,14 @@ function PlanCard({
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.card,
         {
           backgroundColor: colors.bg,
           borderColor: colors.border,
         },
+        disabled && styles.cardDisabled,
         pressed && styles.cardPressed,
       ]}
     >
@@ -298,6 +281,9 @@ const styles = StyleSheet.create({
   },
   cardPressed: {
     opacity: 0.92,
+  },
+  cardDisabled: {
+    opacity: 0.58,
   },
   cardTop: {
     flexDirection: "row",

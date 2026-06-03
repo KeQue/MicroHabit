@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { ensureProfileForCurrentUser } from "@/features/auth/profile";
+import { PAID_LEAGUES_AVAILABLE } from "@/constants/launch";
 import { planName } from "@/constants/plans";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -89,6 +90,10 @@ export default function JoinLeagueScreen() {
     try {
       setError(null);
       setAccepting(true);
+
+      if (required !== "free" && !PAID_LEAGUES_AVAILABLE) {
+        throw new Error("Paid leagues are coming soon in this App Store version.");
+      }
 
       const uid = await getAuthedUserId();
 
@@ -202,7 +207,8 @@ export default function JoinLeagueScreen() {
     return "Plan: —";
   }, [leagueInfo]);
 
-  const continueDisabled = loading || accepting || !joinedLeagueId || needsAcceptance;
+  const paidLeagueLocked = requiredTier !== "free" && !PAID_LEAGUES_AVAILABLE;
+  const continueDisabled = loading || accepting || !joinedLeagueId || needsAcceptance || paidLeagueLocked;
 
   return (
     <View style={{ flex: 1, padding: 20, paddingTop: 70, backgroundColor: "#0B0F14" }}>
@@ -246,31 +252,40 @@ export default function JoinLeagueScreen() {
           {/* Paid league acceptance gate based on profiles.plan_tier */}
           {requiredTier !== "free" ? (
             <View style={{ gap: 10, marginTop: 6 }}>
+              {paidLeagueLocked ? (
+                <Text style={{ color: "#A7B0BC" }}>
+                  Paid commitment leagues are coming soon. This App Store version supports free leagues.
+                </Text>
+              ) : null}
               {needsAcceptance ? (
                 <>
-                  <Text style={{ color: "#A7B0BC" }}>
-                    Accept the owner plan to enter this league.
-                  </Text>
+                  {!paidLeagueLocked ? (
+                    <Text style={{ color: "#A7B0BC" }}>
+                      Accept the owner plan to enter this league.
+                    </Text>
+                  ) : null}
                   <Text style={{ color: "#6B7280", fontSize: 12 }}>
                     Your tier: {userTier === "free" ? "Free" : planName(userTier)} - Required: {planName(requiredTier)}
                   </Text>
 
-                  <Pressable
-                    onPress={() => acceptRequiredTier(requiredTier)}
-                    disabled={accepting || loading}
-                    style={{
-                      padding: 14,
-                      borderRadius: 12,
-                      backgroundColor: "#1A2430",
-                      borderWidth: 1,
-                      borderColor: "#1F2937",
-                      opacity: accepting || loading ? 0.65 : 1,
-                    }}
-                  >
-                    <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
-                      {accepting ? "Accepting..." : `Accept ${planName(requiredTier)}`}
-                    </Text>
-                  </Pressable>
+                  {!paidLeagueLocked ? (
+                    <Pressable
+                      onPress={() => acceptRequiredTier(requiredTier)}
+                      disabled={accepting || loading}
+                      style={{
+                        padding: 14,
+                        borderRadius: 12,
+                        backgroundColor: "#1A2430",
+                        borderWidth: 1,
+                        borderColor: "#1F2937",
+                        opacity: accepting || loading ? 0.65 : 1,
+                      }}
+                    >
+                      <Text style={{ color: "white", fontSize: 16, fontWeight: "700", textAlign: "center" }}>
+                        {accepting ? "Accepting..." : `Accept ${planName(requiredTier)}`}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                 </>
               ) : (
                 <Text style={{ color: "#A7B0BC" }}>Ready to join. You can continue.</Text>
@@ -298,7 +313,7 @@ export default function JoinLeagueScreen() {
             </Text>
           </Pressable>
 
-          {needsAcceptance ? (
+          {needsAcceptance && !paidLeagueLocked ? (
             <Text style={{ marginTop: 4, color: "#6B7280", fontSize: 12 }}>
               You must accept the plan before entering.
             </Text>

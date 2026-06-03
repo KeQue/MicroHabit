@@ -97,7 +97,7 @@ export async function ensureGentleDailyReminder() {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: "MicroHabit",
+      title: "Commito",
       body: reminderBody,
       sound: false,
       data: { kind: REMINDER_KIND },
@@ -125,7 +125,7 @@ export async function scheduleGentleTestNotification() {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: "MicroHabit",
+      title: "Commito",
       body: getGentleNotificationCopy("light_encouragement"),
       sound: false,
       data: { kind: "gentle-test-reminder" },

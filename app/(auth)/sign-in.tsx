@@ -56,7 +56,7 @@ export default function SignInScreen() {
       >
         <View style={styles.shell}>
           <View style={styles.hero}>
-            <Text style={styles.eyebrow}>MICROHABIT</Text>
+            <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Sign in</Text>
             <Text style={styles.subtitle}>Small groups. Real consistency.</Text>
           </View>

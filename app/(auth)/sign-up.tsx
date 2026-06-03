@@ -56,7 +56,7 @@ export default function SignUpScreen() {
       >
         <View style={styles.shell}>
           <View style={styles.hero}>
-            <Text style={styles.eyebrow}>MICROHABIT</Text>
+            <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Create account</Text>
             <Text style={styles.subtitle}>Start your first league with a real email.</Text>
           </View>

@@ -38,7 +38,7 @@ export default function UpdatePasswordScreen() {
       >
         <View style={styles.shell}>
           <View style={styles.hero}>
-            <Text style={styles.eyebrow}>MICROHABIT</Text>
+            <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Choose a new password</Text>
             <Text style={styles.subtitle}>Use at least 6 characters.</Text>
           </View>

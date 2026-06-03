@@ -24,7 +24,7 @@ export default function CheckEmailScreen() {
     >
       <View style={styles.shell}>
         <View style={styles.card}>
-          <Text style={styles.eyebrow}>MICROHABIT</Text>
+          <Text style={styles.eyebrow}>COMMITO</Text>
           <Text style={styles.title}>Check your email</Text>
           <Text style={styles.body}>
             {email

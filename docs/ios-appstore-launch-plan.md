@@ -397,14 +397,14 @@ The goal is to let users feel the stakes before charging them.
 
 ## Naming Decision
 
-The app currently ships as MicroHabit in config and UI. The product direction now points toward Commito.
+The app now ships with Commito as the visible app name. The bundle id, slug, scheme, and GitHub Pages URL still use `microhabit` / `MicroHabit` for technical continuity.
 
 Before App Store submission, choose one:
 
-- Keep MicroHabit for v1 and use Commito language later.
-- Rename to Commito before launch and align app name, icon, screenshots, metadata, and in-app copy.
+- Keep MicroHabit for v1 and use Commito language later. Rejected.
+- Rename to Commito before launch and align app name, icon, screenshots, metadata, and in-app copy. Chosen.
 
-Recommended: if commitment with money is the true product, rename before launch. Commito fits the concept better than MicroHabit.
+Decision: launch with Commito as the user-visible app name.
 
 
 ## Objective 1: Confirm Release Configuration
@@ -490,7 +490,7 @@ Decisions to document in the privacy policy:
 
 Goal: finish everything Apple needs before review.
 
-- App name: MicroHabit.
+- App name: Commito.
 - Subtitle: keep under 30 characters.
 - Category: likely Health & Fitness or Productivity. Pick based on positioning.
 - Age rating: answer honestly based on user-generated league/activity names.
@@ -537,7 +537,7 @@ These are the smaller objectives that lead directly to the larger scope: launchi
 Goal: make v1 small enough to submit confidently.
 
 - Choose Free Launch or Paid Launch.
-- Decide whether the launch brand is MicroHabit or Commito.
+- Decide whether the launch brand is MicroHabit or Commito. Done: Commito.
 - Choose the launch model: paid commitment, simulated stakes, or free MVP.
 - If paid commitment, add Apple In-App Purchase before TestFlight review.
 - If simulated stakes, build the month-end "you would have lost/won/donated" conversion screen.

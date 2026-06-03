@@ -25,9 +25,9 @@ The account must be confirmed and able to sign in before you submit the app.
 ## App Review Notes Template
 
 ```text
-Thank you for reviewing MicroHabit.
+Thank you for reviewing Commito.
 
-MicroHabit is a free MVP for creating or joining monthly accountability leagues
+Commito is a free MVP for creating or joining monthly accountability leagues
 with friends. Users can create an account, create a free league, share an invite
 code, join a league, track today/yesterday habit completion, and compare progress
 in My View and Ranking.

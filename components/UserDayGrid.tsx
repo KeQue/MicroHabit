@@ -271,6 +271,9 @@ export function UserDayGrid({
         const visual = resolveVisual(dayIndex, isDone);
         const isFuture = todayIndex !== undefined && dayIndex > todayIndex;
         const isLocked = minActiveIndex !== undefined && dayIndex < minActiveIndex;
+        const dayLabel = `Day ${dayIndex + 1}${isToday ? ", today" : ""}. ${
+          isDone ? "Completed" : "Not completed"
+        }${isFuture || isLocked ? ". Not editable" : ""}`;
 
         const handlePress =
           isFuture || isLocked
@@ -295,7 +298,10 @@ export function UserDayGrid({
           <Pressable
             key={dayIndex}
             onPress={handlePress}
-            hitSlop={0}
+            accessibilityRole="button"
+            accessibilityLabel={dayLabel}
+            accessibilityState={{ disabled: !handlePress, selected: isDone }}
+            hitSlop={8}
             style={({ pressed }) => [
               styles.pressable,
               { width: tileSize, height: tileSize },

@@ -65,6 +65,8 @@ export default function SignInScreen() {
             <Pressable
               disabled={loading || !!socialLoading}
               onPress={() => void handleSocialSignIn("google")}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
               style={({ pressed }) => [
                 styles.socialBtn,
                 (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -80,6 +82,8 @@ export default function SignInScreen() {
               <Pressable
                 disabled={loading || !!socialLoading}
                 onPress={() => void handleSocialSignIn("apple")}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Apple"
                 style={({ pressed }) => [
                   styles.socialBtn,
                   (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -104,6 +108,8 @@ export default function SignInScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
+              accessibilityLabel="Email"
+              textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
               style={styles.input}
@@ -113,6 +119,8 @@ export default function SignInScreen() {
               placeholder="Password"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
+              accessibilityLabel="Password"
+              textContentType="password"
               value={password}
               onChangeText={setPassword}
               style={styles.input}
@@ -124,6 +132,8 @@ export default function SignInScreen() {
 
             <Pressable
               disabled={loading || !!socialLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
               onPress={async () => {
                 try {
                   setError(null);

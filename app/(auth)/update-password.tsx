@@ -48,6 +48,8 @@ export default function UpdatePasswordScreen() {
               placeholder="New password"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
+              accessibilityLabel="New password"
+              textContentType="newPassword"
               value={password}
               onChangeText={setPassword}
               style={styles.input}
@@ -57,6 +59,8 @@ export default function UpdatePasswordScreen() {
               placeholder="Confirm password"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
+              accessibilityLabel="Confirm password"
+              textContentType="newPassword"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               style={styles.input}
@@ -66,6 +70,8 @@ export default function UpdatePasswordScreen() {
 
             <Pressable
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Update password"
               onPress={async () => {
                 try {
                   setError(null);

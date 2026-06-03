@@ -38,6 +38,9 @@ export default function CheckEmailScreen() {
           {email ? (
             <Pressable
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Resend confirmation email"
+              accessibilityState={{ disabled: loading }}
               onPress={async () => {
                 try {
                   setError(null);
@@ -62,6 +65,8 @@ export default function CheckEmailScreen() {
           ) : null}
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to sign in"
             onPress={() =>
               router.replace({
                 pathname: "/(auth)/sign-in",

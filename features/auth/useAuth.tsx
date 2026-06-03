@@ -73,9 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(s);
         setUser(s?.user ?? null);
         if (s?.user) {
-          void ensureProfileForUser(s.user).catch((err) => {
-            console.log("ensureProfileForUser(init) failed", err);
-          });
+          void ensureProfileForUser(s.user).catch(() => undefined);
         }
       } finally {
         if (mounted) setInitializing(false);
@@ -88,9 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(newSession ?? null);
       setUser(newSession?.user ?? null);
       if (newSession?.user) {
-        void ensureProfileForUser(newSession.user).catch((err) => {
-          console.log("ensureProfileForUser(auth change) failed", err);
-        });
+        void ensureProfileForUser(newSession.user).catch(() => undefined);
       }
       setInitializing(false);
     });

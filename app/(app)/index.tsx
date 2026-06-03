@@ -240,7 +240,12 @@ export default function LeaguesScreen() {
           <Text style={styles.subtitle}>Create or join a league.</Text>
         </View>
 
-        <Pressable onPress={() => setAccountMenuOpen(true)} style={styles.headerGhostBtn}>
+        <Pressable
+          onPress={() => setAccountMenuOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Open account menu"
+          style={styles.headerGhostBtn}
+        >
           <Text style={styles.headerGhostText}>Account</Text>
         </Pressable>
       </View>
@@ -251,22 +256,29 @@ export default function LeaguesScreen() {
         animationType="fade"
         onRequestClose={() => setAccountMenuOpen(false)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setAccountMenuOpen(false)}>
-          <Pressable style={styles.accountCard} onPress={() => {}}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setAccountMenuOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close account menu"
+        >
+          <Pressable style={styles.accountCard} onPress={() => {}} accessible={false}>
             <Text style={styles.accountTitle}>Account</Text>
-            <Pressable onPress={onSignOut} style={styles.accountButton}>
+            <Pressable onPress={onSignOut} accessibilityRole="button" accessibilityLabel="Sign out" style={styles.accountButton}>
               <Text style={styles.accountButtonText}>Sign out</Text>
             </Pressable>
             <Pressable
               onPress={onDeleteAccount}
               disabled={deletingAccount}
+              accessibilityRole="button"
+              accessibilityLabel="Delete account"
               style={[styles.accountButton, styles.accountDangerButton]}
             >
               <Text style={styles.accountDangerText}>
                 {deletingAccount ? "Deleting..." : "Delete account"}
               </Text>
             </Pressable>
-            <Pressable onPress={() => setAccountMenuOpen(false)} style={styles.accountButton}>
+            <Pressable onPress={() => setAccountMenuOpen(false)} accessibilityRole="button" accessibilityLabel="Close account menu" style={styles.accountButton}>
               <Text style={styles.accountButtonText}>Close</Text>
             </Pressable>
           </Pressable>
@@ -280,7 +292,12 @@ export default function LeaguesScreen() {
       ) : null}
 
       <View style={styles.actionStack}>
-        <Pressable onPress={onStartCreate} style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}>
+        <Pressable
+          onPress={onStartCreate}
+          accessibilityRole="button"
+          accessibilityLabel={showCreate ? "Change league plan" : "Create a league"}
+          style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
+        >
           <Text style={styles.actionTitle}>{showCreate ? "Change plan" : "+ Create a league"}</Text>
           <Text style={styles.actionSubtitle}>
             {showCreate ? "Pick a different plan before creating." : "Start a new accountability group."}
@@ -290,6 +307,8 @@ export default function LeaguesScreen() {
         {!showCreate ? (
           <Pressable
             onPress={() => router.push("/(app)/league/join")}
+            accessibilityRole="button"
+            accessibilityLabel="Join with invite code"
             style={({ pressed }) => [styles.actionCard, pressed && styles.actionPressed]}
           >
             <Text style={styles.actionTitle}>Join with code</Text>
@@ -322,6 +341,7 @@ export default function LeaguesScreen() {
               placeholder="e.g. April consistency club"
               placeholderTextColor="#64748B"
               autoCapitalize="sentences"
+              accessibilityLabel="League name"
               style={styles.input}
             />
           </View>
@@ -340,6 +360,7 @@ export default function LeaguesScreen() {
               placeholder="e.g. Gym, walking, reading"
               placeholderTextColor="#64748B"
               autoCapitalize="sentences"
+              accessibilityLabel="Activity"
               style={styles.input}
             />
           </View>
@@ -347,6 +368,8 @@ export default function LeaguesScreen() {
           <Pressable
             onPress={onCreate}
             disabled={!canSubmit}
+            accessibilityRole="button"
+            accessibilityLabel="Create league"
             style={({ pressed }) => [
               styles.createBtn,
               !canSubmit && styles.createBtnDisabled,
@@ -356,7 +379,7 @@ export default function LeaguesScreen() {
             <Text style={styles.createBtnText}>{creating ? "Creating..." : "Create league"}</Text>
           </Pressable>
 
-          <Pressable onPress={resetCreate} style={styles.cancelInlineBtn}>
+          <Pressable onPress={resetCreate} accessibilityRole="button" accessibilityLabel="Cancel create league" style={styles.cancelInlineBtn}>
             <Text style={styles.cancelInlineText}>Cancel</Text>
           </Pressable>
         </View>
@@ -371,7 +394,7 @@ export default function LeaguesScreen() {
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No leagues yet</Text>
             <Text style={styles.emptyText}>Your leagues will show up here once you create or join one.</Text>
-            <Pressable onPress={load} style={styles.emptyRefreshBtn}>
+            <Pressable onPress={load} accessibilityRole="button" accessibilityLabel="Refresh leagues" style={styles.emptyRefreshBtn}>
               <Text style={styles.emptyRefreshText}>Refresh</Text>
             </Pressable>
           </View>
@@ -379,7 +402,7 @@ export default function LeaguesScreen() {
           <>
             <View style={styles.listHeader}>
               <Text style={styles.listHeaderText}>Your leagues</Text>
-              <Pressable onPress={load} style={styles.inlineRefreshBtn}>
+              <Pressable onPress={load} accessibilityRole="button" accessibilityLabel="Refresh leagues" style={styles.inlineRefreshBtn}>
                 <Text style={styles.inlineRefreshText}>Refresh</Text>
               </Pressable>
             </View>
@@ -391,6 +414,8 @@ export default function LeaguesScreen() {
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => router.push(`/(app)/league/${item.id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open league ${item.name ?? "Untitled league"}`}
                   style={({ pressed }) => [
                     styles.leagueCard,
                     pressed && styles.actionPressed,

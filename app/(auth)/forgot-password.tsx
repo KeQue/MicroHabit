@@ -50,6 +50,8 @@ export default function ForgotPasswordScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
+              accessibilityLabel="Email"
+              textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
               style={styles.input}
@@ -60,6 +62,8 @@ export default function ForgotPasswordScreen() {
 
             <Pressable
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Send reset link"
               onPress={async () => {
                 try {
                   setError(null);

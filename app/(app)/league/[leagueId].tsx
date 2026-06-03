@@ -182,6 +182,8 @@ function PillButton({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [
         styles.pillBtn,
         size === "sm" && styles.pillBtnSm,
@@ -255,6 +257,9 @@ function Segmented({
           <Pressable
             key={k}
             onPress={() => onChange(k)}
+            accessibilityRole="tab"
+            accessibilityLabel={k}
+            accessibilityState={{ selected: active }}
             style={({ pressed }) => [
               styles.segmentBtn,
               compact && styles.segmentBtnCompact,
@@ -620,11 +625,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           );
         }
       )
-      .subscribe((status) => {
-        if (__DEV__) {
-          console.log("[league daily_logs realtime]", leagueId, status);
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -643,11 +644,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           void load();
         }
       )
-      .subscribe((status) => {
-        if (__DEV__) {
-          console.log("[league league_members realtime]", leagueId, status);
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -737,15 +734,6 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 
       // revert if failed
       if (error) {
-        console.log("[toggleDayForMember] daily_logs upsert failed", {
-          leagueId,
-          memberId,
-          myId,
-          log_date,
-          next,
-          message: error.message,
-          code: (error as any).code,
-        });
         setMembers((prev) =>
           prev.map((x) =>
             x.id !== memberId
@@ -781,8 +769,13 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           animationType="fade"
           onRequestClose={() => setInviteOpen(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setInviteOpen(false)}>
-            <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setInviteOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close invite modal"
+          >
+            <Pressable style={styles.modalCard} onPress={() => {}} accessible={false}>
               <Text style={styles.modalTitle}>Invite code</Text>
 
               <View style={styles.codeBox}>
@@ -815,8 +808,13 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           animationType="fade"
           onRequestClose={() => setMenuOpen(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
-            <Pressable style={styles.menuCard} onPress={() => {}}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setMenuOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close menu"
+          >
+            <Pressable style={styles.menuCard} onPress={() => {}} accessible={false}>
               <Text style={styles.menuTitle}>Menu</Text>
               <PillButton
                 label="Back"
@@ -861,8 +859,13 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           animationType="fade"
           onRequestClose={() => setEditNameOpen(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setEditNameOpen(false)}>
-            <Pressable style={styles.menuCard} onPress={() => {}}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setEditNameOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close edit display name modal"
+          >
+            <Pressable style={styles.menuCard} onPress={() => {}} accessible={false}>
               <Text style={styles.menuTitle}>Edit display name</Text>
 
               <TextInput
@@ -876,6 +879,8 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={20}
+                accessibilityLabel="Display name"
+                textContentType="name"
                 style={styles.nameInput}
               />
 
@@ -898,6 +903,8 @@ Open Commito \u2192 Join \u2192 Paste the code`;
             <View style={styles.headerSide}>
               <Pressable
                 onPress={onMenu}
+                accessibilityRole="button"
+                accessibilityLabel="Open league menu"
                 style={({ pressed }) => [
                   styles.headerIconBtn,
                   pressed && { backgroundColor: UI.pillBgActive },
@@ -954,6 +961,8 @@ Open Commito \u2192 Join \u2192 Paste the code`;
               <View style={styles.headerSide}>
                 <Pressable
                   onPress={onMenu}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open league menu"
                   style={({ pressed }) => [
                     styles.headerIconBtn,
                     pressed && { backgroundColor: UI.pillBgActive },
@@ -1057,6 +1066,8 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                         viewMode === "Ranking" && member.id === myId ? (
                           <Pressable
                             onPress={onOpenEditName}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit display name"
                             style={({ pressed }) => [
                               styles.editNameBtn,
                               styles.rankEditNameBtn,

@@ -200,22 +200,6 @@ export async function getLeagueMembers(
     };
   });
 
-  if (__DEV__) {
-    console.log("[getLeagueMembers] requested user ids", userIds);
-    console.log(
-      "[getLeagueMembers] returned profile ids",
-      (profiles ?? []).map((p: any) => p.id)
-    );
-    console.log(
-      "[getLeagueMembers] merged",
-      merged.map((m) => ({
-        user_id: m.user_id,
-        hasProfile: m.has_profile,
-        display_name: m.display_name,
-      }))
-    );
-  }
-
   return merged;
 }
 

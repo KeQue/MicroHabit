@@ -2,6 +2,16 @@
 
 Last updated: 2026-05-08
 
+## Current Launch Gate
+
+Before the next App Store submission, finish the security/accessibility gate tracked in `docs/security-accessibility-audit.md`.
+
+Current status:
+
+- App-side logging and accessibility baseline is in progress on the launch hardening branch.
+- Supabase RLS/RPC hardening migration has been added and must be applied to the linked project.
+- After applying the migration, retest direct blocked cases and the main TestFlight flows before merging to production.
+
 ## Refined Product Direction
 
 Working brand direction: Commito.

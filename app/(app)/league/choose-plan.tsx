@@ -123,7 +123,12 @@ export default function ChoosePlanScreen() {
         </View>
       )}
 
-      <Pressable onPress={() => router.back()} style={styles.cancelBtn}>
+      <Pressable
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Cancel plan selection"
+        style={styles.cancelBtn}
+      >
         <Text style={styles.cancelText}>Cancel</Text>
       </Pressable>
     </ScrollView>
@@ -186,6 +191,9 @@ function PlanCard({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}${price ? `, ${price}` : ""}. ${subtitle}${example ? `. ${example}` : ""}`}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.card,
         {

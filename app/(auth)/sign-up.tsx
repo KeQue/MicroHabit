@@ -65,6 +65,8 @@ export default function SignUpScreen() {
             <Pressable
               disabled={loading || !!socialLoading}
               onPress={() => void handleSocialSignIn("google")}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
               style={({ pressed }) => [
                 styles.socialBtn,
                 (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -80,6 +82,8 @@ export default function SignUpScreen() {
               <Pressable
                 disabled={loading || !!socialLoading}
                 onPress={() => void handleSocialSignIn("apple")}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Apple"
                 style={({ pressed }) => [
                   styles.socialBtn,
                   (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -104,6 +108,8 @@ export default function SignUpScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
+              accessibilityLabel="Email"
+              textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
               style={styles.input}
@@ -113,6 +119,8 @@ export default function SignUpScreen() {
               placeholder="Password (min 6 chars)"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
+              accessibilityLabel="Password"
+              textContentType="newPassword"
               value={password}
               onChangeText={setPassword}
               style={styles.input}
@@ -122,6 +130,8 @@ export default function SignUpScreen() {
 
             <Pressable
               disabled={loading || !!socialLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Create account"
               onPress={async () => {
                 try {
                   setError(null);

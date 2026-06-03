@@ -272,6 +272,8 @@ export default function JoinLeagueScreen() {
                     <Pressable
                       onPress={() => acceptRequiredTier(requiredTier)}
                       disabled={accepting || loading}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Accept ${planName(requiredTier)}`}
                       style={{
                         padding: 14,
                         borderRadius: 12,
@@ -298,6 +300,8 @@ export default function JoinLeagueScreen() {
           <Pressable
             onPress={continueToLeague}
             disabled={continueDisabled}
+            accessibilityRole="button"
+            accessibilityLabel="Continue to league"
             style={{
               marginTop: 8,
               padding: 14,
@@ -331,6 +335,7 @@ export default function JoinLeagueScreen() {
           autoCapitalize="characters"
           autoCorrect={false}
           editable={!loading && !accepting}
+          accessibilityLabel="Invite code"
           style={{
             borderWidth: 1,
             borderColor: "#1F2937",
@@ -348,6 +353,8 @@ export default function JoinLeagueScreen() {
         <Pressable
           onPress={() => joinByCode(code)}
           disabled={loading || accepting}
+          accessibilityRole="button"
+          accessibilityLabel="Open invite"
           style={{
             padding: 16,
             borderRadius: 14,
@@ -361,12 +368,12 @@ export default function JoinLeagueScreen() {
           </Text>
         </Pressable>
 
-        <Pressable onPress={() => router.back()} disabled={loading || accepting}>
+        <Pressable onPress={() => router.back()} disabled={loading || accepting} accessibilityRole="button" accessibilityLabel="Go back">
           <Text style={{ color: "#A7B0BC" }}>Back</Text>
         </Pressable>
       </View>
       ) : (
-        <Pressable onPress={() => router.back()} disabled={loading || accepting} style={{ marginTop: 18 }}>
+        <Pressable onPress={() => router.back()} disabled={loading || accepting} accessibilityRole="button" accessibilityLabel="Go back" style={{ marginTop: 18 }}>
           <Text style={{ color: "#A7B0BC" }}>Back</Text>
         </Pressable>
       )}

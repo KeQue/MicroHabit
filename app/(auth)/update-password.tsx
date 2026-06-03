@@ -38,7 +38,7 @@ export default function UpdatePasswordScreen() {
       >
         <View style={styles.shell}>
           <View style={styles.hero}>
-            <Text style={styles.eyebrow}>MICROHABIT</Text>
+            <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Choose a new password</Text>
             <Text style={styles.subtitle}>Use at least 6 characters.</Text>
           </View>
@@ -48,6 +48,8 @@ export default function UpdatePasswordScreen() {
               placeholder="New password"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
+              accessibilityLabel="New password"
+              textContentType="newPassword"
               value={password}
               onChangeText={setPassword}
               style={styles.input}
@@ -57,6 +59,8 @@ export default function UpdatePasswordScreen() {
               placeholder="Confirm password"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
+              accessibilityLabel="Confirm password"
+              textContentType="newPassword"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               style={styles.input}
@@ -66,6 +70,9 @@ export default function UpdatePasswordScreen() {
 
             <Pressable
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Update password"
+              accessibilityState={{ disabled: loading }}
               onPress={async () => {
                 try {
                   setError(null);

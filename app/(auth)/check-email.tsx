@@ -24,7 +24,7 @@ export default function CheckEmailScreen() {
     >
       <View style={styles.shell}>
         <View style={styles.card}>
-          <Text style={styles.eyebrow}>MICROHABIT</Text>
+          <Text style={styles.eyebrow}>COMMITO</Text>
           <Text style={styles.title}>Check your email</Text>
           <Text style={styles.body}>
             {email
@@ -38,6 +38,9 @@ export default function CheckEmailScreen() {
           {email ? (
             <Pressable
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Resend confirmation email"
+              accessibilityState={{ disabled: loading }}
               onPress={async () => {
                 try {
                   setError(null);
@@ -62,6 +65,8 @@ export default function CheckEmailScreen() {
           ) : null}
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to sign in"
             onPress={() =>
               router.replace({
                 pathname: "/(auth)/sign-in",

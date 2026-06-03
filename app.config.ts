@@ -1,7 +1,7 @@
 import type { ExpoConfig } from "@expo/config-types";
 
 const config: ExpoConfig = {
-  name: "MicroHabit",
+  name: "Commito",
   slug: "microhabit",
   version: "1.0.2",
   orientation: "portrait",

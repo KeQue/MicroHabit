@@ -38,7 +38,7 @@ export default function ForgotPasswordScreen() {
       >
         <View style={styles.shell}>
           <View style={styles.hero}>
-            <Text style={styles.eyebrow}>MICROHABIT</Text>
+            <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Reset password</Text>
             <Text style={styles.subtitle}>We will send a secure reset link to your email.</Text>
           </View>
@@ -50,6 +50,8 @@ export default function ForgotPasswordScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
+              accessibilityLabel="Email"
+              textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
               style={styles.input}
@@ -60,6 +62,9 @@ export default function ForgotPasswordScreen() {
 
             <Pressable
               disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="Send reset link"
+              accessibilityState={{ disabled: loading }}
               onPress={async () => {
                 try {
                   setError(null);

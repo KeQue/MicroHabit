@@ -2,6 +2,16 @@
 
 Last updated: 2026-05-08
 
+## Current Launch Gate
+
+Before the next App Store submission, finish the security/accessibility gate tracked in `docs/security-accessibility-audit.md`.
+
+Current status:
+
+- App-side logging and accessibility baseline is in progress on the launch hardening branch.
+- Supabase RLS/RPC hardening migration has been added and must be applied to the linked project.
+- After applying the migration, retest direct blocked cases and the main TestFlight flows before merging to production.
+
 ## Refined Product Direction
 
 Working brand direction: Commito.
@@ -397,14 +407,14 @@ The goal is to let users feel the stakes before charging them.
 
 ## Naming Decision
 
-The app currently ships as MicroHabit in config and UI. The product direction now points toward Commito.
+The app now ships with Commito as the visible app name. The bundle id, slug, scheme, and GitHub Pages URL still use `microhabit` / `MicroHabit` for technical continuity.
 
 Before App Store submission, choose one:
 
-- Keep MicroHabit for v1 and use Commito language later.
-- Rename to Commito before launch and align app name, icon, screenshots, metadata, and in-app copy.
+- Keep MicroHabit for v1 and use Commito language later. Rejected.
+- Rename to Commito before launch and align app name, icon, screenshots, metadata, and in-app copy. Chosen.
 
-Recommended: if commitment with money is the true product, rename before launch. Commito fits the concept better than MicroHabit.
+Decision: launch with Commito as the user-visible app name.
 
 
 ## Objective 1: Confirm Release Configuration
@@ -439,7 +449,7 @@ Goal: avoid obvious App Review rejection reasons.
 - Decide what to do with paid tiers before submission:
   - Free launch: remove or hide paid plan calls to action, paywall copy, and testing-only plan acceptance. Current code treats paid leagues as coming soon with `PAID_LEAGUES_AVAILABLE = false`.
   - Paid launch: implement Apple IAP, purchase restore, entitlement checks, and App Store Connect products.
-- Create a reviewer demo account and include credentials in App Review notes.
+- Create a reviewer demo account and include credentials in App Review notes. Template added in `docs/app-review-notes.md`; actual account still needs to be created and tested in production/TestFlight.
 - Ensure Supabase production project, auth providers, email confirmation, redirect URLs, and custom SMTP are production-ready.
 - Ensure Google and Apple sign-in work in the production iOS build, not only Expo dev.
 - Remove starter assets and unused Expo placeholder imagery if visible anywhere in the shipped app. Done: Expo default icon/splash and old starter routes/assets were replaced or removed.
@@ -490,7 +500,7 @@ Decisions to document in the privacy policy:
 
 Goal: finish everything Apple needs before review.
 
-- App name: MicroHabit.
+- App name: Commito.
 - Subtitle: keep under 30 characters.
 - Category: likely Health & Fitness or Productivity. Pick based on positioning.
 - Age rating: answer honestly based on user-generated league/activity names.
@@ -537,7 +547,7 @@ These are the smaller objectives that lead directly to the larger scope: launchi
 Goal: make v1 small enough to submit confidently.
 
 - Choose Free Launch or Paid Launch.
-- Decide whether the launch brand is MicroHabit or Commito.
+- Decide whether the launch brand is MicroHabit or Commito. Done: Commito.
 - Choose the launch model: paid commitment, simulated stakes, or free MVP.
 - If paid commitment, add Apple In-App Purchase before TestFlight review.
 - If simulated stakes, build the month-end "you would have lost/won/donated" conversion screen.
@@ -554,7 +564,7 @@ Goal: remove the things Apple is most likely to reject before users even test th
 - Add Privacy Policy URL. Live: `https://keque.github.io/MicroHabit/privacy/`.
 - Add Support URL. Live: `https://keque.github.io/MicroHabit/support/`.
 - Replace the temporary support email in policy/support pages with a real mailbox before App Store submission.
-- Prepare demo reviewer account.
+- Prepare demo reviewer account. Notes template drafted in `docs/app-review-notes.md`; real credentials must be created outside git.
 - Confirm Sign in with Apple works if other social login is available.
 - Confirm any paid feature is either hidden or handled through Apple IAP. Free-launch code path now hides testing unlocks and marks paid leagues as coming soon.
 - Remove visible Expo starter content and placeholder imagery. Done.
@@ -647,7 +657,7 @@ Goal: make the App Store page ready before the final build.
 - Capture iPhone screenshots from the production/TestFlight build.
 - Add privacy policy URL.
 - Add support URL.
-- Add reviewer notes.
+- Add reviewer notes. Draft template exists in `docs/app-review-notes.md`; final credentials must be inserted only in App Store Connect.
 
 Finish line: App Store Connect metadata is complete except for selecting the final build.
 

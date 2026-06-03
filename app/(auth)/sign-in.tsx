@@ -56,7 +56,7 @@ export default function SignInScreen() {
       >
         <View style={styles.shell}>
           <View style={styles.hero}>
-            <Text style={styles.eyebrow}>MICROHABIT</Text>
+            <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Sign in</Text>
             <Text style={styles.subtitle}>Small groups. Real consistency.</Text>
           </View>
@@ -65,6 +65,9 @@ export default function SignInScreen() {
             <Pressable
               disabled={loading || !!socialLoading}
               onPress={() => void handleSocialSignIn("google")}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+              accessibilityState={{ disabled: loading || !!socialLoading }}
               style={({ pressed }) => [
                 styles.socialBtn,
                 (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -80,6 +83,9 @@ export default function SignInScreen() {
               <Pressable
                 disabled={loading || !!socialLoading}
                 onPress={() => void handleSocialSignIn("apple")}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Apple"
+                accessibilityState={{ disabled: loading || !!socialLoading }}
                 style={({ pressed }) => [
                   styles.socialBtn,
                   (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -104,6 +110,8 @@ export default function SignInScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
+              accessibilityLabel="Email"
+              textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
               style={styles.input}
@@ -113,6 +121,8 @@ export default function SignInScreen() {
               placeholder="Password"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
+              accessibilityLabel="Password"
+              textContentType="password"
               value={password}
               onChangeText={setPassword}
               style={styles.input}
@@ -124,6 +134,8 @@ export default function SignInScreen() {
 
             <Pressable
               disabled={loading || !!socialLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
               onPress={async () => {
                 try {
                   setError(null);
@@ -146,6 +158,7 @@ export default function SignInScreen() {
                 loading && styles.primaryBtnDisabled,
                 pressed && !loading && !socialLoading && styles.primaryBtnPressed,
               ]}
+              accessibilityState={{ disabled: loading || !!socialLoading }}
             >
               <Text style={styles.primaryBtnText}>{loading ? "Signing in..." : "Sign in"}</Text>
             </Pressable>

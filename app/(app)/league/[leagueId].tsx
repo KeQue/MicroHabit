@@ -1,4 +1,4 @@
-﻿import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { deleteCurrentAccount } from "@/features/auth/account";
@@ -24,8 +24,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-type PlanTier = "A" | "B" | "C";
 
 type Member = {
   id: string; // user_id
@@ -173,19 +171,26 @@ function PillButton({
   onPress,
   size = "md",
   tone = "default",
+  disabled = false,
 }: {
   label: string;
   onPress: () => void | Promise<void>;
   size?: "md" | "sm" | "xs";
   tone?: "default" | "danger";
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.pillBtn,
         size === "sm" && styles.pillBtnSm,
         size === "xs" && styles.pillBtnXs,
+        disabled && styles.pillBtnDisabled,
         pressed && { backgroundColor: UI.pillBgActive },
       ]}
       hitSlop={8}
@@ -255,6 +260,9 @@ function Segmented({
           <Pressable
             key={k}
             onPress={() => onChange(k)}
+            accessibilityRole="tab"
+            accessibilityLabel={k}
+            accessibilityState={{ selected: active }}
             style={({ pressed }) => [
               styles.segmentBtn,
               compact && styles.segmentBtnCompact,
@@ -308,7 +316,6 @@ export default function LeagueDetailScreen() {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
-  const todayWeekday = today.getDay();
   const todayIndex = today.getDate() - 1;
   const monthDays = useMemo(() => new Date(year, month + 1, 0).getDate(), [year, month]);
 
@@ -324,9 +331,6 @@ export default function LeagueDetailScreen() {
 
   const [leagueName, setLeagueName] = useState<string>("League");
   const [leagueActivity, setLeagueActivity] = useState<string>("");
-  const [leaguePlanTier, setLeaguePlanTier] = useState<PlanTier | null>(null);
-
-  const [leagueIsFree, setLeagueIsFree] = useState<boolean>(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -496,9 +500,6 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 
       setLeagueName(leagueRow?.name ?? "League");
       setLeagueActivity(leagueRow?.activity ?? "");
-      setLeaguePlanTier((leagueRow?.plan_tier as PlanTier) ?? null);
-
-      setLeagueIsFree(!!leagueRow?.is_free);
       setInviteCode((leagueRow?.invite_code as string) ?? null);
 
       const rows = await getLeagueMembers(leagueId);
@@ -620,11 +621,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           );
         }
       )
-      .subscribe((status) => {
-        if (__DEV__) {
-          console.log("[league daily_logs realtime]", leagueId, status);
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -643,11 +640,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           void load();
         }
       )
-      .subscribe((status) => {
-        if (__DEV__) {
-          console.log("[league league_members realtime]", leagueId, status);
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
@@ -737,15 +730,6 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 
       // revert if failed
       if (error) {
-        console.log("[toggleDayForMember] daily_logs upsert failed", {
-          leagueId,
-          memberId,
-          myId,
-          log_date,
-          next,
-          message: error.message,
-          code: (error as any).code,
-        });
         setMembers((prev) =>
           prev.map((x) =>
             x.id !== memberId
@@ -781,8 +765,12 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           animationType="fade"
           onRequestClose={() => setInviteOpen(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setInviteOpen(false)}>
-            <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setInviteOpen(false)}
+            accessible={false}
+          >
+            <Pressable style={styles.modalCard} onPress={() => {}} accessible={false}>
               <Text style={styles.modalTitle}>Invite code</Text>
 
               <View style={styles.codeBox}>
@@ -815,8 +803,12 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           animationType="fade"
           onRequestClose={() => setMenuOpen(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setMenuOpen(false)}>
-            <Pressable style={styles.menuCard} onPress={() => {}}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setMenuOpen(false)}
+            accessible={false}
+          >
+            <Pressable style={styles.menuCard} onPress={() => {}} accessible={false}>
               <Text style={styles.menuTitle}>Menu</Text>
               <PillButton
                 label="Back"
@@ -838,6 +830,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                 label={deletingAccount ? "Deleting..." : "Delete account"}
                 size="sm"
                 tone="danger"
+                disabled={deletingAccount}
                 onPress={onDeleteAccount}
               />
               {__DEV__ ? (
@@ -861,8 +854,12 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           animationType="fade"
           onRequestClose={() => setEditNameOpen(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setEditNameOpen(false)}>
-            <Pressable style={styles.menuCard} onPress={() => {}}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setEditNameOpen(false)}
+            accessible={false}
+          >
+            <Pressable style={styles.menuCard} onPress={() => {}} accessible={false}>
               <Text style={styles.menuTitle}>Edit display name</Text>
 
               <TextInput
@@ -876,6 +873,8 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={20}
+                accessibilityLabel="Display name"
+                textContentType="name"
                 style={styles.nameInput}
               />
 
@@ -884,6 +883,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
               <PillButton
                 label={savingDisplayName ? "Saving..." : "Save"}
                 size="sm"
+                disabled={savingDisplayName}
                 onPress={onSaveDisplayName}
               />
               <PillButton label="Close" size="sm" onPress={() => setEditNameOpen(false)} />
@@ -898,6 +898,8 @@ Open Commito \u2192 Join \u2192 Paste the code`;
             <View style={styles.headerSide}>
               <Pressable
                 onPress={onMenu}
+                accessibilityRole="button"
+                accessibilityLabel="Open league menu"
                 style={({ pressed }) => [
                   styles.headerIconBtn,
                   pressed && { backgroundColor: UI.pillBgActive },
@@ -954,6 +956,8 @@ Open Commito \u2192 Join \u2192 Paste the code`;
               <View style={styles.headerSide}>
                 <Pressable
                   onPress={onMenu}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open league menu"
                   style={({ pressed }) => [
                     styles.headerIconBtn,
                     pressed && { backgroundColor: UI.pillBgActive },
@@ -1057,12 +1061,14 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                         viewMode === "Ranking" && member.id === myId ? (
                           <Pressable
                             onPress={onOpenEditName}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit display name"
                             style={({ pressed }) => [
                               styles.editNameBtn,
                               styles.rankEditNameBtn,
                               pressed && styles.editNameBtnPressed,
                             ]}
-                            hitSlop={8}
+                            hitSlop={10}
                           >
                             <Ionicons name="pencil" size={12} color={UI.text} />
                           </Pressable>
@@ -1144,6 +1150,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: UI.pillBorder,
     backgroundColor: UI.pillBg,
+  },
+  pillBtnDisabled: {
+    opacity: 0.55,
   },
   pillBtnSm: {
     paddingHorizontal: 10,

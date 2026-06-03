@@ -104,6 +104,8 @@ export default function PaywallScreen() {
 
       <Pressable
         onPress={onPrimaryPress}
+        accessibilityRole="button"
+        accessibilityLabel={PAID_LEAGUES_AVAILABLE ? "Choose a paid plan" : "Create a free league"}
         style={{
           marginTop: 24,
           backgroundColor: "#101826",
@@ -119,7 +121,7 @@ export default function PaywallScreen() {
         </Text>
       </Pressable>
 
-      <Pressable onPress={() => router.back()} style={{ marginTop: 20, padding: 10 }}>
+      <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back" style={{ marginTop: 20, padding: 10 }}>
         <Text style={{ textAlign: "center", color: "#A7B0BC" }}>Back</Text>
       </Pressable>
 

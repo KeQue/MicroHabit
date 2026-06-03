@@ -56,7 +56,7 @@ export default function SignUpScreen() {
       >
         <View style={styles.shell}>
           <View style={styles.hero}>
-            <Text style={styles.eyebrow}>MICROHABIT</Text>
+            <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Create account</Text>
             <Text style={styles.subtitle}>Start your first league with a real email.</Text>
           </View>
@@ -65,6 +65,9 @@ export default function SignUpScreen() {
             <Pressable
               disabled={loading || !!socialLoading}
               onPress={() => void handleSocialSignIn("google")}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+              accessibilityState={{ disabled: loading || !!socialLoading }}
               style={({ pressed }) => [
                 styles.socialBtn,
                 (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -80,6 +83,9 @@ export default function SignUpScreen() {
               <Pressable
                 disabled={loading || !!socialLoading}
                 onPress={() => void handleSocialSignIn("apple")}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Apple"
+                accessibilityState={{ disabled: loading || !!socialLoading }}
                 style={({ pressed }) => [
                   styles.socialBtn,
                   (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -104,6 +110,8 @@ export default function SignUpScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
+              accessibilityLabel="Email"
+              textContentType="emailAddress"
               value={email}
               onChangeText={setEmail}
               style={styles.input}
@@ -113,6 +121,8 @@ export default function SignUpScreen() {
               placeholder="Password (min 6 chars)"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
+              accessibilityLabel="Password"
+              textContentType="newPassword"
               value={password}
               onChangeText={setPassword}
               style={styles.input}
@@ -122,6 +132,9 @@ export default function SignUpScreen() {
 
             <Pressable
               disabled={loading || !!socialLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Create account"
+              accessibilityState={{ disabled: loading || !!socialLoading }}
               onPress={async () => {
                 try {
                   setError(null);

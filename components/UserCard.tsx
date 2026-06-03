@@ -180,10 +180,6 @@ function rankTheme(rank?: number) {
 function rankIcon(rank?: number) {
   if (rank === 1) return "\u{1F451}";
   return null;
-  if (rank === 1) return "👑";
-  if (rank === 2) return "🥈";
-  if (rank === 3) return "🥉";
-  return null;
 }
 
 function rankBadgeText(rank?: number) {

@@ -1,4 +1,4 @@
-﻿import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { deleteCurrentAccount } from "@/features/auth/account";
@@ -24,8 +24,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-type PlanTier = "A" | "B" | "C";
 
 type Member = {
   id: string; // user_id
@@ -318,7 +316,6 @@ export default function LeagueDetailScreen() {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
-  const todayWeekday = today.getDay();
   const todayIndex = today.getDate() - 1;
   const monthDays = useMemo(() => new Date(year, month + 1, 0).getDate(), [year, month]);
 
@@ -334,9 +331,6 @@ export default function LeagueDetailScreen() {
 
   const [leagueName, setLeagueName] = useState<string>("League");
   const [leagueActivity, setLeagueActivity] = useState<string>("");
-  const [leaguePlanTier, setLeaguePlanTier] = useState<PlanTier | null>(null);
-
-  const [leagueIsFree, setLeagueIsFree] = useState<boolean>(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -506,9 +500,6 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 
       setLeagueName(leagueRow?.name ?? "League");
       setLeagueActivity(leagueRow?.activity ?? "");
-      setLeaguePlanTier((leagueRow?.plan_tier as PlanTier) ?? null);
-
-      setLeagueIsFree(!!leagueRow?.is_free);
       setInviteCode((leagueRow?.invite_code as string) ?? null);
 
       const rows = await getLeagueMembers(leagueId);

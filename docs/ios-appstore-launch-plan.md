@@ -416,7 +416,7 @@ Goal: the binary can be built, uploaded, and mapped to the existing App Store Co
 - Verify App Store Connect app id in `eas.json`: `6759626676`.
 - Increment `ios.buildNumber` before every upload. Current value: `19`.
 - Keep user-facing version aligned. Current app version: `1.0.2` in `app.config.ts`.
-- Resolve config mismatch: `app.config.ts` has `supportsTablet: false`; `app.json` has `supportsTablet: true`. Expo should use dynamic config, but this should still be cleaned up to avoid confusion.
+- Resolve config mismatch: `app.config.ts` has `supportsTablet: false`; `app.json` has `supportsTablet: true`. Done: both configs now use `supportsTablet: false`.
 - Verify production build command:
 
 ```bash
@@ -442,7 +442,7 @@ Goal: avoid obvious App Review rejection reasons.
 - Create a reviewer demo account and include credentials in App Review notes.
 - Ensure Supabase production project, auth providers, email confirmation, redirect URLs, and custom SMTP are production-ready.
 - Ensure Google and Apple sign-in work in the production iOS build, not only Expo dev.
-- Remove starter assets and unused Expo placeholder imagery if visible anywhere in the shipped app.
+- Remove starter assets and unused Expo placeholder imagery if visible anywhere in the shipped app. Done: Expo default icon/splash and old starter routes/assets were replaced or removed.
 
 ## Objective 3: Product QA Checklist
 
@@ -557,7 +557,7 @@ Goal: remove the things Apple is most likely to reject before users even test th
 - Prepare demo reviewer account.
 - Confirm Sign in with Apple works if other social login is available.
 - Confirm any paid feature is either hidden or handled through Apple IAP. Free-launch code path now hides testing unlocks and marks paid leagues as coming soon.
-- Remove visible Expo starter content and placeholder imagery.
+- Remove visible Expo starter content and placeholder imagery. Done.
 
 Finish line: App Store Connect can be filled honestly, and the reviewer has a complete path through the app.
 

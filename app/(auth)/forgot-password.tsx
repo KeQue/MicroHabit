@@ -64,6 +64,7 @@ export default function ForgotPasswordScreen() {
               disabled={loading}
               accessibilityRole="button"
               accessibilityLabel="Send reset link"
+              accessibilityState={{ disabled: loading }}
               onPress={async () => {
                 try {
                   setError(null);

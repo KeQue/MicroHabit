@@ -173,21 +173,26 @@ function PillButton({
   onPress,
   size = "md",
   tone = "default",
+  disabled = false,
 }: {
   label: string;
   onPress: () => void | Promise<void>;
   size?: "md" | "sm" | "xs";
   tone?: "default" | "danger";
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.pillBtn,
         size === "sm" && styles.pillBtnSm,
         size === "xs" && styles.pillBtnXs,
+        disabled && styles.pillBtnDisabled,
         pressed && { backgroundColor: UI.pillBgActive },
       ]}
       hitSlop={8}
@@ -772,8 +777,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           <Pressable
             style={styles.modalOverlay}
             onPress={() => setInviteOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Close invite modal"
+            accessible={false}
           >
             <Pressable style={styles.modalCard} onPress={() => {}} accessible={false}>
               <Text style={styles.modalTitle}>Invite code</Text>
@@ -811,8 +815,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           <Pressable
             style={styles.modalOverlay}
             onPress={() => setMenuOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Close menu"
+            accessible={false}
           >
             <Pressable style={styles.menuCard} onPress={() => {}} accessible={false}>
               <Text style={styles.menuTitle}>Menu</Text>
@@ -836,6 +839,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                 label={deletingAccount ? "Deleting..." : "Delete account"}
                 size="sm"
                 tone="danger"
+                disabled={deletingAccount}
                 onPress={onDeleteAccount}
               />
               {__DEV__ ? (
@@ -862,8 +866,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           <Pressable
             style={styles.modalOverlay}
             onPress={() => setEditNameOpen(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Close edit display name modal"
+            accessible={false}
           >
             <Pressable style={styles.menuCard} onPress={() => {}} accessible={false}>
               <Text style={styles.menuTitle}>Edit display name</Text>
@@ -889,6 +892,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
               <PillButton
                 label={savingDisplayName ? "Saving..." : "Save"}
                 size="sm"
+                disabled={savingDisplayName}
                 onPress={onSaveDisplayName}
               />
               <PillButton label="Close" size="sm" onPress={() => setEditNameOpen(false)} />
@@ -1073,7 +1077,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                               styles.rankEditNameBtn,
                               pressed && styles.editNameBtnPressed,
                             ]}
-                            hitSlop={8}
+                            hitSlop={10}
                           >
                             <Ionicons name="pencil" size={12} color={UI.text} />
                           </Pressable>
@@ -1155,6 +1159,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: UI.pillBorder,
     backgroundColor: UI.pillBg,
+  },
+  pillBtnDisabled: {
+    opacity: 0.55,
   },
   pillBtnSm: {
     paddingHorizontal: 10,

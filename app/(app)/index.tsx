@@ -259,8 +259,7 @@ export default function LeaguesScreen() {
         <Pressable
           style={styles.modalOverlay}
           onPress={() => setAccountMenuOpen(false)}
-          accessibilityRole="button"
-          accessibilityLabel="Close account menu"
+          accessible={false}
         >
           <Pressable style={styles.accountCard} onPress={() => {}} accessible={false}>
             <Text style={styles.accountTitle}>Account</Text>
@@ -272,6 +271,7 @@ export default function LeaguesScreen() {
               disabled={deletingAccount}
               accessibilityRole="button"
               accessibilityLabel="Delete account"
+              accessibilityState={{ disabled: deletingAccount }}
               style={[styles.accountButton, styles.accountDangerButton]}
             >
               <Text style={styles.accountDangerText}>
@@ -370,6 +370,7 @@ export default function LeaguesScreen() {
             disabled={!canSubmit}
             accessibilityRole="button"
             accessibilityLabel="Create league"
+            accessibilityState={{ disabled: !canSubmit }}
             style={({ pressed }) => [
               styles.createBtn,
               !canSubmit && styles.createBtnDisabled,

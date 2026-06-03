@@ -67,6 +67,7 @@ export default function SignInScreen() {
               onPress={() => void handleSocialSignIn("google")}
               accessibilityRole="button"
               accessibilityLabel="Continue with Google"
+              accessibilityState={{ disabled: loading || !!socialLoading }}
               style={({ pressed }) => [
                 styles.socialBtn,
                 (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -84,6 +85,7 @@ export default function SignInScreen() {
                 onPress={() => void handleSocialSignIn("apple")}
                 accessibilityRole="button"
                 accessibilityLabel="Continue with Apple"
+                accessibilityState={{ disabled: loading || !!socialLoading }}
                 style={({ pressed }) => [
                   styles.socialBtn,
                   (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -156,6 +158,7 @@ export default function SignInScreen() {
                 loading && styles.primaryBtnDisabled,
                 pressed && !loading && !socialLoading && styles.primaryBtnPressed,
               ]}
+              accessibilityState={{ disabled: loading || !!socialLoading }}
             >
               <Text style={styles.primaryBtnText}>{loading ? "Signing in..." : "Sign in"}</Text>
             </Pressable>

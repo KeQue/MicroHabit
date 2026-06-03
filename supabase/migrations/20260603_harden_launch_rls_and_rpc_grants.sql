@@ -10,6 +10,7 @@ drop policy if exists daily_logs_upsert_self on public.daily_logs;
 drop policy if exists daily_logs_write_only_paid_or_free on public.daily_logs;
 drop policy if exists "delete own daily logs" on public.daily_logs;
 drop policy if exists "insert own daily logs" on public.daily_logs;
+drop policy if exists "update own daily logs" on public.daily_logs;
 drop policy if exists daily_logs_no_direct_delete on public.daily_logs;
 drop policy if exists daily_logs_no_direct_insert on public.daily_logs;
 drop policy if exists daily_logs_no_direct_update on public.daily_logs;
@@ -101,6 +102,8 @@ using (
 drop policy if exists league_members_insert_self on public.league_members;
 drop policy if exists league_members_delete_self on public.league_members;
 
+revoke insert, update, delete on public.league_members from anon, authenticated;
+
 -- Paywall/admin toggles and legacy toggle RPCs are not public app APIs.
 revoke all on function public.set_paywall_enabled(boolean) from public;
 revoke all on function public.set_paywall_enabled(boolean) from anon;
@@ -116,6 +119,11 @@ revoke all on function public.toggle_daily_log(uuid, date, boolean) from public;
 revoke all on function public.toggle_daily_log(uuid, date, boolean) from anon;
 revoke all on function public.toggle_daily_log(uuid, date, boolean) from authenticated;
 grant execute on function public.toggle_daily_log(uuid, date, boolean) to service_role;
+
+revoke execute on function public.accept_invite_and_agree(uuid) from anon;
+revoke execute on function public.create_league_and_join(text, text, text, text, boolean) from anon;
+revoke execute on function public.join_league_by_code(text) from anon;
+revoke execute on function public.join_league_by_id(uuid) from anon;
 
 -- Deleting an account should remove owned leagues too, because created_by is
 -- not nullable and otherwise keeps user-linked records after profile deletion.

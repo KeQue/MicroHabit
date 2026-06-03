@@ -355,6 +355,7 @@ export default function JoinLeagueScreen() {
           disabled={loading || accepting}
           accessibilityRole="button"
           accessibilityLabel="Open invite"
+          accessibilityState={{ disabled: loading || accepting }}
           style={{
             padding: 16,
             borderRadius: 14,

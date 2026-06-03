@@ -72,6 +72,7 @@ export default function UpdatePasswordScreen() {
               disabled={loading}
               accessibilityRole="button"
               accessibilityLabel="Update password"
+              accessibilityState={{ disabled: loading }}
               onPress={async () => {
                 try {
                   setError(null);

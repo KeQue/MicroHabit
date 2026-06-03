@@ -301,7 +301,7 @@ export function UserDayGrid({
             accessibilityRole="button"
             accessibilityLabel={dayLabel}
             accessibilityState={{ disabled: !handlePress, selected: isDone }}
-            hitSlop={8}
+            hitSlop={12}
             style={({ pressed }) => [
               styles.pressable,
               { width: tileSize, height: tileSize },

@@ -67,6 +67,7 @@ export default function SignUpScreen() {
               onPress={() => void handleSocialSignIn("google")}
               accessibilityRole="button"
               accessibilityLabel="Continue with Google"
+              accessibilityState={{ disabled: loading || !!socialLoading }}
               style={({ pressed }) => [
                 styles.socialBtn,
                 (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -84,6 +85,7 @@ export default function SignUpScreen() {
                 onPress={() => void handleSocialSignIn("apple")}
                 accessibilityRole="button"
                 accessibilityLabel="Continue with Apple"
+                accessibilityState={{ disabled: loading || !!socialLoading }}
                 style={({ pressed }) => [
                   styles.socialBtn,
                   (loading || !!socialLoading) && styles.socialBtnDisabled,
@@ -132,6 +134,7 @@ export default function SignUpScreen() {
               disabled={loading || !!socialLoading}
               accessibilityRole="button"
               accessibilityLabel="Create account"
+              accessibilityState={{ disabled: loading || !!socialLoading }}
               onPress={async () => {
                 try {
                   setError(null);

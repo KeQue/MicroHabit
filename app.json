@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
   "supportsTablet": false,
-  "buildNumber": "23"
+  "buildNumber": "24"
 },
     "android": {
       "adaptiveIcon": {

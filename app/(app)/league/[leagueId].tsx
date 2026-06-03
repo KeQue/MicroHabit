@@ -1,6 +1,7 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
+import { deleteCurrentAccount } from "@/features/auth/account";
 import { getLeagueMembers } from "@/features/leagues/api";
 import { scheduleGentleTestNotification } from "@/features/notifications/local";
 import { supabase } from "@/lib/supabase";
@@ -10,6 +11,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Modal,
   Pressable,
@@ -170,10 +172,12 @@ function PillButton({
   label,
   onPress,
   size = "md",
+  tone = "default",
 }: {
   label: string;
   onPress: () => void | Promise<void>;
   size?: "md" | "sm" | "xs";
+  tone?: "default" | "danger";
 }) {
   return (
     <Pressable
@@ -191,6 +195,7 @@ function PillButton({
           styles.pillBtnText,
           size === "sm" && styles.pillBtnTextSm,
           size === "xs" && styles.pillBtnTextXs,
+          tone === "danger" && styles.pillBtnTextDanger,
         ]}
       >
         {label}
@@ -331,11 +336,40 @@ export default function LeagueDetailScreen() {
   const [savingDisplayName, setSavingDisplayName] = useState(false);
   const [displayNameError, setDisplayNameError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const listAnim = useRef(new Animated.Value(1)).current;
 
   async function onSignOut() {
     await supabase.auth.signOut();
     router.replace("/(auth)/sign-in");
+  }
+
+  function onDeleteAccount() {
+    if (deletingAccount) return;
+
+    Alert.alert(
+      "Delete account?",
+      "This permanently deletes your account, profile, league memberships, and activity logs. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete account",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setMenuOpen(false);
+              setDeletingAccount(true);
+              await deleteCurrentAccount();
+              router.replace("/(auth)/sign-in");
+            } catch (e: any) {
+              Alert.alert("Could not delete account", e?.message ?? "Unknown error");
+            } finally {
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   function buildInviteMessage(code: string) {
@@ -800,6 +834,12 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                   await onSignOut();
                 }}
               />
+              <PillButton
+                label={deletingAccount ? "Deleting..." : "Delete account"}
+                size="sm"
+                tone="danger"
+                onPress={onDeleteAccount}
+              />
               {__DEV__ ? (
                 <PillButton
                   label="Test notification"
@@ -1116,6 +1156,7 @@ const styles = StyleSheet.create({
   pillBtnText: { color: UI.text, fontSize: 16, fontWeight: "700" },
   pillBtnTextSm: { fontSize: 14 },
   pillBtnTextXs: { fontSize: 14, fontWeight: "800" },
+  pillBtnTextDanger: { color: "#FCA5A5" },
 
   scroll: { flex: 1 },
   scrollContent: { padding: 16, gap: 8, paddingBottom: 28 },

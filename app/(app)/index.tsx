@@ -5,6 +5,7 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { deleteCurrentAccount } from "../../features/auth/account";
 import { ensureProfileForCurrentUser } from "../../features/auth/profile";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
 import { supabase } from "../../lib/supabase";
@@ -48,6 +50,7 @@ export default function LeaguesScreen() {
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newActivity, setNewActivity] = useState("");
@@ -179,6 +182,7 @@ export default function LeaguesScreen() {
   }
 
   async function onSignOut() {
+    setAccountMenuOpen(false);
     await supabase.auth.signOut();
     router.replace("/(auth)/sign-in");
   }
@@ -196,11 +200,9 @@ export default function LeaguesScreen() {
           style: "destructive",
           onPress: async () => {
             try {
+              setAccountMenuOpen(false);
               setDeletingAccount(true);
-              const { error } = await supabase.rpc("delete_my_account");
-              if (error) throw error;
-
-              await supabase.auth.signOut().catch(() => undefined);
+              await deleteCurrentAccount();
               router.replace("/(auth)/sign-in");
             } catch (e: any) {
               Alert.alert("Could not delete account", normalizeErr(e));
@@ -238,21 +240,38 @@ export default function LeaguesScreen() {
           <Text style={styles.subtitle}>Create or join a league.</Text>
         </View>
 
-        <View style={styles.headerActions}>
-          <Pressable onPress={onSignOut} style={styles.headerGhostBtn}>
-            <Text style={styles.headerGhostText}>Sign out</Text>
-          </Pressable>
-          <Pressable
-            onPress={onDeleteAccount}
-            disabled={deletingAccount}
-            style={styles.headerDangerBtn}
-          >
-            <Text style={styles.headerDangerText}>
-              {deletingAccount ? "Deleting..." : "Delete account"}
-            </Text>
-          </Pressable>
-        </View>
+        <Pressable onPress={() => setAccountMenuOpen(true)} style={styles.headerGhostBtn}>
+          <Text style={styles.headerGhostText}>Account</Text>
+        </Pressable>
       </View>
+
+      <Modal
+        visible={accountMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAccountMenuOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setAccountMenuOpen(false)}>
+          <Pressable style={styles.accountCard} onPress={() => {}}>
+            <Text style={styles.accountTitle}>Account</Text>
+            <Pressable onPress={onSignOut} style={styles.accountButton}>
+              <Text style={styles.accountButtonText}>Sign out</Text>
+            </Pressable>
+            <Pressable
+              onPress={onDeleteAccount}
+              disabled={deletingAccount}
+              style={[styles.accountButton, styles.accountDangerButton]}
+            >
+              <Text style={styles.accountDangerText}>
+                {deletingAccount ? "Deleting..." : "Delete account"}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => setAccountMenuOpen(false)} style={styles.accountButton}>
+              <Text style={styles.accountButtonText}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {error ? (
         <View style={styles.errorBox}>
@@ -424,23 +443,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     marginTop: 6,
   },
-  headerActions: {
-    alignItems: "flex-end",
-    flexShrink: 0,
-  },
   headerGhostText: {
     color: "#C8D0DB",
     fontSize: 15,
     fontWeight: "500",
   },
-  headerDangerBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 2,
+  modalOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
-  headerDangerText: {
+  accountCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 20,
+    padding: 18,
+    gap: 12,
+    backgroundColor: "#101826",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  accountTitle: {
+    color: "white",
+    fontSize: 22,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  accountButton: {
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  accountDangerButton: {
+    borderColor: "rgba(248,113,113,0.28)",
+  },
+  accountButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  accountDangerText: {
     color: "#FCA5A5",
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
   },
   errorBox: {
     marginTop: 14,

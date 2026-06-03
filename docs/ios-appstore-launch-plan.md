@@ -439,7 +439,7 @@ Goal: avoid obvious App Review rejection reasons.
 - Decide what to do with paid tiers before submission:
   - Free launch: remove or hide paid plan calls to action, paywall copy, and testing-only plan acceptance. Current code treats paid leagues as coming soon with `PAID_LEAGUES_AVAILABLE = false`.
   - Paid launch: implement Apple IAP, purchase restore, entitlement checks, and App Store Connect products.
-- Create a reviewer demo account and include credentials in App Review notes.
+- Create a reviewer demo account and include credentials in App Review notes. Template added in `docs/app-review-notes.md`; actual account still needs to be created and tested in production/TestFlight.
 - Ensure Supabase production project, auth providers, email confirmation, redirect URLs, and custom SMTP are production-ready.
 - Ensure Google and Apple sign-in work in the production iOS build, not only Expo dev.
 - Remove starter assets and unused Expo placeholder imagery if visible anywhere in the shipped app. Done: Expo default icon/splash and old starter routes/assets were replaced or removed.
@@ -554,7 +554,7 @@ Goal: remove the things Apple is most likely to reject before users even test th
 - Add Privacy Policy URL. Live: `https://keque.github.io/MicroHabit/privacy/`.
 - Add Support URL. Live: `https://keque.github.io/MicroHabit/support/`.
 - Replace the temporary support email in policy/support pages with a real mailbox before App Store submission.
-- Prepare demo reviewer account.
+- Prepare demo reviewer account. Notes template drafted in `docs/app-review-notes.md`; real credentials must be created outside git.
 - Confirm Sign in with Apple works if other social login is available.
 - Confirm any paid feature is either hidden or handled through Apple IAP. Free-launch code path now hides testing unlocks and marks paid leagues as coming soon.
 - Remove visible Expo starter content and placeholder imagery. Done.
@@ -647,7 +647,7 @@ Goal: make the App Store page ready before the final build.
 - Capture iPhone screenshots from the production/TestFlight build.
 - Add privacy policy URL.
 - Add support URL.
-- Add reviewer notes.
+- Add reviewer notes. Draft template exists in `docs/app-review-notes.md`; final credentials must be inserted only in App Store Connect.
 
 Finish line: App Store Connect metadata is complete except for selecting the final build.
 

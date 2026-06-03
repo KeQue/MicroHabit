@@ -434,9 +434,10 @@ npx eas submit --platform ios --profile production
 Goal: avoid obvious App Review rejection reasons.
 
 - Add an in-app account deletion entry point because the app supports account creation. Done in `account-deletion-app-review`.
-- Add public Privacy Policy URL and Support URL for App Store Connect. Drafts added in `docs/privacy-policy.md` and `docs/support.md`; static pages added in `docs/privacy/index.html` and `docs/support/index.html`; they still need GitHub Pages or another public host enabled.
+- Add public Privacy Policy URL and Support URL for App Store Connect. Drafts added in `docs/privacy-policy.md` and `docs/support.md`; static pages added in `docs/privacy/index.html` and `docs/support/index.html`; GitHub Pages is enabled and the pages are live.
+- Replace `support@commito.app` with a real support email before submission. Preferred future address: `commito.support@gmail.com`, but it still needs to be created and verified.
 - Decide what to do with paid tiers before submission:
-  - Free launch: remove or hide paid plan calls to action, paywall copy, and testing-only plan acceptance.
+  - Free launch: remove or hide paid plan calls to action, paywall copy, and testing-only plan acceptance. Current code treats paid leagues as coming soon with `PAID_LEAGUES_AVAILABLE = false`.
   - Paid launch: implement Apple IAP, purchase restore, entitlement checks, and App Store Connect products.
 - Create a reviewer demo account and include credentials in App Review notes.
 - Ensure Supabase production project, auth providers, email confirmation, redirect URLs, and custom SMTP are production-ready.
@@ -550,11 +551,12 @@ Finish line: anyone opening the app can understand what v1 does without seeing u
 Goal: remove the things Apple is most likely to reject before users even test the app.
 
 - Add account deletion inside the app. Done.
-- Add Privacy Policy URL.
-- Add Support URL.
+- Add Privacy Policy URL. Live: `https://keque.github.io/MicroHabit/privacy/`.
+- Add Support URL. Live: `https://keque.github.io/MicroHabit/support/`.
+- Replace the temporary support email in policy/support pages with a real mailbox before App Store submission.
 - Prepare demo reviewer account.
 - Confirm Sign in with Apple works if other social login is available.
-- Confirm any paid feature is either hidden or handled through Apple IAP.
+- Confirm any paid feature is either hidden or handled through Apple IAP. Free-launch code path now hides testing unlocks and marks paid leagues as coming soon.
 - Remove visible Expo starter content and placeholder imagery.
 
 Finish line: App Store Connect can be filled honestly, and the reviewer has a complete path through the app.

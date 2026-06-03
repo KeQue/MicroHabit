@@ -1,7 +1,8 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { PAID_LEAGUES_AVAILABLE } from "../../constants/launch";
 import { useAuth } from "../../features/auth/useAuth";
 import { supabase } from "../../lib/supabase";
 
@@ -19,8 +20,6 @@ export default function PaywallScreen() {
   const [tier, setTier] = useState<Tier>("free");
   const [error, setError] = useState<string | null>(null);
 
-  const [paywallEnabled, setPaywallEnabled] = useState<boolean>(true);
-
   const load = useCallback(async () => {
     if (!uid) {
       setLoading(false);
@@ -31,15 +30,6 @@ export default function PaywallScreen() {
       setError(null);
       setLoading(true);
 
-      // 1) Read paywall toggle (safer default: ON if anything fails)
-      try {
-        const { data: enabled, error: pe } = await supabase.rpc("get_paywall_enabled");
-        if (!pe) setPaywallEnabled(Boolean(enabled));
-      } catch {
-        setPaywallEnabled(true);
-      }
-
-      // 2) Read tier
       const { data, error: e, status } = await supabase
         .from("profiles")
         .select("plan_tier")
@@ -51,9 +41,7 @@ export default function PaywallScreen() {
       const t = ((data?.plan_tier ?? "free") as Tier) || "free";
       setTier(t);
 
-      // 3) If user already paid => exit paywall
       if (t !== "free") {
-        // If this paywall was triggered by joining with a code, return to Join and prefill it
         if (code) {
           router.replace({
             pathname: "/(app)/league/join",
@@ -93,8 +81,7 @@ export default function PaywallScreen() {
   }
 
   const onPrimaryPress = () => {
-    // Paywall OFF => testing mode => allow picking A/B/C in choose-plan
-    if (!paywallEnabled) {
+    if (PAID_LEAGUES_AVAILABLE) {
       router.push({
         pathname: "/(app)/league/choose-plan",
         params: code ? { source: "paywall", code } : { source: "paywall" },
@@ -102,12 +89,7 @@ export default function PaywallScreen() {
       return;
     }
 
-    // Paywall ON => do NOT route to choose-plan (it only shows Free and causes loop)
-    Alert.alert(
-      "Purchase not implemented",
-      "Payments are not wired yet. For now you can disable the paywall toggle to test A/B/C.",
-      [{ text: "OK" }]
-    );
+    router.replace("/(app)");
   };
 
   return (
@@ -115,7 +97,7 @@ export default function PaywallScreen() {
       <Text style={{ fontSize: 34, fontWeight: "900", color: "white" }}>Upgrade required</Text>
 
       <Text style={{ marginTop: 10, fontSize: 16, color: "#A7B0BC" }}>
-        This action requires a paid plan.
+        Paid commitment leagues are coming soon. This App Store version supports free leagues.
       </Text>
 
       {error ? <Text style={{ marginTop: 12, color: "#FCA5A5" }}>{error}</Text> : null}
@@ -133,7 +115,7 @@ export default function PaywallScreen() {
         }}
       >
         <Text style={{ color: "white", fontSize: 18, fontWeight: "800" }}>
-          {paywallEnabled ? "Purchase a paid plan" : "Choose a paid plan (testing)"}
+          {PAID_LEAGUES_AVAILABLE ? "Choose a paid plan" : "Create a free league"}
         </Text>
       </Pressable>
 
@@ -142,9 +124,6 @@ export default function PaywallScreen() {
       </Pressable>
 
       <Text style={{ marginTop: 16, color: "#334155" }}>Current tier: {tier}</Text>
-      <Text style={{ marginTop: 6, color: "#334155" }}>
-        Paywall enabled: {String(paywallEnabled)}
-      </Text>
     </View>
   );
 }

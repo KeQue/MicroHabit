@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -46,6 +47,7 @@ export default function LeaguesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newActivity, setNewActivity] = useState("");
@@ -181,6 +183,36 @@ export default function LeaguesScreen() {
     router.replace("/(auth)/sign-in");
   }
 
+  function onDeleteAccount() {
+    if (deletingAccount) return;
+
+    Alert.alert(
+      "Delete account?",
+      "This permanently deletes your account, profile, league memberships, and activity logs. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete account",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setDeletingAccount(true);
+              const { error } = await supabase.rpc("delete_my_account");
+              if (error) throw error;
+
+              await supabase.auth.signOut().catch(() => undefined);
+              router.replace("/(auth)/sign-in");
+            } catch (e: any) {
+              Alert.alert("Could not delete account", normalizeErr(e));
+            } finally {
+              setDeletingAccount(false);
+            }
+          },
+        },
+      ]
+    );
+  }
+
   function onStartCreate() {
     setError(null);
     router.push({ pathname: "/league/choose-plan", params: { source: "create" } });
@@ -201,14 +233,25 @@ export default function LeaguesScreen() {
       style={styles.screen}
     >
       <View style={styles.headerRow}>
-        <View>
+        <View style={styles.headerTitleBlock}>
           <Text style={styles.title}>Leagues</Text>
           <Text style={styles.subtitle}>Create or join a league.</Text>
         </View>
 
-        <Pressable onPress={onSignOut} style={styles.headerGhostBtn}>
-          <Text style={styles.headerGhostText}>Sign out</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={onSignOut} style={styles.headerGhostBtn}>
+            <Text style={styles.headerGhostText}>Sign out</Text>
+          </Pressable>
+          <Pressable
+            onPress={onDeleteAccount}
+            disabled={deletingAccount}
+            style={styles.headerDangerBtn}
+          >
+            <Text style={styles.headerDangerText}>
+              {deletingAccount ? "Deleting..." : "Delete account"}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {error ? (
@@ -360,6 +403,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 16,
   },
+  headerTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
   title: {
     fontSize: 40,
     fontWeight: "900",
@@ -377,10 +424,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     marginTop: 6,
   },
+  headerActions: {
+    alignItems: "flex-end",
+    flexShrink: 0,
+  },
   headerGhostText: {
     color: "#C8D0DB",
     fontSize: 15,
     fontWeight: "500",
+  },
+  headerDangerBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  headerDangerText: {
+    color: "#FCA5A5",
+    fontSize: 13,
+    fontWeight: "600",
   },
   errorBox: {
     marginTop: 14,

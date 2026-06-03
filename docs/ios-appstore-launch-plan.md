@@ -434,7 +434,7 @@ npx eas submit --platform ios --profile production
 Goal: avoid obvious App Review rejection reasons.
 
 - Add an in-app account deletion entry point because the app supports account creation. Done in `account-deletion-app-review`.
-- Add public Privacy Policy URL and Support URL for App Store Connect. Drafts added in `docs/privacy-policy.md` and `docs/support.md`; they still need to be published as public URLs.
+- Add public Privacy Policy URL and Support URL for App Store Connect. Drafts added in `docs/privacy-policy.md` and `docs/support.md`; static pages added in `docs/privacy/index.html` and `docs/support/index.html`; they still need GitHub Pages or another public host enabled.
 - Decide what to do with paid tiers before submission:
   - Free launch: remove or hide paid plan calls to action, paywall copy, and testing-only plan acceptance.
   - Paid launch: implement Apple IAP, purchase restore, entitlement checks, and App Store Connect products.

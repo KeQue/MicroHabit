@@ -433,8 +433,8 @@ npx eas submit --platform ios --profile production
 
 Goal: avoid obvious App Review rejection reasons.
 
-- Add an in-app account deletion entry point because the app supports account creation.
-- Add public Privacy Policy URL and Support URL for App Store Connect.
+- Add an in-app account deletion entry point because the app supports account creation. Done in `account-deletion-app-review`.
+- Add public Privacy Policy URL and Support URL for App Store Connect. Drafts added in `docs/privacy-policy.md` and `docs/support.md`; they still need to be published as public URLs.
 - Decide what to do with paid tiers before submission:
   - Free launch: remove or hide paid plan calls to action, paywall copy, and testing-only plan acceptance.
   - Paid launch: implement Apple IAP, purchase restore, entitlement checks, and App Store Connect products.
@@ -549,7 +549,7 @@ Finish line: anyone opening the app can understand what v1 does without seeing u
 
 Goal: remove the things Apple is most likely to reject before users even test the app.
 
-- Add account deletion inside the app.
+- Add account deletion inside the app. Done.
 - Add Privacy Policy URL.
 - Add Support URL.
 - Prepare demo reviewer account.
@@ -626,7 +626,7 @@ Goal: make App Store privacy labels match reality.
 - List every type of user data stored in Supabase.
 - Identify whether each data type is linked to the user.
 - Identify whether each data type is used for tracking. Expected answer should be no unless a tracking SDK is added.
-- Document account deletion behavior.
+- Document account deletion behavior. Drafted in `docs/privacy-policy.md`.
 - Document how league invite codes work.
 - Document local notification behavior.
 - Publish the privacy policy.

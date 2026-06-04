@@ -95,4 +95,5 @@ at the public privacy policy URL used in App Store Connect.
 
 For privacy or support requests, contact:
 
-support@commito.app
+commito.support@gmail.com
+

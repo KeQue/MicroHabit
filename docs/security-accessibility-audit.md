@@ -60,4 +60,5 @@ Reference standards to use for follow-up reviews:
   - switch My View/Ranking;
   - invite, menu, edit display name, sign out, delete account.
 - Test larger text/dynamic type and high-contrast readability on the main league screen.
-- Replace temporary support email copy when the real support inbox is ready.
+- Support email is set to commito.support@gmail.com.
+

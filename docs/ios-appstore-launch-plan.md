@@ -445,7 +445,7 @@ Goal: avoid obvious App Review rejection reasons.
 
 - Add an in-app account deletion entry point because the app supports account creation. Done in `account-deletion-app-review`.
 - Add public Privacy Policy URL and Support URL for App Store Connect. Drafts added in `docs/privacy-policy.md` and `docs/support.md`; static pages added in `docs/privacy/index.html` and `docs/support/index.html`; GitHub Pages is enabled and the pages are live.
-- Replace `support@commito.app` with a real support email before submission. Preferred future address: `commito.support@gmail.com`, but it still needs to be created and verified.
+- Support email is set to `commito.support@gmail.com`.
 - Decide what to do with paid tiers before submission:
   - Free launch: remove or hide paid plan calls to action, paywall copy, and testing-only plan acceptance. Current code treats paid leagues as coming soon with `PAID_LEAGUES_AVAILABLE = false`.
   - Paid launch: implement Apple IAP, purchase restore, entitlement checks, and App Store Connect products.
@@ -563,7 +563,7 @@ Goal: remove the things Apple is most likely to reject before users even test th
 - Add account deletion inside the app. Done.
 - Add Privacy Policy URL. Live: `https://keque.github.io/MicroHabit/privacy/`.
 - Add Support URL. Live: `https://keque.github.io/MicroHabit/support/`.
-- Replace the temporary support email in policy/support pages with a real mailbox before App Store submission.
+- Support email is set to `commito.support@gmail.com`.
 - Prepare demo reviewer account. Notes template drafted in `docs/app-review-notes.md`; real credentials must be created outside git.
 - Confirm Sign in with Apple works if other social login is available.
 - Confirm any paid feature is either hidden or handled through Apple IAP. Free-launch code path now hides testing unlocks and marks paid leagues as coming soon.
@@ -736,3 +736,4 @@ Finish line: the app is live and you have a simple support plan.
 - Apple app privacy details: https://developer.apple.com/app-store/app-privacy-details/
 - Expo iOS production builds: https://docs.expo.dev/tutorial/eas/ios-production-build/
 - Expo iOS submit docs: https://docs.expo.dev/submit/ios/
+

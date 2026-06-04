@@ -54,8 +54,8 @@ https://keque.github.io/MicroHabit/privacy/
 Support:
 https://keque.github.io/MicroHabit/support/
 
-Note: before submission, replace the temporary support email shown on those pages
-with a real mailbox controlled by the developer.
+Support inbox:
+commito.support@gmail.com
 ```
 
 ## Demo Account Creation Checklist
@@ -74,7 +74,8 @@ with a real mailbox controlled by the developer.
 
 - Replace `[REVIEWER_DEMO_EMAIL]`.
 - Replace `[REVIEWER_DEMO_PASSWORD]`.
-- Replace the support email in the privacy/support pages before submission.
+- Support email is set to commito.support@gmail.com.
 - Confirm the Privacy Policy URL works.
 - Confirm the Support URL works.
 - Confirm the selected build is the same build used for the demo-account test.
+

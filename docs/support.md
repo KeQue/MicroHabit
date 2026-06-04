@@ -2,7 +2,7 @@
 
 Need help with Commito? Contact us at:
 
-support@commito.app
+commito.support@gmail.com
 
 ## Common Issues
 
@@ -29,7 +29,7 @@ confirmation before deletion is completed.
 
 ### I found a bug
 
-Email support@commito.app with:
+Email commito.support@gmail.com with:
 
 - The email address used for your account.
 - The league name or invite code, if relevant.
@@ -39,4 +39,5 @@ Email support@commito.app with:
 ## App Review Demo Support
 
 If you are reviewing Commito for the App Store and need help accessing a demo
-account or testing an invite flow, contact support@commito.app.
+account or testing an invite flow, contact commito.support@gmail.com.
+

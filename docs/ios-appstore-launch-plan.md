@@ -424,7 +424,7 @@ Goal: the binary can be built, uploaded, and mapped to the existing App Store Co
 - Confirm `app.config.ts` is the source of truth for Expo config.
 - Verify iOS bundle id: `com.sadik.microhabit`.
 - Verify App Store Connect app id in `eas.json`: `6759626676`.
-- Increment `ios.buildNumber` before every upload. Current value: `24`.
+- Increment `ios.buildNumber` before every upload. Current value: `25`.
 - Keep user-facing version aligned. Current app version: `1.0.2` in `app.config.ts`.
 - Resolve config mismatch: `app.config.ts` has `supportsTablet: false`; `app.json` has `supportsTablet: true`. Done: both configs now use `supportsTablet: false`.
 - Verify production build command:
@@ -673,7 +673,7 @@ Goal: get a real binary into TestFlight.
 - Wait for processing.
 - Add internal testers.
 
-Finish line: build 24 is installable from TestFlight.
+Finish line: build 25 is installable from TestFlight.
 
 ### 10. Run TestFlight Smoke Tests
 

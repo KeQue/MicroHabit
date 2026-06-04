@@ -332,6 +332,7 @@ export default function LeagueDetailScreen() {
   const [leagueName, setLeagueName] = useState<string>("League");
   const [leagueActivity, setLeagueActivity] = useState<string>("");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [leagueIsFree, setLeagueIsFree] = useState<boolean | null>(null);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -498,9 +499,14 @@ Open Commito \u2192 Join \u2192 Paste the code`;
         .single();
       if (leagueErr) throw leagueErr;
 
+      const isFreeLeague = leagueRow?.is_free !== false;
       setLeagueName(leagueRow?.name ?? "League");
       setLeagueActivity(leagueRow?.activity ?? "");
       setInviteCode((leagueRow?.invite_code as string) ?? null);
+      setLeagueIsFree(isFreeLeague);
+      if (!isFreeLeague) {
+        setError("Paid leagues are coming soon. Create or join a free league to track days in this version.");
+      }
 
       const rows = await getLeagueMembers(leagueId);
 
@@ -695,6 +701,11 @@ Open Commito \u2192 Join \u2192 Paste the code`;
       // only allow self
       if (!myId || memberId !== myId) return;
 
+      if (leagueIsFree === false) {
+        setError("Paid leagues are coming soon. Create or join a free league to track days in this version.");
+        return;
+      }
+
       // bounds
       if (day < 0 || day >= monthDays) return;
 
@@ -737,9 +748,12 @@ Open Commito \u2192 Join \u2192 Paste the code`;
               : { ...x, days: x.days.map((v, i) => (i === day ? current : v)) }
           )
         );
+        setError("Could not save this day. Create or join a free league if this is a paid test league.");
+        return;
       }
+      setError(null);
     },
-    [leagueId, members, monthDays, myId, year, month, todayIndex]
+    [leagueId, leagueIsFree, members, monthDays, myId, year, month, todayIndex]
   );
 
   const showInvite = myRole === "owner" || myRole === "admin" || myRole === "member";
@@ -1052,7 +1066,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                       colorDark={member.colorDark}
                       accentActive={member.accentActive}
                       todayIndex={todayIndex}
-                      disabled={!!myId && member.id !== myId}
+                      disabled={(!!myId && member.id !== myId) || leagueIsFree === false}
                       onToggle={(i) => toggleDayForMember(member.id, i)}
                       showRank={viewMode === "Ranking"}
                       rank={rank}

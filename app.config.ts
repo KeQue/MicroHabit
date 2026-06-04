@@ -12,6 +12,7 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: "com.sadik.microhabit",
     supportsTablet: false,
+    usesAppleSignIn: true,
 
     // IMPORTANT: increment this every TestFlight/App Store upload
     // Must be higher than the last uploaded build number

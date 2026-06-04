@@ -10,6 +10,7 @@
     "newArchEnabled": true,
     "ios": {
   "supportsTablet": false,
+  "usesAppleSignIn": true,
   "buildNumber": "25"
 },
     "android": {

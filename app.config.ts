@@ -44,7 +44,7 @@ const config: ExpoConfig = {
       "expo-splash-screen",
       {
         image: "./assets/images/commito-splash.png",
-        imageWidth: 200,
+        imageWidth: 280,
         resizeMode: "contain",
         backgroundColor: "#0B0F14",
         dark: {

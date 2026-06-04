@@ -748,7 +748,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
               : { ...x, days: x.days.map((v, i) => (i === day ? current : v)) }
           )
         );
-        setError("Could not save this day. Create or join a free league if this is a paid test league.");
+        setError("Could not save this day. You can only edit today or yesterday in leagues where tracking is active.");
         return;
       }
       setError(null);

@@ -240,7 +240,7 @@ on the next native build. Do not delete a real account for this UI check.
 - First device check: open Commito from TestFlight, then open Settings and
   confirm `Commito 1.0.2 (27)`. Repeat the pending native checks below.
 
-### Build 28 preparation
+### Build 28 status
 
 - Version 1.0.2 (28) contains the local password-recovery correction described
   above. It does not introduce a separate email-link sign-in option.
@@ -251,8 +251,17 @@ on the next native build. Do not delete a real account for this UI check.
   routing passed. Mismatched passwords never submitted, a failed save stayed
   on the form, and a successful save returned to leagues with confirmation.
 - These synthetic checks do not verify iOS deep links or real password changes.
-  Cloud compilation, TestFlight upload and native recovery verification are
-  pending until their results are recorded.
+- Source checkpoint: [7cc6142](https://github.com/KeQue/MicroHabit/commit/7cc614223fe04eff5abaea821c27a9f6ae2cd4fa).
+  [iOS build](https://expo.dev/accounts/keke12/projects/microhabit/builds/940eb2f9-5309-48ca-9024-fb16e8ac3cd3)
+  finished successfully on October 27, 2026. Expo confirms version 1.0.2,
+  build 28, the exact source checkpoint, and a ready artifact.
+- [TestFlight upload](https://expo.dev/accounts/keke12/projects/microhabit/submissions/c2b597fd-4849-44a8-ac8b-863a0ee26f7a)
+  is FINISHED without a reported error. Apple processing, installation and
+  native password recovery still need verification. No App Store release,
+  branch merge or new backend change was performed.
+- Read-only Supabase auth configuration inspection confirms that
+  `microhabit://update-password` is allowed, with `microhabit://sign-in` as the
+  site URL and a default recovery email template. No auth settings were changed.
 - On build 28, request a fresh reset email, check Spam/Junk, and open its link
   on the iPhone. Expect **Choose a new password**. Save a new password, sign
   out, confirm the old password fails and the new password works. Repeat once

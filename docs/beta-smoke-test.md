@@ -5,6 +5,13 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
 
 ## Authentication hardening candidate 1.0.2 (29), October 27, 2026
 
+Source checkpoint: [6a8d8ad](https://github.com/KeQue/MicroHabit/commit/6a8d8ad7a600933d76dacf36de7b441403f467e8).
+The [iOS build](https://expo.dev/accounts/keke12/projects/microhabit/builds/23f50fcb-2bef-4618-a56b-4bbd8f36559f)
+was queued with version 1.0.2, build 29 and that exact commit. The
+[TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/dd26e04a-b015-4377-8f22-6ecc9cb3ee20)
+was scheduled using existing EAS credentials and is waiting for compilation.
+This is not a completed build/upload or an App Store review/release.
+
 **Public release remains NO-GO.** The earlier build-28 functional results did
 not establish security or public-release readiness. This candidate addresses
 native callback trust, PKCE and local session storage; it does not close the

@@ -46,12 +46,13 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
   metadata checks passed. No user records were modified by deployment.
 - A read-only check of public authentication settings confirmed that email,
   Google, and Apple sign-in are enabled and email confirmation is required.
-  Successful sign-in and recovery flows still need device testing.
+  Configuration alone does not establish native sign-in behaviour; subsequent
+  founder-reported device results are recorded below.
 - Public privacy and support URLs returned HTTP 200 on October 26, 2026.
-  The published pages still lack the local owner-league deletion explanation;
-  the published support page also lacks the UTC check-in explanation. Publish
-  the reviewed documentation updates before wider beta distribution, then
-  recheck the actual page content. Reachability alone is not content approval.
+  They then lacked the owner-league deletion and UTC explanations. The founder
+  approved the documentation-only update on October 27; both pages are now
+  published and their actual HTML was verified against the approved files.
+  See the publication record below. Reachability alone is not content approval.
 
 ## Device result recorded October 26, 2026
 
@@ -283,7 +284,8 @@ on the next native build. Do not delete a real account for this UI check.
   installation have not yet been verified.
 - No public App Store review/release, branch merge, new database migration,
   wider tester invitation, or policy-page publication was performed during this
-  checkpoint. Updated policy pages still need publishing before wider beta.
+  checkpoint. The policy pages were later published on October 27, as recorded
+  below.
 - First device check: open Commito from TestFlight, then open Settings and
   confirm `Commito 1.0.2 (27)`. Repeat the pending native checks below.
 
@@ -363,7 +365,7 @@ client. Native configuration and production authentication redirects can differ.
 
 ## Record failures
 
-### Public-page update prepared October 27, 2026
+### Public-page update published October 27, 2026
 
 - Fresh requests to the public Privacy policy and Support URLs returned HTTP
   200, but the live content still matched the older June wording. The owner
@@ -378,10 +380,19 @@ client. Native configuration and production authentication redirects can differ.
   Existing page styles were retained. These checks do not replace opening the
   links from the actual iPhone app or establish legal compliance.
 - Read-only GitHub Pages settings confirm that publication uses `main:/docs`.
-  Review #2 is draft and unmerged; the public pages have not been updated.
-  Publishing these four documentation files requires founder approval before
-  merging that review. It does not require merging the app beta review or
-  rebuilding Commito. After publication, compare actual served content again.
+  After explicit founder approval, review #2 was merged at
+  `ba145724ad2f3b1aaf24325bd776f3903867265b`. Comparing this commit with the prior
+  main confirms that only the four approved documentation files changed.
+- GitHub Pages reports the merge commit as built, without an error. Subsequent
+  requests to the canonical [Privacy policy](https://keque.github.io/MicroHabit/privacy/)
+  and [Support](https://keque.github.io/MicroHabit/support/) URLs both returned
+  HTTP 200 and matched the approved HTML after line-ending normalization.
+  Both show October 27, 2026, the free-beta wording and owner deletion warning;
+  Support also shows the UTC and Spam/Junk explanations.
+- The app beta review remains draft and unmerged. No app build, public App
+  Store release, database change or Pages-settings change was made for this
+  publication. Opening the links from the actual iPhone app remains a separate
+  native check.
 
 For each failure, record the action, expected result, actual result, UTC time,
 device/build, and whether a refresh/restart changes the outcome. Include a

@@ -3,6 +3,42 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
+## Final verification recorded October 27, 2026
+
+- TypeScript checking, repository ESLint, seven auth callback tests and three
+  UTC calendar tests passed again during the final review.
+- An isolated browser harness ran the actual league detail screen with
+  synthetic data and mocked native components/backend services. Rejected
+  writes and thrown network failures restored the previously checked value
+  and score. Pending writes disabled overlapping edits; a successful change
+  survived a reload of the mocked stored data. Rankings counted completed
+  days only, updated after simulated realtime events, and ordered equal scores
+  by name. This verifies screen logic, not native rendering or live transport.
+- `supabase/tests/account_deletion.sql` passed against the existing isolated
+  schema-only live copy (PostgreSQL 18; production is PostgreSQL 17). It called
+  the real deletion RPC as authenticated synthetic owners/members, verified
+  shared-league/history removal and peer read visibility, and preserved the
+  other account's owned league and an unrelated owner's data. Unauthenticated
+  deletion was rejected. Every fixture and deletion rolled back; no live user
+  data was touched. This does not verify Supabase Auth service/session cleanup
+  or refresh of the installed app after deletion.
+- **Deferred at the founder's request:** The two-account iPhone owner-deletion
+  test was explicitly skipped. Do not mark the native shared-deletion check
+  below as passed based on the isolated SQL result.
+- **Partial device observation:** Today was checked before the founder tried
+  changing it offline, and was unchecked after reconnecting and refreshing.
+  Error visibility and request timing were not confirmed. A request completing
+  when connectivity returned could explain this result; it does not establish
+  failed-save rollback on the phone. The explicit failure cases passed only in
+  the isolated screen harness described above.
+- Review found no app-source/config/dependency changes since the build-28
+  checkpoint `7cc6142`. This pass adds a rollback-only SQL test and updates this
+  record; it requires no new binary. The app review remains unmerged, with no
+  public App Store release or wider tester invitations authorized here.
+- Email Spam placement remains unresolved. Provider cancellation remains
+  deferred. Native simultaneous updates, accessibility/large-text checks and
+  actual UTC rollover observations remain unverified where listed below.
+
 ## Status before device testing
 
 - Local TypeScript checking and full-repository ESLint checks passed during this change.
@@ -107,8 +143,24 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
   `.ConfirmationURL`. No obvious sender mismatch or missing template link was
   found. No email settings were changed by this review. Spam placement has not
   been attributed to a specific cause; sender authentication headers and fresh
-  recipient tests would provide further evidence. A verified sending-domain
-  setup is being considered, pending whether the founder owns a domain.
+  recipient tests would provide further evidence. The founder confirmed on
+  October 27 that no Commito domain is owned yet. No domain was purchased and
+  no SMTP/DNS settings or email providers were changed. The current Gmail
+  setup remains in use. Test delivery to fresh recipient inboxes before wider
+  signup; spam handling remains a known private-beta workaround, not a
+  completed delivery fix.
+- **Final sender decision October 27, 2026:** After Google would not allow
+  App Password creation for the support account, the founder chose to retain
+  `cheosa.silviu@gmail.com` for automated signup and recovery emails, with
+  `commito.support@gmail.com` as the public support/contact inbox. A fresh
+  read-only check confirmed that Supabase's From address and SMTP username
+  both remain the personal Gmail address, using Gmail port 465 and display
+  name Commito; the existing SMTP password remains configured. Public
+  support/privacy pages and their app links already direct support requests
+  to the support inbox. No SMTP settings or reply routing were changed;
+  replies to automated emails are not established as going to the support
+  inbox. The unused local password-entry window was closed. No app rebuild
+  or domain purchase is needed for this decision. Spam placement remains open.
 - **Fail (founder reported, Commito 1.0.2 (27)):** The recovery email opened
   Chrome, requested permission to open Commito, then opened the signed-in app
   without displaying the new-password form. No password change was confirmed.
@@ -369,7 +421,8 @@ build before this request. This is the standalone `com.sadik.microhabit` app,
 distinct from the SDK-compatible Expo client. The production Expo environment's
 two public Supabase configuration values matched the tested local environment.
 
-All of these remain pending even if ordinary tracking works in the SDK 54 Expo
+The results below supersede the earlier build-26 pending status. Unchecked
+items remain unverified even if ordinary tracking works in the SDK 54 Expo
 client. Native configuration and production authentication redirects can differ.
 
 - [x] Email confirmation works after moving the message out of Gmail Spam
@@ -398,8 +451,10 @@ client. Native configuration and production authentication redirects can differ.
   check-in persistence after closing/reopening Commito (founder reported during
   the TestFlight checks). Settings policy links and post-deletion login rejection
   also passed as recorded above.
-- [ ] Simultaneous two-device updates and shared-league deletion checks on the
-  actual build intended for beta distribution remain separate.
+- [ ] Simultaneous two-device updates on the actual beta build remain unverified.
+- [ ] **Deferred at the founder's request:** Shared-league owner deletion on the
+  installed app. The isolated SQL deletion test passed; native refresh and
+  navigation after deletion were not tested.
 
 ## Record failures
 

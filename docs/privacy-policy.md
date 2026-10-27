@@ -1,6 +1,6 @@
 # Commito Privacy Policy
 
-Last updated: June 3, 2026
+Last updated: October 26, 2026
 
 Commito helps people create or join monthly accountability leagues with friends.
 This policy explains what information the app collects, why it is used, and how
@@ -60,6 +60,10 @@ block core app functionality.
 Users can delete their account inside the app from the Account menu. Account
 deletion removes the user account, profile, league memberships, habit logs, and
 related user data from the app database where technically possible.
+
+Deleting an account also deletes leagues created by that account, including
+the shared check-in history for all members of those leagues. This cannot be
+undone.
 
 Some records may be retained if required for legal, security, fraud prevention,
 financial, tax, or compliance reasons.

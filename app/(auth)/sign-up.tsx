@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +13,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../features/auth/useAuth";
 import { supabase } from "../../lib/supabase";
+import { PolicyLinks } from "../../components/PolicyLinks";
 
 const INPUT_BG = "rgba(255,255,255,0.04)";
 const INPUT_BORDER = "rgba(255,255,255,0.12)";
@@ -54,7 +56,7 @@ export default function SignUpScreen() {
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={styles.flex}
       >
-        <View style={styles.shell}>
+        <ScrollView contentContainerStyle={styles.shell} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
             <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Create account</Text>
@@ -181,8 +183,9 @@ export default function SignUpScreen() {
             <Link href="/(auth)/sign-in" style={styles.secondaryLink}>
               Back to sign in
             </Link>
+            <PolicyLinks />
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -196,7 +199,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   shell: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 22,
     paddingTop: 88,
     paddingBottom: 28,

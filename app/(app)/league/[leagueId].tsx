@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { AccountMenuSheet } from "@/components/AccountMenuSheet";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { deleteCurrentAccount } from "@/features/auth/account";
+import { canEditUtcDate, millisecondsUntilNextUtcDay, utcCalendar, utcDateKey } from "@/features/leagues/utc-calendar";
 import { getLeagueMembers } from "@/features/leagues/api";
 import { scheduleGentleTestNotification } from "@/features/notifications/local";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Alert,
   Animated,
   Modal,
@@ -135,20 +138,6 @@ function emojiForActivity(activity?: string | null) {
   if (value.includes("yoga") || value.includes("mobility") || value.includes("stretch")) return "\u{1F9D8}";
   if (value.includes("swim")) return "\u{1F3CA}";
   return "\u2728";
-}
-
-// Date helpers (LOCAL, no timezone bugs)
-function pad2(n: number) {
-  return n < 10 ? `0${n}` : `${n}`;
-}
-function toDateOnlyLocal(d: Date) {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-function startOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-function endOfMonth(d: Date) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
 
 // count ONLY boolean true
@@ -313,11 +302,34 @@ export default function LeagueDetailScreen() {
   const params = useLocalSearchParams<{ leagueId: string }>();
   const leagueId = typeof params.leagueId === "string" ? params.leagueId : "";
 
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const todayIndex = today.getDate() - 1;
-  const monthDays = useMemo(() => new Date(year, month + 1, 0).getDate(), [year, month]);
+  const [utcDay, setUtcDay] = useState(() => utcDateKey());
+  const { year, month, todayIndex, monthDays, start, end, yesterday, yesterdayOutsideMonth } =
+    useMemo(() => utcCalendar(new Date(`${utcDay}T00:00:00Z`)), [utcDay]);
+  const [yesterdayCompleted, setYesterdayCompleted] = useState(false);
+  const [savingDay, setSavingDay] = useState(false);
+  const saveInProgress = useRef(false);
+  const loadGeneration = useRef(0);
+  const displayedDay = useRef(utcDay);
+  const displayedLeague = useRef(leagueId);
+  displayedDay.current = utcDay;
+  displayedLeague.current = leagueId;
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const refreshDay = () => {
+      setUtcDay(utcDateKey());
+      clearTimeout(timer);
+      timer = setTimeout(refreshDay, millisecondsUntilNextUtcDay() + 50);
+    };
+    refreshDay();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshDay();
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, []);
 
   const [viewMode, setViewMode] = useState<"My View" | "Ranking">("My View");
 
@@ -325,6 +337,9 @@ export default function LeagueDetailScreen() {
   const [myRole, setMyRole] = useState<string>("member");
 
   const [members, setMembers] = useState<Member[]>([]);
+  const [loadedCalendarKey, setLoadedCalendarKey] = useState<string | null>(null);
+  const calendarKey = `${leagueId}:${start}`;
+  const hasCurrentCalendarData = loadedCalendarKey === calendarKey;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -354,7 +369,7 @@ export default function LeagueDetailScreen() {
 
     Alert.alert(
       "Delete account?",
-      "This permanently deletes your account, profile, league memberships, and activity logs. This cannot be undone.",
+      "This permanently deletes your account, profile, league memberships, and activity logs. Any leagues you own and their shared history are also deleted for all members. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -478,12 +493,15 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 
   const load = useCallback(async () => {
     if (!leagueId) return;
+    const generation = ++loadGeneration.current;
+    const isCurrent = () => generation === loadGeneration.current && displayedDay.current === utcDay && displayedLeague.current === leagueId;
 
     try {
       setError(null);
       setLoading(true);
 
       const { data: userRes, error: userErr } = await supabase.auth.getUser();
+      if (!isCurrent()) return;
       if (userErr) throw userErr;
       const user = userRes.user;
       if (!user) {
@@ -497,6 +515,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
         .select("id,name,activity,plan_tier,is_free,invite_code")
         .eq("id", leagueId)
         .single();
+      if (!isCurrent()) return;
       if (leagueErr) throw leagueErr;
 
       const isFreeLeague = leagueRow?.is_free !== false;
@@ -509,6 +528,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
       }
 
       const rows = await getLeagueMembers(leagueId);
+      if (!isCurrent()) return;
 
       const me = rows.find((r: any) => r.user_id === user.id);
       setMyRole((me?.role as string) ?? "member");
@@ -531,9 +551,9 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           return a.user_id.localeCompare(b.user_id);
         });
 
-      const from = toDateOnlyLocal(startOfMonth(new Date(year, month, 1)));
-      const to = toDateOnlyLocal(endOfMonth(new Date(year, month, 1)));
-      const logs = await fetchMonthLogs(leagueId, from, to);
+      const logs = await fetchMonthLogs(leagueId, yesterdayOutsideMonth ? yesterday : start, end);
+      if (!isCurrent()) return;
+      setYesterdayCompleted(logs.some((row) => row.user_id === user.id && row.log_date === yesterday && row.completed));
 
       const daysByUser = new Map<string, boolean[]>();
       for (const m of normalized) {
@@ -545,8 +565,9 @@ Open Commito \u2192 Join \u2192 Paste the code`;
         const arr = daysByUser.get(uid);
         if (!arr) continue;
 
-        const d = new Date(row.log_date + "T00:00:00");
-        const idx = d.getDate() - 1;
+        const d = new Date(row.log_date + "T00:00:00Z");
+        if (row.log_date < start) continue;
+        const idx = d.getUTCDate() - 1;
         if (idx < 0 || idx >= arr.length) continue;
 
         arr[idx] = !!row.completed;
@@ -567,12 +588,13 @@ Open Commito \u2192 Join \u2192 Paste the code`;
       });
 
       setMembers(nextMembers);
+      setLoadedCalendarKey(`${leagueId}:${start}`);
     } catch (e: any) {
-      setError(e?.message ?? "Failed to load league");
+      if (isCurrent()) setError(e?.message ?? "Failed to load league");
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [leagueId, month, monthDays, router, year]);
+  }, [leagueId, monthDays, router, start, end, yesterday, yesterdayOutsideMonth, utcDay]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -585,6 +607,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 
   useEffect(() => {
     void load();
+    return () => { loadGeneration.current += 1; };
   }, [load]);
 
   useEffect(() => {
@@ -608,10 +631,13 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           const row = payload?.new ?? payload?.old;
           if (!row) return;
 
-          const d = new Date(row.log_date + "T00:00:00");
-          if (d.getFullYear() !== year || d.getMonth() !== month) return;
+          const d = new Date(row.log_date + "T00:00:00Z");
+          if (yesterdayOutsideMonth && row.log_date === yesterday && row.user_id === myId) {
+            setYesterdayCompleted(!!row.completed);
+          }
+          if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month) return;
 
-          const idx = d.getDate() - 1;
+          const idx = d.getUTCDate() - 1;
           if (idx < 0 || idx >= monthDays) return;
 
           const value = !!row.completed;
@@ -632,7 +658,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [leagueId, year, month, monthDays]);
+  }, [leagueId, year, month, monthDays, myId, yesterday, yesterdayOutsideMonth]);
 
   useEffect(() => {
     if (!leagueId) return;
@@ -654,6 +680,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
   }, [leagueId, load]);
 
   const membersToRender = useMemo((): RenderedMember[] => {
+    if (!hasCurrentCalendarData) return [];
     if (viewMode === "Ranking") {
       const ranked = [...members]
         .map((m) => ({ m, s: scoreDays(m.days) }))
@@ -692,69 +719,58 @@ Open Commito \u2192 Join \u2192 Paste the code`;
     if (i <= 0) return members.map((member) => ({ member }));
     const me = members[i];
     return [me, ...members.slice(0, i), ...members.slice(i + 1)].map((member) => ({ member }));
-  }, [members, myId, viewMode]);
+  }, [members, myId, viewMode, hasCurrentCalendarData]);
 
-  const toggleDayForMember = useCallback(
-    async (memberId: string, dayIndex: string | number) => {
-      const day = typeof dayIndex === "number" ? dayIndex : Number(dayIndex);
-
-      // only allow self
-      if (!myId || memberId !== myId) return;
-
+  const toggleDate = useCallback(
+    async (memberId: string, logDate: string) => {
+      if (!myId || memberId !== myId || saveInProgress.current || !hasCurrentCalendarData) return;
       if (leagueIsFree === false) {
         setError("Paid leagues are coming soon. Create or join a free league to track days in this version.");
         return;
       }
-
-      // bounds
-      if (day < 0 || day >= monthDays) return;
-
-      // no future
-      if (day > todayIndex) return;
-
-      // âœ… NEW: only today + yesterday
-      if (!isEditableDay(day, todayIndex)) return;
-
-      const d = new Date(year, month, day + 1);
-      const log_date = toDateOnlyLocal(d);
-
-      const current = members.find((m) => m.id === myId)?.days?.[day] ?? false;
-      const next = !current;
-
-      // optimistic UI
-      setMembers((prev) =>
-        prev.map((x) =>
-          x.id !== memberId ? x : { ...x, days: x.days.map((v, i) => (i === day ? next : v)) }
-        )
-      );
-
-      const { error } = await supabase.from("daily_logs").upsert(
-        {
-          league_id: leagueId,
-          user_id: myId,
-          log_date,
-          completed: next,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "league_id,user_id,log_date" }
-      );
-
-      // revert if failed
-      if (error) {
-        setMembers((prev) =>
-          prev.map((x) =>
-            x.id !== memberId
-              ? x
-              : { ...x, days: x.days.map((v, i) => (i === day ? current : v)) }
-          )
-        );
-        setError("Could not save this day. You can only edit today or yesterday in leagues where tracking is active.");
+      // Recheck at press time: a screen may still be catching up after midnight.
+      const now = new Date();
+      if (utcDateKey(now) !== utcDay || !canEditUtcDate(logDate, now)) {
+        setUtcDay(utcDateKey(now));
         return;
       }
-      setError(null);
+      const outsideMonth = logDate < start;
+      const day = Number(logDate.slice(8, 10)) - 1;
+      const current = outsideMonth ? yesterdayCompleted : members.find((m) => m.id === myId)?.days[day] ?? false;
+      const next = !current;
+      const updateValue = (value: boolean) => {
+        if (displayedDay.current !== utcDay || displayedLeague.current !== leagueId) return;
+        if (outsideMonth) setYesterdayCompleted(value);
+        else setMembers((prev) => prev.map((m) => m.id !== memberId ? m : {
+          ...m, days: m.days.map((v, i) => i === day ? value : v),
+        }));
+      };
+      saveInProgress.current = true;
+      setSavingDay(true);
+      updateValue(next);
+      try {
+        const { error: saveError } = await supabase.from("daily_logs").upsert({
+          league_id: leagueId, user_id: myId, log_date: logDate,
+          completed: next, updated_at: new Date().toISOString(),
+        }, { onConflict: "league_id,user_id,log_date" });
+        if (saveError) throw saveError;
+        setError(null);
+      } catch {
+        updateValue(current);
+        setError("Could not save this day. You can only edit today or yesterday (UTC) in leagues where tracking is active.");
+      } finally {
+        saveInProgress.current = false;
+        setSavingDay(false);
+      }
     },
-    [leagueId, leagueIsFree, members, monthDays, myId, year, month, todayIndex]
+    [leagueId, leagueIsFree, members, myId, start, utcDay, yesterdayCompleted, hasCurrentCalendarData]
   );
+
+  const toggleDayForMember = (memberId: string, dayIndex: string | number) => {
+    const day = Number(dayIndex);
+    if (!Number.isInteger(day) || day < 0 || day >= monthDays || !isEditableDay(day, todayIndex)) return;
+    void toggleDate(memberId, `${start.slice(0, 8)}${String(day + 1).padStart(2, "0")}`);
+  };
 
   const showInvite = myRole === "owner" || myRole === "admin" || myRole === "member";
   const bgColors =
@@ -811,56 +827,31 @@ Open Commito \u2192 Join \u2192 Paste the code`;
           </Pressable>
         </Modal>
 
-        <Modal
+        <AccountMenuSheet
           visible={menuOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setMenuOpen(false)}
-        >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setMenuOpen(false)}
-            accessible={false}
-          >
-            <Pressable style={styles.menuCard} onPress={() => {}} accessible={false}>
-              <Text style={styles.menuTitle}>Menu</Text>
-              <PillButton
-                label="Back"
-                size="sm"
-                onPress={() => {
-                  setMenuOpen(false);
-                  router.back();
-                }}
-              />
-              <PillButton
-                label="Sign out"
-                size="sm"
-                onPress={async () => {
-                  setMenuOpen(false);
-                  await onSignOut();
-                }}
-              />
-              <PillButton
-                label={deletingAccount ? "Deleting..." : "Delete account"}
-                size="sm"
-                tone="danger"
-                disabled={deletingAccount}
-                onPress={onDeleteAccount}
-              />
-              {__DEV__ ? (
-                <PillButton
-                  label="Test notification"
-                  size="sm"
-                  onPress={async () => {
-                    setMenuOpen(false);
-                    await scheduleGentleTestNotification();
-                  }}
-                />
-              ) : null}
-              <PillButton label="Close" size="sm" onPress={() => setMenuOpen(false)} />
-            </Pressable>
-          </Pressable>
-        </Modal>
+          onClose={() => setMenuOpen(false)}
+          onCheckInRules={() => {
+            setMenuOpen(false);
+            Alert.alert(
+              "Check-in rules",
+              "You can mark today and yesterday complete or incomplete. Earlier days and future days are locked. All league members share the same day boundary: 00:00 UTC. The calendar and monthly rankings follow this cutoff."
+            );
+          }}
+          onBack={() => {
+            setMenuOpen(false);
+            router.back();
+          }}
+          onSignOut={async () => {
+            setMenuOpen(false);
+            await onSignOut();
+          }}
+          onDeleteAccount={onDeleteAccount}
+          deletingAccount={deletingAccount}
+          onTestNotification={__DEV__ ? async () => {
+            setMenuOpen(false);
+            await scheduleGentleTestNotification();
+          } : undefined}
+        />
 
         <Modal
           visible={editNameOpen}
@@ -1023,6 +1014,16 @@ Open Commito \u2192 Join \u2192 Paste the code`;
             </View>
           ) : null}
 
+          {!loading && hasCurrentCalendarData && yesterdayOutsideMonth && myId && leagueIsFree !== false ? (
+            <View style={{ alignItems: "flex-start", gap: 8, marginBottom: 16 }}>
+              <PillButton
+                label={`${yesterdayCompleted ? "Undo" : "Complete"} yesterday (${yesterday})`}
+                onPress={() => toggleDate(myId, yesterday)}
+                disabled={savingDay}
+              />
+              <Text style={styles.activityChipText}>Previous month; excluded from current month rankings.</Text>
+            </View>
+          ) : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           {viewMode === "Ranking" ? (
@@ -1035,6 +1036,8 @@ Open Commito \u2192 Join \u2192 Paste the code`;
               <MemberCardSkeleton />
               <MemberCardSkeleton />
             </View>
+          ) : !hasCurrentCalendarData ? (
+            <Text style={styles.errorText}>Pull to refresh to load the current month of check-ins.</Text>
           ) : (
             <Animated.View
               style={{
@@ -1066,7 +1069,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
                       colorDark={member.colorDark}
                       accentActive={member.accentActive}
                       todayIndex={todayIndex}
-                      disabled={(!!myId && member.id !== myId) || leagueIsFree === false}
+                      disabled={(!!myId && member.id !== myId) || leagueIsFree === false || savingDay}
                       onToggle={(i) => toggleDayForMember(member.id, i)}
                       showRank={viewMode === "Ranking"}
                       rank={rank}

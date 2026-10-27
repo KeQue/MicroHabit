@@ -20,12 +20,18 @@ exactly as shown.
 ### My habit day did not save
 
 Check your internet connection, then pull to refresh the league screen. Commito
-only allows editing today and yesterday in the current MVP.
+uses UTC for check-in dates and monthly rankings. Only today and yesterday in UTC
+can be edited. A new check-in day starts at 00:00 UTC, which may differ from local
+midnight. On the first day of a month, use the separate yesterday check-in control
+to edit the previous month's final day.
 
 ### I want to delete my account
 
 Open the app, go to the Account menu, and choose Delete account. You will see a
 confirmation before deletion is completed.
+
+Deleting your account also deletes leagues you created and their shared check-in
+history for all members. This cannot be undone.
 
 ### I found a bug
 

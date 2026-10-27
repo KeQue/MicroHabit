@@ -11,7 +11,7 @@
     "ios": {
   "supportsTablet": false,
   "usesAppleSignIn": true,
-  "buildNumber": "25"
+  "buildNumber": "27"
 },
     "android": {
       "adaptiveIcon": {

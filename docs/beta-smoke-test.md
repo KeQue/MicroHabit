@@ -79,7 +79,13 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
 ## Authentication results recorded October 27, 2026
 
 - **Pass (founder reported):** Sign-in and sign-out worked during the current
-  TestFlight check. A full restart while signed out was not separately reported.
+  TestFlight check. The founder subsequently tapped Sign out, fully closed and
+  reopened Commito, confirmed it was still signed out, and successfully signed
+  in again with Apple. This completes the observed sign-out/restart flow.
+- **Pass (founder reported):** Closing and reopening Commito without tapping
+  Sign out preserved the signed-in session and displayed the league selection.
+  The founder clarified that Sign out had not been tapped; this is session
+  persistence, not verification of remaining signed out after restart.
 - **Delivered to Spam (founder reported):** The recovery email arrived in Spam;
   the original missing-email report was not a delivery failure.
 - **Fail (founder reported, Commito 1.0.2 (27)):** The recovery email opened
@@ -93,6 +99,12 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
   remain pending as distinct cases.
 - **Pass (founder reported during the TestFlight checks):** Google sign-in
   worked. Provider cancellation was not separately tested.
+- **Pass (founder reported after the disposable-account deletion test):**
+  Signing in with the deleted account's email/password returned invalid email
+  or password. This confirms the observed post-deletion login rejection.
+  Email confirmation, check-in persistence during that test, and removal of
+  the deleted owner's leagues from another member's view were not separately
+  reported; those observations are not inferred from the login error.
 - **Fail (founder reported):** Apple sign-in returned an external-code exchange
   error after account selection. A read-only query found a matching Supabase
   auth error at 2026-10-27 11:38:21 UTC with Apple's `invalid_client` response.
@@ -334,9 +346,13 @@ client. Native configuration and production authentication redirects can differ.
 - [x] Google sign-in completes on the iPhone (founder reported).
 - [x] Apple sign-in completes on the iPhone (founder reported after the October
   27 credential renewal). The previously observed error was `invalid_client`.
-- [ ] Provider cancellation returns to a usable screen. An Expo client failure
-  is not sufficient evidence that the standalone flow is broken.
-- [ ] Sign out and restart: private screens are unavailable until sign-in.
+- [ ] **Deferred at the founder's request:** Provider cancellation returns to a
+  usable screen. This check was skipped, not passed. An Expo client failure is
+  not sufficient evidence that the standalone flow is broken.
+- [x] Sign out and restart: the app remained signed out after closing/reopening,
+  then Apple sign-in succeeded (founder reported).
+- [x] After deleting the disposable account, email/password sign-in is rejected
+  (founder reported). Shared-league deletion/cascade checks remain separate.
 - [ ] Allow notifications and verify a local daily reminder arrives at 17:00
   device-local time. These are local reminders, not server notifications. Denying
   permission should not prevent using leagues. The developer-only short test
@@ -346,6 +362,26 @@ client. Native configuration and production authentication redirects can differ.
   deletion on the actual build intended for beta distribution.
 
 ## Record failures
+
+### Public-page update prepared October 27, 2026
+
+- Fresh requests to the public Privacy policy and Support URLs returned HTTP
+  200, but the live content still matched the older June wording. The owner
+  deletion warning and UTC check-in explanation were absent.
+- [Documentation-only review](https://github.com/KeQue/MicroHabit/pull/2)
+  prepares the two HTML pages and their Markdown copies, based directly on
+  current `main`. It includes the free-beta scope, owner-league deletion warning,
+  UTC rules, reset-email/Spam guidance, current Google email-delivery service,
+  local reminders, and version/build information for support requests.
+- HTML and Markdown content match. Isolated browser checks passed at 320px and
+  390px: one page heading, contact-link targets, and no horizontal overflow.
+  Existing page styles were retained. These checks do not replace opening the
+  links from the actual iPhone app or establish legal compliance.
+- Read-only GitHub Pages settings confirm that publication uses `main:/docs`.
+  Review #2 is draft and unmerged; the public pages have not been updated.
+  Publishing these four documentation files requires founder approval before
+  merging that review. It does not require merging the app beta review or
+  rebuilding Commito. After publication, compare actual served content again.
 
 For each failure, record the action, expected result, actual result, UTC time,
 device/build, and whether a refresh/restart changes the outcome. Include a

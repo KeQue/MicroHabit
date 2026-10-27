@@ -1,8 +1,9 @@
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import * as Linking from "expo-linking";
 import { Stack, useRouter, useSegments } from "expo-router";
-import React, { useEffect, useRef } from "react";
-import { consumeAuthCallbackUrl, isAuthCallbackUrl } from "../features/auth/links";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
+import { isAuthCallbackUrl } from "../features/auth/links";
 import {
   cancelGentleDailyReminder,
   configureNotifications,
@@ -11,10 +12,11 @@ import {
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
 
 function RouteGate() {
-  const { user, initializing } = useAuth();
+  const { user, initializing, passwordRecovery, processingAuthLink, handleAuthCallback } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const lastHandledUrlRef = useRef<string | null>(null);
+  const [initialLinkChecked, setInitialLinkChecked] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -23,10 +25,11 @@ function RouteGate() {
       if (!isAuthCallbackUrl(url) || lastHandledUrlRef.current === url) return;
       lastHandledUrlRef.current = url;
 
-      const result = await consumeAuthCallbackUrl(url);
+      const result = await handleAuthCallback(url);
       if (!active || result.kind === "none") return;
 
       if (result.kind === "error") {
+        Alert.alert("Could not open link", result.message);
         router.replace({
           pathname: "/(auth)/sign-in",
           params: { error: result.message },
@@ -42,10 +45,16 @@ function RouteGate() {
       router.replace("/(app)");
     };
 
-    void Linking.getInitialURL().then((url) => {
-      if (!active || !url) return;
-      void handleAuthUrl(url);
-    });
+    void (async () => {
+      try {
+        const url = await Linking.getInitialURL();
+        if (active && url) await handleAuthUrl(url);
+      } catch {
+        if (active) Alert.alert("Could not open link", "Please reopen the email link, or request a new one.");
+      } finally {
+        if (active) setInitialLinkChecked(true);
+      }
+    })();
 
     const sub = Linking.addEventListener("url", ({ url }) => {
       void handleAuthUrl(url);
@@ -55,10 +64,10 @@ function RouteGate() {
       active = false;
       sub.remove();
     };
-  }, [router]);
+  }, [router, handleAuthCallback]);
 
   useEffect(() => {
-    if (initializing) return;
+    if (initializing || !initialLinkChecked || processingAuthLink) return;
 
     const group = segments[0]; // "(auth)" | "(app)" | etc.
     const inAuthGroup = group === "(auth)";
@@ -71,8 +80,13 @@ function RouteGate() {
       return;
     }
 
+    if (passwordRecovery) {
+      if (!allowSignedInAuthScreen) router.replace("/(auth)/update-password");
+      return;
+    }
+
     if (!inAppGroup && !allowSignedInAuthScreen) router.replace("/(app)");
-  }, [user, initializing, segments, router]);
+  }, [user, initializing, initialLinkChecked, processingAuthLink, passwordRecovery, segments, router]);
 
   useEffect(() => {
     if (initializing) return;

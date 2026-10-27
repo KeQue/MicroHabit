@@ -76,6 +76,29 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
   The deployed restriction now denies app and anonymous roles access while
   preserving trusted backend access. Payments remain disabled in the app.
 
+## Authentication results recorded October 27, 2026
+
+- **Pass (founder reported):** Sign-in and sign-out worked during the current
+  TestFlight check. A full restart while signed out was not separately reported.
+- **Delivered to Spam (founder reported):** The recovery email arrived in Spam;
+  the original missing-email report was not a delivery failure.
+- **Fail (founder reported, Commito 1.0.2 (27)):** The recovery email opened
+  Chrome, requested permission to open Commito, then opened the signed-in app
+  without displaying the new-password form. No password change was confirmed.
+- **Local correction, not in build 27:** Recognize recovery from the reset path
+  as well as the link type, handle native and Expo callback paths, and hold
+  ordinary sign-in routing while the initial link/session is being processed.
+  Recovery stays on the password form until a successful change. The success
+  message now accurately says the password was saved and keeps the user signed
+  in. Reset-request copy mentions Spam/Junk without claiming delivery.
+- Automated callback tests use synthetic tokens and mocked authentication;
+  they cover native/Expo formats, PKCE without a type parameter, ordinary
+  sign-in, expired/incomplete links, and exchange/network failures. These tests
+  do not prove native routing, email configuration, or a real password change.
+  Repeat recovery with a fresh email on the next standalone build, both with
+  Commito closed and already open. Confirm the new password works and the old
+  password fails. No additional email was requested by the assistant.
+
 ## Prepare the test
 
 1. Use two email addresses you control. Keep passwords outside this repository.
@@ -216,6 +239,24 @@ on the next native build. Do not delete a real account for this UI check.
   checkpoint. Updated policy pages still need publishing before wider beta.
 - First device check: open Commito from TestFlight, then open Settings and
   confirm `Commito 1.0.2 (27)`. Repeat the pending native checks below.
+
+### Build 28 preparation
+
+- Version 1.0.2 (28) contains the local password-recovery correction described
+  above. It does not introduce a separate email-link sign-in option.
+- TypeScript, repository ESLint, seven callback tests and three UTC tests pass.
+  An isolated browser harness ran the actual auth provider, route gate and
+  password screen with mocked native services/authentication. Cold and warm
+  recovery, PKCE without a type parameter, ordinary OAuth and expired-link
+  routing passed. Mismatched passwords never submitted, a failed save stayed
+  on the form, and a successful save returned to leagues with confirmation.
+- These synthetic checks do not verify iOS deep links or real password changes.
+  Cloud compilation, TestFlight upload and native recovery verification are
+  pending until their results are recorded.
+- On build 28, request a fresh reset email, check Spam/Junk, and open its link
+  on the iPhone. Expect **Choose a new password**. Save a new password, sign
+  out, confirm the old password fails and the new password works. Repeat once
+  with Commito fully closed and once with it already running, using fresh links.
 
 ### Build 26 status
 

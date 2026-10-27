@@ -3,6 +3,21 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Separate functional passes from release security
+
+- Observation: successful sign-in/recovery and a saved review branch were
+  described as completing the agreed checks, but a subsequent audit exposed
+  callback-origin and implicit-flow risks outside those functional tests.
+- Correction: label the verification scope explicitly. A functional pass does
+  not close authentication trust boundaries, provider deletion integration,
+  native storage, or public-release requirements. Skipped device checks remain
+  skipped even when related SQL assertions pass.
+- Transfer checks: an unrelated-origin callback and URL-supplied recovery type
+  must not authenticate; wrong/missing PKCE verifiers must fail; failed secure
+  storage migration must retain the old session for retry without publishing
+  partial protected data. The build-29 automated tests exercise these cases.
+  Actual native Keychain/provider flows remain pending until device testing.
+
 ## Assess the requested subject
 
 - Observation: a request to improve assistant quality became a founder-training

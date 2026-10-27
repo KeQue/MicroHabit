@@ -3,6 +3,77 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
+## Authentication hardening candidate 1.0.2 (29), October 27, 2026
+
+**Public release remains NO-GO.** The earlier build-28 functional results did
+not establish security or public-release readiness. This candidate addresses
+native callback trust, PKCE and local session storage; it does not close the
+entire subsequent audit. Installed build 28 does not contain these changes.
+
+- Fresh protected Supabase inspection succeeded through read-only management
+  queries: 27 public functions, 29 policies, and RLS enabled on all public tables.
+  Function definitions/ACLs, policies, RLS settings, table/column grants, view
+  definitions/options, constraints and nullability match the isolated copy after
+  normalizing database names, line endings and PostgreSQL 17/18 NOT NULL catalog
+  representation. All six public views use security-invoker semantics. The six
+  privileged function signatures (including both legacy log toggles) remain
+  service-role only. No production settings or user records were changed.
+- Live migration versions are still `20260312`, `20261026`, `20261026150000`,
+  and `20261026160000`. Historical migration/schema-file reconciliation is not
+  complete. These observations are not permission to replay older migrations.
+- The four existing isolated SQL suites passed again. The new repeatable
+  `supabase/tests/checkin_authorization.sql` additionally checks authenticated
+  check-in persistence, old-date/paid writes, cross-user updates, direct
+  membership injection/deletion, role escalation, privileged legacy grants,
+  outsider reads (including ranking views), and outsider writes. All fixtures
+  roll back. This is role-level SQL testing, not fresh authenticated requests
+  through the hosted Supabase Auth/PostgREST services.
+- The client explicitly uses PKCE. Native crypto supplies secure random values
+  and SHA-256 for the SDK's S256 challenge rather than its plain fallback.
+  Exchanges require the verifier created by the initiating device. Callback
+  addresses must match the app-generated sign-in/reset addresses; Expo callbacks
+  are allowed only for that specific development address. Unrelated origins,
+  embedded credentials, duplicate parameters and token-bearing implicit links
+  cannot establish a session. Recovery is bound to the local reset flow rather
+  than a URL-supplied type. OAuth cancellation/browser errors clear the verifier.
+- Native session/verifier values now use Expo SecureStore (device-only Keychain
+  accessibility on iOS). Bounded chunks support large Unicode sessions; a
+  manifest is published only after every chunk is written. Existing AsyncStorage
+  sessions migrate on read and their plaintext copy is removed after success.
+  A failed migration retains its source for retry. Sign-out removes protected
+  values and the legacy copy. Web retains the existing AsyncStorage adapter;
+  native storage tests do not establish browser storage security. Keychain data
+  may survive iOS uninstall; reinstall/session-expiry behaviour needs device QA.
+- TypeScript, repository ESLint and whitespace checks passed. All 23 automated
+  tests passed: 8 callback, 6 SDK/PKCE/crypto, 6 storage, and 3 UTC tests. SDK
+  tests use synthetic endpoints and mocked token responses; no emails are sent.
+  Tests exercise S256 through the native-crypto bridge, missing/wrong verifiers,
+  one-use exchange, recovery flow markers, migration failure, replacement failure,
+  missing/corrupt chunks, and sign-out without legacy-session resurrection.
+- An isolated browser harness ran the actual auth provider, route gate and
+  password form with native/backend services mocked: cold/warm PKCE recovery,
+  ordinary OAuth, expired links, failed/successful password saves, rejection of
+  unrelated native callback events, and cancellation/browser-failure cleanup
+  passed. An iOS Hermes JS export also passed. Neither verifies real Keychain
+  calls, provider consent or hosted PKCE exchange on an iPhone.
+- After installing the new candidate, request NEW confirmation/reset emails
+  from that device. Old token-based links are deliberately rejected. Open the
+  newest link on the same device/client that requested it. A reset/new signup
+  replaces the previous pending verifier. Confirmation resend requires a pending
+  sign-in verifier; otherwise the UI directs the user to start signup again.
+- **Required candidate device checks:** upgrade from build 28 while signed in;
+  restart and confirm session migration; explicit sign-out/restart; fresh email
+  signup/confirmation (including resend); Google and Apple login; fresh reset
+  links with the app closed and open; new password accepted/old password rejected.
+  Repeat cancellation on the candidate if practical. These are pending and
+  cannot inherit the passes from build 28.
+- **Other audit gates remain open:** Apple authorization revocation/deletion
+  integration, public shared-content safeguards, privacy/controller disclosures,
+  email Spam/capacity, relevant dependency advisories (npm still reports 49),
+  abuse/idempotency controls, operations and the unperformed final-device/release
+  checks. Verified HTTPS Universal Links are not configured. PKCE mitigates code
+  interception; it does not make the custom URL scheme exclusive to Commito.
+
 ## Final verification recorded October 27, 2026
 
 - TypeScript checking, repository ESLint, seven auth callback tests and three

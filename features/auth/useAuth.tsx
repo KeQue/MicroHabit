@@ -1,7 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import * as WebBrowser from "expo-web-browser";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { buildAuthRedirectUrl, consumeAuthCallbackUrl, parseAuthCallbackUrl } from "./links";
+import { buildAuthRedirectUrl, cancelPendingAuthFlow, consumeAuthCallbackUrl, getPendingAuthFlow, parseAuthCallbackUrl } from "./links";
 import type { AuthCallbackResult } from "./callback";
 import { ensureProfileForUser } from "./profile";
 import { supabase } from "../../lib/supabase";
@@ -126,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- actions ---
   async function signUp(email: string, password: string) {
+    await cancelPendingAuthFlow();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -148,6 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signInWithProvider = useCallback(async (provider: SocialAuthProvider) => {
+    await cancelPendingAuthFlow();
     const redirectTo = buildAuthRedirectUrl("/sign-in");
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -164,8 +166,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(`Could not start ${provider === "apple" ? "Apple" : "Google"} sign-in.`);
     }
 
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
+    let result: WebBrowser.WebBrowserAuthSessionResult;
+    try {
+      result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
+    } catch (error) {
+      await cancelPendingAuthFlow();
+      throw error;
+    }
     if (result.type !== "success" || !result.url) {
+      await cancelPendingAuthFlow();
       return "cancelled";
     }
 
@@ -188,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [handleAuthCallback]);
 
   async function resetPassword(email: string) {
+    await cancelPendingAuthFlow();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: buildAuthRedirectUrl("/update-password"),
     });
@@ -200,6 +210,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resendSignUpConfirmation(email: string) {
+    if (await getPendingAuthFlow() !== "sign-in") {
+      throw new Error("Start signup again on this device to request a new confirmation link. Then open the newest email here.");
+    }
     const { error } = await supabase.auth.resend({
       type: "signup",
       email,
@@ -211,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    await cancelPendingAuthFlow();
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }

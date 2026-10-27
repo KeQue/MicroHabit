@@ -80,7 +80,7 @@
     <main>
       <article>
         <h1>Commito Privacy Policy</h1>
-        <p class="updated">Last updated: June 3, 2026</p>
+        <p class="updated">Last updated: October 27, 2026</p>
 
         <p>
           Commito helps people create or join monthly accountability leagues with
@@ -95,7 +95,6 @@
           <li>League information: league names, activity names, invite codes, membership, roles, and league progress.</li>
           <li>Habit activity: daily completion logs for the leagues a user joins.</li>
           <li>Authentication information: sign-in provider details handled through Supabase Auth.</li>
-          <li>Notification preferences or device notification tokens if push notifications are enabled in a future version.</li>
           <li>Basic technical information that may be processed by services used to run the app, such as Supabase and Expo.</li>
         </ul>
 
@@ -118,12 +117,10 @@
           codes allow other users with the code to open or join the related league.
         </p>
 
-        <h2>Payments, Rewards, And Charity</h2>
+        <h2>Free Beta And Payments</h2>
         <p>
-          If paid leagues are enabled, purchases are handled through Apple or Google
-          in-app purchases and may be managed through RevenueCat. Commito may store
-          purchase status, product type, league access, estimated reward information,
-          and charity-related ledger information needed to operate the league.
+          The current beta offers free leagues. Paid league purchases, reward
+          payouts, and charity payments are not enabled in this beta.
         </p>
         <p>Commito does not store card numbers or bank account details.</p>
 
@@ -133,13 +130,23 @@
           notifications in the app or device settings. Denying notifications does
           not block core app functionality.
         </p>
+        <p>
+          Reminders are scheduled locally on your device for 17:00 device-local
+          time. Notification permissions and scheduled reminders are managed on
+          the device.
+        </p>
 
         <h2>Account Deletion</h2>
         <p>
-          Users can delete their account inside the app from the Account menu.
+          Users can delete their account inside the app from Settings.
           Account deletion removes the user account, profile, league memberships,
           habit logs, and related user data from the app database where technically
           possible.
+        </p>
+        <p>
+          Deleting an account also deletes leagues created by that account,
+          including the shared check-in history for all members of those leagues.
+          This cannot be undone.
         </p>
         <p>
           Some records may be retained if required for legal, security, fraud
@@ -159,8 +166,8 @@
         <ul>
           <li>Supabase for authentication and database services.</li>
           <li>Expo for app development and delivery services.</li>
-          <li>Apple and Google for app distribution and in-app purchases.</li>
-          <li>RevenueCat for purchase infrastructure if paid leagues are enabled.</li>
+          <li>Apple and Google for supported sign-in methods and app distribution.</li>
+          <li>Google's email service for account confirmation and password-reset emails sent through Supabase Auth.</li>
         </ul>
         <p>These services may process information according to their own policies.</p>
 

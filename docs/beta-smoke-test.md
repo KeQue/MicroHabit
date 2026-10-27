@@ -85,6 +85,40 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
 - **Fail (founder reported, Commito 1.0.2 (27)):** The recovery email opened
   Chrome, requested permission to open Commito, then opened the signed-in app
   without displaying the new-password form. No password change was confirmed.
+- **Pass (founder reported after the build 28 test instructions):** A new
+  recovery email arrived, its link displayed the change-password screen, and
+  changing the password worked. The founder subsequently confirmed that signing
+  in with the new password worked and the old password was rejected. This
+  completes the basic recovery test. Cold-start and already-running link tests
+  remain pending as distinct cases.
+- **Pass (founder reported during the TestFlight checks):** Google sign-in
+  worked. Provider cancellation was not separately tested.
+- **Fail (founder reported):** Apple sign-in returned an external-code exchange
+  error after account selection. A read-only query found a matching Supabase
+  auth error at 2026-10-27 11:38:21 UTC with Apple's `invalid_client` response.
+  Apple is enabled with Services ID `com.sadik.microhabit.auth`. The app uses
+  browser OAuth for Apple. Expired or incorrect client credentials are possible
+  causes; secret expiry has not been established from the available metadata.
+- **Apple credential renewed October 27, 2026:** After the founder provided
+  the key location, a nearby Apple-login key was found and used to generate an
+  ES256 client-secret JWT for the existing Services ID and Apple team. The
+  generated credential expires March 26, 2027; renew before that date. The
+  private key and JWT were kept out of the repository and tool output.
+  Supabase accepted a targeted update to `external_apple_secret`; a fresh
+  configuration read showed that only this field changed. The API returns an
+  opaque secret representation, which did not match the JWT or its SHA-256,
+  so exact secret read-back verification was not established. Auth health and
+  public settings returned HTTP 200 with Apple, Google and email still enabled.
+- **Apple verification boundary:** The generated ES256 signature verified
+  locally. Apple returned `invalid_grant` for both a synthetic invalid-code
+  request and its invalid-signature control, so these requests do not establish
+  that Apple accepts the key. The subsequent real iPhone test below supplies
+  the end-to-end result. No app-code change or new build was made for this
+  credential renewal.
+- **Pass (founder reported after the credential renewal):** After being asked
+  to retry Apple sign-in in Commito 1.0.2 (28), the founder confirmed that it
+  signed in. This resolves the observed Apple sign-in failure. Provider
+  cancellation and account-linking edge cases were not tested by that result.
 - **Local correction, not in build 27:** Recognize recovery from the reset path
   as well as the link type, handle native and Expo callback paths, and hold
   ordinary sign-in routing while the initial link/session is being processed.
@@ -95,9 +129,10 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
   they cover native/Expo formats, PKCE without a type parameter, ordinary
   sign-in, expired/incomplete links, and exchange/network failures. These tests
   do not prove native routing, email configuration, or a real password change.
-  Repeat recovery with a fresh email on the next standalone build, both with
-  Commito closed and already open. Confirm the new password works and the old
-  password fails. No additional email was requested by the assistant.
+  The founder subsequently confirmed the recovery form and password change on
+  the iPhone, successful sign-in with the new password, and rejection of the old
+  password. Still verify links with Commito closed and already open separately.
+  No additional email was requested by the assistant.
 
 ## Prepare the test
 
@@ -256,12 +291,16 @@ on the next native build. Do not delete a real account for this UI check.
   finished successfully on October 27, 2026. Expo confirms version 1.0.2,
   build 28, the exact source checkpoint, and a ready artifact.
 - [TestFlight upload](https://expo.dev/accounts/keke12/projects/microhabit/submissions/c2b597fd-4849-44a8-ac8b-863a0ee26f7a)
-  is FINISHED without a reported error. Apple processing, installation and
-  native password recovery still need verification. No App Store release,
-  branch merge or new backend change was performed.
+  is FINISHED without a reported error. After receiving the build 28 test
+  instructions, the founder confirmed the email opened the password form and
+  the password change worked on the iPhone. The installed build number was not
+  separately reconfirmed in that report. New-password sign-in and old-password
+  rejection subsequently passed (founder reported). Cold/warm link cases still
+  need separate verification. No App Store release or branch merge was
+  performed. The later Apple credential renewal is recorded above.
 - Read-only Supabase auth configuration inspection confirms that
   `microhabit://update-password` is allowed, with `microhabit://sign-in` as the
-  site URL and a default recovery email template. No auth settings were changed.
+  site URL. No auth settings were changed during this redirect inspection.
 - On build 28, request a fresh reset email, check Spam/Junk, and open its link
   on the iPhone. Expect **Choose a new password**. Save a new password, sign
   out, confirm the old password fails and the new password works. Repeat once
@@ -289,11 +328,14 @@ All of these remain pending even if ordinary tracking works in the SDK 54 Expo
 client. Native configuration and production authentication redirects can differ.
 
 - [ ] Email confirmation returns to the intended app flow.
-- [ ] Forgot password sends an email; its link opens the correct recovery screen;
-  the new password works and the old password no longer does.
-- [ ] Google sign-in and Apple sign-in complete on an iPhone and return to the
-  correct account. Provider cancellation returns to a usable screen. An Expo
-  client failure is not sufficient evidence that the standalone flow is broken.
+- [x] Forgot password sends an email; its link opens the correct recovery screen;
+  the new password works and the old password no longer does (founder reported
+  after the build 28 test instructions; see authentication results above).
+- [x] Google sign-in completes on the iPhone (founder reported).
+- [x] Apple sign-in completes on the iPhone (founder reported after the October
+  27 credential renewal). The previously observed error was `invalid_client`.
+- [ ] Provider cancellation returns to a usable screen. An Expo client failure
+  is not sufficient evidence that the standalone flow is broken.
 - [ ] Sign out and restart: private screens are unavailable until sign-in.
 - [ ] Allow notifications and verify a local daily reminder arrives at 17:00
   device-local time. These are local reminders, not server notifications. Denying

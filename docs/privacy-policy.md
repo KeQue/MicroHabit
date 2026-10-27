@@ -1,6 +1,6 @@
 # Commito Privacy Policy
 
-Last updated: June 3, 2026
+Last updated: October 27, 2026
 
 Commito helps people create or join monthly accountability leagues with friends.
 This policy explains what information the app collects, why it is used, and how
@@ -16,8 +16,6 @@ Commito may collect and store:
 - Habit activity: daily completion logs for the leagues a user joins.
 - Authentication information: sign-in provider details handled through Supabase
   Auth.
-- Notification preferences or device notification tokens if push notifications
-  are enabled in a future version.
 - Basic technical information that may be processed by services used to run the
   app, such as Supabase and Expo.
 
@@ -40,12 +38,10 @@ League members can see information needed for the league experience, including
 member display names, activity progress, and rankings. Invite codes allow other
 users with the code to open or join the related league.
 
-## Payments, Rewards, And Charity
+## Free Beta And Payments
 
-If paid leagues are enabled, purchases are handled through Apple or Google
-in-app purchases and may be managed through RevenueCat. Commito may store
-purchase status, product type, league access, estimated reward information, and
-charity-related ledger information needed to operate the league.
+The current beta offers free leagues. Paid league purchases, reward payouts,
+and charity payments are not enabled in this beta.
 
 Commito does not store card numbers or bank account details.
 
@@ -55,11 +51,18 @@ Commito may ask permission to send reminders. Users can allow or deny
 notifications in the app or device settings. Denying notifications does not
 block core app functionality.
 
+Reminders are scheduled locally on your device for 17:00 device-local time.
+Notification permissions and scheduled reminders are managed on the device.
+
 ## Account Deletion
 
-Users can delete their account inside the app from the Account menu. Account
+Users can delete their account inside the app from Settings. Account
 deletion removes the user account, profile, league memberships, habit logs, and
 related user data from the app database where technically possible.
+
+Deleting an account also deletes leagues created by that account, including
+the shared check-in history for all members of those leagues. This cannot be
+undone.
 
 Some records may be retained if required for legal, security, fraud prevention,
 financial, tax, or compliance reasons.
@@ -76,8 +79,9 @@ Commito may use third-party services to operate the app, including:
 
 - Supabase for authentication and database services.
 - Expo for app development and delivery services.
-- Apple and Google for app distribution and in-app purchases.
-- RevenueCat for purchase infrastructure if paid leagues are enabled.
+- Apple and Google for supported sign-in methods and app distribution.
+- Google's email service for account confirmation and password-reset emails
+  sent through Supabase Auth.
 
 These services may process information according to their own policies.
 

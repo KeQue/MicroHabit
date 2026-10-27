@@ -192,14 +192,30 @@ downward dismissal, position reset on reopening, and independent row scrolling.
 Repeat these gestures on the actual iPhone; browser results do not verify
 native gesture handling or modal animation.
 These UI changes were made after build 26 and are **not in that build**.
-Version **1.0.2 (27)** is prepared locally on October 27, 2026 to include them.
-Build 27 is not yet created or uploaded at this checkpoint.
+Version **1.0.2 (27)** was prepared on October 27, 2026 to include them.
 TypeScript, ESLint, version-label checks, and an iOS JS export passed during
 implementation. An isolated browser preview checked phone layouts and callback
 wiring with mocked native metadata; actual iPhone presentation remains pending.
 Verify close/back, check-in rules, policy/support links, sign-out, the deletion
 confirmation/cancel path, scrolling with larger text, and the displayed version
 on the next native build. Do not delete a real account for this UI check.
+
+### Build 27 status
+
+- Checkpoint source: [0e8b22f](https://github.com/KeQue/MicroHabit/commit/0e8b22f47bd70c8b173574e5abdceabe66f24a1f)
+  on `beta/free-leagues-build-27`; [draft review](https://github.com/KeQue/MicroHabit/pull/1).
+- [iOS build](https://expo.dev/accounts/keke12/projects/microhabit/builds/9f7ae895-e413-4995-8da7-0c892575a9e0)
+  finished successfully on October 27, 2026. Expo's build metadata confirms
+  version 1.0.2, build 27, and the exact checkpoint source commit above.
+- [TestFlight upload](https://expo.dev/accounts/keke12/projects/microhabit/submissions/b8876530-1e74-4f1f-8f24-86213c7b0837)
+  completed successfully on October 27, 2026 using the existing App Store
+  Connect API key; Expo reports FINISHED with no error. Apple processing and
+  installation have not yet been verified.
+- No public App Store review/release, branch merge, new database migration,
+  wider tester invitation, or policy-page publication was performed during this
+  checkpoint. Updated policy pages still need publishing before wider beta.
+- First device check: open Commito from TestFlight, then open Settings and
+  confirm `Commito 1.0.2 (27)`. Repeat the pending native checks below.
 
 ### Build 26 status
 

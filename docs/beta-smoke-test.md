@@ -79,6 +79,11 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
 
 ## Authentication results recorded October 27, 2026
 
+- **Pass (founder reported October 27, 2026):** In response to the daily-reminder
+  check, the founder confirmed it arrived yesterday (October 26). The installed
+  client/build and exact delivery time were not separately reported. The reminder
+  implementation has no source changes between the baseline and current build;
+  this is an observed delivery, not a fresh build-28 scheduling test.
 - **Pass (founder reported):** Sign-in and sign-out worked during the current
   TestFlight check. The founder subsequently tapped Sign out, fully closed and
   reopened Commito, confirmed it was still signed out, and successfully signed
@@ -89,6 +94,21 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
   persistence, not verification of remaining signed out after restart.
 - **Delivered to Spam (founder reported):** The recovery email arrived in Spam;
   the original missing-email report was not a delivery failure.
+- **Pass with a delivery issue (founder reported October 27, 2026):** The signup
+  confirmation email arrived in Spam and its link could not initially be
+  selected in Gmail. After marking the message as not spam, the founder could
+  select Confirm and reported that confirmation worked. The signup confirmation
+  flow passed through that manual workaround. Spam placement remains unresolved;
+  this result does not establish reliable inbox delivery for other recipients.
+- **Read-only sender review October 27, 2026:** Supabase uses Gmail SMTP on
+  port 465, with a gmail.com From address matching the authenticated sender,
+  the display name Commito, and a 30-emails/hour project limit. Confirmation
+  remains required, and the custom confirmation template includes
+  `.ConfirmationURL`. No obvious sender mismatch or missing template link was
+  found. No email settings were changed by this review. Spam placement has not
+  been attributed to a specific cause; sender authentication headers and fresh
+  recipient tests would provide further evidence. A verified sending-domain
+  setup is being considered, pending whether the founder owns a domain.
 - **Fail (founder reported, Commito 1.0.2 (27)):** The recovery email opened
   Chrome, requested permission to open Commito, then opened the signed-in app
   without displaying the new-password form. No password change was confirmed.
@@ -103,9 +123,11 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
 - **Pass (founder reported after the disposable-account deletion test):**
   Signing in with the deleted account's email/password returned invalid email
   or password. This confirms the observed post-deletion login rejection.
-  Email confirmation, check-in persistence during that test, and removal of
-  the deleted owner's leagues from another member's view were not separately
-  reported; those observations are not inferred from the login error.
+  Check-in persistence during that deletion test and removal of the deleted
+  owner's leagues from another member's view were not separately reported;
+  those observations are not inferred from the login error. Email confirmation
+  and a separate native league/check-in flow subsequently passed as recorded
+  elsewhere in this checklist.
 - **Fail (founder reported):** Apple sign-in returned an external-code exchange
   error after account selection. A read-only query found a matching Supabase
   auth error at 2026-10-27 11:38:21 UTC with Apple's `invalid_client` response.
@@ -177,6 +199,13 @@ project name, and UTC test time. Use **Pass**, **Fail**, or **Pending** per item
 
 ## Accounts, creation, and joining
 
+- **Pass (founder reported October 27, 2026, following the TestFlight test
+  instructions):** Created a free test league, joined it with a second account
+  using its invite code, marked today complete, and confirmed the check-in was
+  still saved after closing and reopening Commito. This verifies that reported
+  installed-app flow; simultaneous two-device updates were not separately
+  reported.
+
 - [ ] Create A and B through email sign-up. If confirmation is enabled, confirm
   both emails and verify each account can sign in. Record email delays or broken
   confirmation links.
@@ -235,6 +264,8 @@ Leave them **Pending** if you cannot run them; helper tests are not substitutes.
 
 ## Privacy, support, and deletion
 
+- [x] Privacy policy and Support both load from Commito Settings on the iPhone
+  after publication (founder reported October 27, 2026).
 - [ ] Open Privacy policy and Support from sign-in, sign-up, the Leagues Account
   menu, and the league menu. Pages load and are readable. A browser opening does
   not establish that its content loaded successfully; check the page itself.
@@ -341,7 +372,8 @@ two public Supabase configuration values matched the tested local environment.
 All of these remain pending even if ordinary tracking works in the SDK 54 Expo
 client. Native configuration and production authentication redirects can differ.
 
-- [ ] Email confirmation returns to the intended app flow.
+- [x] Email confirmation works after moving the message out of Gmail Spam
+  (founder reported). Spam placement remains an unresolved onboarding issue.
 - [x] Forgot password sends an email; its link opens the correct recovery screen;
   the new password works and the old password no longer does (founder reported
   after the build 28 test instructions; see authentication results above).
@@ -355,13 +387,19 @@ client. Native configuration and production authentication redirects can differ.
   then Apple sign-in succeeded (founder reported).
 - [x] After deleting the disposable account, email/password sign-in is rejected
   (founder reported). Shared-league deletion/cascade checks remain separate.
-- [ ] Allow notifications and verify a local daily reminder arrives at 17:00
-  device-local time. These are local reminders, not server notifications. Denying
+- [x] Daily reminder delivery observed: founder reported it arrived on October
+  26. Build/client and exact delivery time were not separately recorded. The
+  implementation schedules 17:00 device-local time. These are local reminders,
+  not server notifications. Denying
   permission should not prevent using leagues. The developer-only short test
   notification, if present in a development client, does not prove delivery of
   the release reminder. UTC check-in boundaries and local reminder time differ.
-- [ ] Repeat invite, check-in persistence, two-device updates, policy links, and
-  deletion on the actual build intended for beta distribution.
+- [x] League creation, joining by invite code with a second account, and today's
+  check-in persistence after closing/reopening Commito (founder reported during
+  the TestFlight checks). Settings policy links and post-deletion login rejection
+  also passed as recorded above.
+- [ ] Simultaneous two-device updates and shared-league deletion checks on the
+  actual build intended for beta distribution remain separate.
 
 ## Record failures
 
@@ -391,8 +429,9 @@ client. Native configuration and production authentication redirects can differ.
   Support also shows the UTC and Spam/Junk explanations.
 - The app beta review remains draft and unmerged. No app build, public App
   Store release, database change or Pages-settings change was made for this
-  publication. Opening the links from the actual iPhone app remains a separate
-  native check.
+  publication. The founder subsequently opened both links from Commito Settings
+  on the iPhone and confirmed that both worked. Other entry points and
+  accessibility scenarios remain separate checks.
 
 For each failure, record the action, expected result, actual result, UTC time,
 device/build, and whether a refresh/restart changes the outcome. Include a

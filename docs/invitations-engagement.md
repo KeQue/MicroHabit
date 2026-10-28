@@ -3,7 +3,7 @@
 October 28, 2026. The founder explicitly approved this reporting migration and
 a new TestFlight build after reviewing the local implementation. The single
 migration committed at 21:59:39 UTC and was verified from fresh requests.
-Commito 1.0.2 (34) is being prepared with published HTTPS invitations; build 33
+Commito 1.0.2 (34) is built and uploaded with published HTTPS invitations; build 33
 still shares the app-only address. Installed build 31 lacks the Batch-2
 invitation changes. The next
 retention batch and a public App Store release are outside this approval.
@@ -80,6 +80,17 @@ change or public App Store release was performed for this fix.
 The native candidate preserves the app identity, sign-in validation, join RPC,
 league rules and paid-disabled flag. Test sharing afresh from build 34; old
 messages containing `microhabit:///` do not change automatically.
+
+Build-34 source checkpoint: `c281ef118d9741649418cfecaf2e1649e68c1fba`.
+The [Expo build](https://expo.dev/accounts/keke12/projects/microhabit/builds/d67b95e7-f669-4e24-9a36-abed15de1961)
+finished at 22:52:33 UTC on October 28. Its
+[automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/63f2ebb1-5bfe-4d36-963c-2bd39c23df33)
+was verified `FINISHED` at 22:52:57 UTC. The version, build and exact source
+identity match, and a binary is available. This verifies Expo build and Apple
+upload completion, not Apple processing or actual installation. No founder
+iPhone or messenger pass has been reported for this fix yet. The founder was
+offered the live invitation page for a separate handoff test with their existing
+app; that result remains pending. No new database work was performed.
 
 A friend can share an invitation through the existing native Share sheet.
 The message contains a readable code, an installed-app link, and manual

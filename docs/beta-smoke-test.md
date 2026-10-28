@@ -3,7 +3,7 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
-## HTTPS invitations — build 34 preparation, October 28, 2026
+## HTTPS invitations — build 34, October 28, 2026
 
 The founder confirmed build 33's app-only address was unclickable both in the
 preview and after sending. They approved publication and a new TestFlight build.
@@ -11,7 +11,11 @@ Only the reviewed invitation/disclosure files were published to Pages `main`;
 its exact commit, public HTML/JS and privacy text were verified. Live Chrome
 checks at 320px/390px passed with synthetic code and no database requests.
 All 76 Node tests, TypeScript and full lint pass. Build 34 enables the published
-web link; build 33 retains the old share text. Native checks remain pending:
+web link; build 33 retains the old share text. Its
+[build](https://expo.dev/accounts/keke12/projects/microhabit/builds/d67b95e7-f669-4e24-9a36-abed15de1961)
+from `c281ef1` and [automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/63f2ebb1-5bfe-4d36-963c-2bd39c23df33)
+both finished: build at 22:52:33 UTC, submission verified at 22:52:57 UTC.
+Apple processing/installation and native checks remain pending:
 
 - [ ] Update Commito to **1.0.2 (34)** and share a **new** invitation. Its address
   should start with `https://keque.github.io/MicroHabit/join/`, with the same code.

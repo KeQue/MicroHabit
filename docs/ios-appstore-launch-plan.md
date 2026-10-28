@@ -31,7 +31,8 @@ release gates below.
 
 The founder subsequently approved a normal HTTPS invitation page and build 34
 after reporting the shared app-only address unclickable. The website-only
-publication is verified; native delivery/testing remain pending. See the same
+publication is verified; build 34 and its TestFlight upload finished. Apple
+processing, installation and native testing remain pending. See the same
 Batch-2 record for exact source and deployment boundaries.
 
 ## Current Launch Gate

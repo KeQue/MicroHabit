@@ -20,7 +20,9 @@ current plan; standard submission succeeded without a plan change or rebuild.
 The founder subsequently reported the monthly-history screen working and asked
 for a compact layout revision. Build 31 moves the current-month
 label into the existing Past results row; this changes no cycle rules or backend
-objects. Its build is underway with automatic TestFlight submission scheduled.
+objects. Its build and automatic TestFlight submission both finished; the
+submission was checked at 21:19:47 UTC on October 28. Installation and the
+compact layout on the founder's iPhone have not been separately verified.
 See the build-31 entry in [beta checks](beta-smoke-test.md).
 
 - Use UTC calendar months: 28, 29, 30 or 31 days. The old May launch plan's

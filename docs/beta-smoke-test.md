@@ -3,6 +3,32 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
+## Invitations and measurement — Batch 2 local review, October 28, 2026
+
+See [implementation, metric definitions and evidence](invitations-engagement.md).
+The local changes are not included in build 31. No new TestFlight upload or
+production migration was performed for this batch. Automated checks and
+isolated SQL fixtures do not establish the following iPhone results:
+
+- [ ] Share an invite using the existing Share button. Check readable code,
+  native-app link and manual signup instructions; cancel sharing safely.
+- [ ] Open it with Commito installed, both closed and already running. Prefill
+  the code, but create no membership until **Join league** is tapped.
+- [ ] Repeat while signed out. Complete ordinary email/social sign-in or signup
+  and email confirmation; return to the same invitation. Back cancels it.
+- [ ] Password recovery still opens the password-change screen before any
+  pending invitation. A new account must not inherit an old account's intent.
+- [ ] Join twice using the same code: one membership. Invalid code/network loss
+  offers retry. Open a second invitation while the first request is pending;
+  no stale preview or clearing of the second invitation.
+- [ ] Check the longer message preview and all action buttons on a small iPhone
+  and with larger text/VoiceOver. Custom-scheme clickability varies by messenger;
+  the readable code remains the installation fallback.
+
+The private operator report requires separate migration approval. After any
+approved deployment, verify app report access is denied, unused event writes
+are denied, and ordinary joining/check-ins/rankings still work.
+
 ## Compact month row — build 31 preparation, October 28, 2026
 
 The founder reported the monthly-history screen working and supplied a native
@@ -16,10 +42,10 @@ Chrome preview fits the row at 320px and 390px widths, including September's
 longer label. Icons were substituted in that preview; actual iPhone layout and
 VoiceOver remain pending. No database, scoring or check-in behavior changed.
 The [build-31 job](https://expo.dev/accounts/keke12/projects/microhabit/builds/458a5369-7223-4352-99c6-5270dd8ce2d1)
-has started from source checkpoint `183fb51`. Its [automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/32f4ab67-53ef-4df0-9eec-4a3778ff1ebd)
-is scheduled using existing credentials. This is not confirmation that the new
-binary is already available on the phone; installed build 30 retains the old
-layout. A fresh Expo check confirms build 30's submission is now `FINISHED`.
+finished from source checkpoint `183fb51`. Its [automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/32f4ab67-53ef-4df0-9eec-4a3778ff1ebd)
+was verified `FINISHED` at 21:19:47 UTC on October 28. Actual iPhone installation
+and compact-row native layout remain unverified; installed build 30 retains
+the old layout. Build 30's submission is also `FINISHED`.
 
 ## Monthly history Batch 1 — build 30, October 28, 2026
 
@@ -35,9 +61,9 @@ Source checkpoint: `68cb3e9171b179a36a58061c86e06371dd2ab0d3`.
 The [build-30 job](https://expo.dev/accounts/keke12/projects/microhabit/builds/94ff94ab-b2d6-413c-b1ee-3751ed6fb846)
 finished at 20:24:05 UTC, with an available binary and the expected
 version/build/source. The [TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/ed0f5aae-1b5d-4c16-a7da-1f6132df57f3)
-was `IN_QUEUE` at 20:37:29 UTC with no error reported; Apple upload, processing
-and actual iPhone installation are not yet
-verified. The standard submission uses existing credentials; no Expo plan
+was verified `FINISHED` at 20:58:55 UTC. The founder subsequently reported the
+monthly-history screen working; the precise installed build was not separately
+confirmed. The standard submission uses existing credentials; no Expo plan
 upgrade or public App Store release was requested.
 Installed build 29 lacks this feature.
 

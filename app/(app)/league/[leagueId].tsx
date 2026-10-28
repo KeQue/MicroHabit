@@ -4,6 +4,8 @@ import { MonthlyResults } from "@/components/MonthlyResults";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { deleteCurrentAccount } from "@/features/auth/account";
+import { buildInviteMessage } from "@/features/invitations/links";
+import { usePendingInvite } from "@/features/invitations/pending-invite";
 import { canEditUtcDate, millisecondsUntilNextUtcDay, utcCalendar, utcDateKey } from "@/features/leagues/utc-calendar";
 import { getLeagueMembers } from "@/features/leagues/api";
 import { compareRankNames } from "@/features/leagues/monthly-results";
@@ -303,6 +305,7 @@ function MemberCardSkeleton() {
 export default function LeagueDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { clear: clearPendingInvite } = usePendingInvite();
   const params = useLocalSearchParams<{ leagueId: string }>();
   const leagueId = typeof params.leagueId === "string" ? params.leagueId : "";
 
@@ -389,6 +392,7 @@ export default function LeagueDetailScreen() {
               setMenuOpen(false);
               setDeletingAccount(true);
               await deleteCurrentAccount();
+              await clearPendingInvite();
               router.replace("/(auth)/sign-in");
             } catch (e: any) {
               Alert.alert("Could not delete account", e?.message ?? "Unknown error");
@@ -399,13 +403,6 @@ export default function LeagueDetailScreen() {
         },
       ]
     );
-  }
-
-  function buildInviteMessage(code: string) {
-    // Canonical template (no links)
-    return `Join my Commito league \u{1F4AA}
-Invite code: ${code}
-Open Commito \u2192 Join \u2192 Paste the code`;
   }
 
   function onInvite() {
@@ -427,8 +424,11 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 
   async function onShareInvite() {
     if (!inviteCode) return;
-    const message = buildInviteMessage(inviteCode);
-    await Share.share({ message });
+    try {
+      await Share.share({ message: buildInviteMessage(inviteCode) });
+    } catch {
+      Alert.alert("Could not share invitation", "Please copy the invite code and send it instead.");
+    }
   }
 
   const myDisplayName = useMemo(
@@ -819,7 +819,9 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 
               <Text style={styles.modalMessageLabel}>Message</Text>
               <View style={styles.messageBox}>
-                <Text style={styles.messageText}>{inviteMessage}</Text>
+                <ScrollView style={{ maxHeight: 180 }}>
+                  <Text style={styles.messageText}>{inviteMessage}</Text>
+                </ScrollView>
               </View>
 
               {copied ? <Text style={styles.copiedText}>Copied</Text> : <View style={{ height: 18 }} />}

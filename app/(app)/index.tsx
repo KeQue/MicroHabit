@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { deleteCurrentAccount } from "../../features/auth/account";
+import { usePendingInvite } from "../../features/invitations/pending-invite";
 import { ensureProfileForCurrentUser } from "../../features/auth/profile";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
 import { supabase } from "../../lib/supabase";
@@ -29,6 +30,7 @@ function normalizeErr(e: any): string {
 
 export default function LeaguesScreen() {
   const router = useRouter();
+  const { clear: clearPendingInvite } = usePendingInvite();
   const params = useLocalSearchParams();
 
   const planTierFromParams = useMemo(() => {
@@ -202,6 +204,7 @@ export default function LeaguesScreen() {
               setAccountMenuOpen(false);
               setDeletingAccount(true);
               await deleteCurrentAccount();
+              await clearPendingInvite();
               router.replace("/(auth)/sign-in");
             } catch (e: any) {
               Alert.alert("Could not delete account", normalizeErr(e));

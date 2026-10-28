@@ -1,4 +1,4 @@
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { Link, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -20,7 +20,6 @@ const TEXT = "#FFFFFF";
 const PLACEHOLDER = "rgba(255,255,255,0.44)";
 
 export default function SignInScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ error?: string; message?: string }>();
   const { signIn, signInWithProvider } = useAuth();
 
@@ -34,10 +33,7 @@ export default function SignInScreen() {
     try {
       setError(null);
       setSocialLoading(provider);
-      const result = await signInWithProvider(provider);
-      if (result === "signed-in") {
-        router.replace("/(app)");
-      }
+      await signInWithProvider(provider);
     } catch (e: any) {
       setError(e?.message ?? `${provider === "apple" ? "Apple" : "Google"} sign-in failed`);
     } finally {
@@ -148,7 +144,7 @@ export default function SignInScreen() {
                   if (!password) throw new Error("Password is required");
 
                   await signIn(e, password);
-                  router.replace("/(app)");
+                  // Root navigation preserves any invitation after sign-in.
                 } catch (e: any) {
                   setError(e?.message ?? "Sign-in failed");
                 } finally {

@@ -4,6 +4,9 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { isAuthCallbackUrl } from "../features/auth/links";
+import { postAuthRoute } from "../features/auth/post-auth-route";
+import { parseInviteUrl } from "../features/invitations/links";
+import { PendingInviteProvider, usePendingInvite } from "../features/invitations/pending-invite";
 import {
   cancelGentleDailyReminder,
   configureNotifications,
@@ -15,6 +18,10 @@ function RouteGate() {
   const { user, initializing, passwordRecovery, processingAuthLink, handleAuthCallback } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const { ready: pendingReady, pending, capture } = usePendingInvite();
+  const captureRef = useRef(capture);
+  captureRef.current = capture;
+  const lastOfferedRef = useRef<string | null>(null);
   const lastHandledUrlRef = useRef<string | null>(null);
   const [initialLinkChecked, setInitialLinkChecked] = useState(false);
 
@@ -22,6 +29,14 @@ function RouteGate() {
     let active = true;
 
     const handleAuthUrl = async (url: string) => {
+      const inviteCode = parseInviteUrl(url);
+      if (inviteCode) {
+        try { await captureRef.current(inviteCode); }
+        catch {
+          if (active) Alert.alert("Invitation", `Please sign in, choose Join, and enter ${inviteCode}.`);
+        }
+        return;
+      }
       if (!isAuthCallbackUrl(url) || lastHandledUrlRef.current === url) return;
       lastHandledUrlRef.current = url;
 
@@ -42,7 +57,7 @@ function RouteGate() {
         return;
       }
 
-      router.replace("/(app)");
+      // The route gate chooses the post-auth destination, including pending invites.
     };
 
     void (async () => {
@@ -67,26 +82,17 @@ function RouteGate() {
   }, [router, handleAuthCallback]);
 
   useEffect(() => {
-    if (initializing || !initialLinkChecked || processingAuthLink) return;
-
-    const group = segments[0]; // "(auth)" | "(app)" | etc.
-    const inAuthGroup = group === "(auth)";
-    const inAppGroup = group === "(app)";
-    const currentPath = segments.join("/");
-    const allowSignedInAuthScreen = currentPath === "(auth)/update-password";
-
-    if (!user) {
-      if (!inAuthGroup) router.replace("/(auth)/sign-in");
-      return;
+    const destination = postAuthRoute({ userId: user?.id ?? null, initializing,
+      initialLinkChecked, processingAuthLink, passwordRecovery, pendingReady,
+      pending, segments, lastOffered: lastOfferedRef.current });
+    if (destination === "sign-in") router.replace("/(auth)/sign-in");
+    else if (destination === "update-password") router.replace("/(auth)/update-password");
+    else if (destination === "app") router.replace("/(app)");
+    else if (destination) {
+      lastOfferedRef.current = destination.offeredKey;
+      router.replace({ pathname: "/(app)/league/join", params: { code: destination.code, inviteNonce: destination.nonce } });
     }
-
-    if (passwordRecovery) {
-      if (!allowSignedInAuthScreen) router.replace("/(auth)/update-password");
-      return;
-    }
-
-    if (!inAppGroup && !allowSignedInAuthScreen) router.replace("/(app)");
-  }, [user, initializing, initialLinkChecked, processingAuthLink, passwordRecovery, segments, router]);
+  }, [user, initializing, initialLinkChecked, processingAuthLink, passwordRecovery, pendingReady, pending, segments, router]);
 
   useEffect(() => {
     if (initializing) return;
@@ -116,7 +122,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={DarkTheme}>
       <AuthProvider>
-        <RouteGate />
+        <PendingInviteProvider><RouteGate /></PendingInviteProvider>
       </AuthProvider>
     </ThemeProvider>
   );

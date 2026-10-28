@@ -22,6 +22,11 @@ minimal engagement measurement second; recap/reminder improvements third;
 safeguarded nudges and voluntary achievements last. Each batch requires review
 before starting the next. This does not approve any production migration.
 
+Batch 2 local implementation and verification are recorded in
+[invitations and engagement](invitations-engagement.md). Its new database
+migration and app delivery are pending review; it does not close the public
+release gates below.
+
 ## Current Launch Gate
 
 Before the next App Store submission, finish the security/accessibility gate tracked in `docs/security-accessibility-audit.md`.

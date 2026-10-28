@@ -34,10 +34,7 @@ export default function SignUpScreen() {
     try {
       setError(null);
       setSocialLoading(provider);
-      const result = await signInWithProvider(provider);
-      if (result === "signed-in") {
-        router.replace("/(app)");
-      }
+      await signInWithProvider(provider);
     } catch (e: any) {
       setError(e?.message ?? `${provider === "apple" ? "Apple" : "Google"} sign-in failed`);
     } finally {
@@ -153,9 +150,7 @@ export default function SignUpScreen() {
                   const { data } = await supabase.auth.getSession();
                   const hasSession = !!data.session;
 
-                  if (hasSession) {
-                    router.replace("/(app)");
-                  } else {
+                  if (!hasSession) {
                     router.replace({
                       pathname: "/(auth)/check-email",
                       params: { email: e },

@@ -3,12 +3,15 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
-## Invitations and measurement — Batch 2 / build 32, October 28, 2026
+## Invitations and measurement — Batch 2 / build 33, October 28, 2026
 
 See [implementation, metric definitions and evidence](invitations-engagement.md).
 The invitation changes are not included in build 31. The founder approved the
 single reporting migration and a new TestFlight build. The migration is now
-committed and verified; build 32 is being prepared. Automated checks and
+committed and verified. Build 32 finished and uploaded, but is superseded by
+build 33: final review found and reproduced an edited-code cancellation gap,
+then fixed it using the original intent's nonce. Use build 33 for these checks.
+Its delivery is being prepared. Automated checks and
 isolated SQL fixtures do not establish the following iPhone results:
 
 - [ ] Share an invite using the existing Share button. Check readable code,
@@ -17,6 +20,8 @@ isolated SQL fixtures do not establish the following iPhone results:
   the code, but create no membership until **Join league** is tapped.
 - [ ] Repeat while signed out. Complete ordinary email/social sign-in or signup
   and email confirmation; return to the same invitation. Back cancels it.
+- [ ] Edit the prefilled code, then Back. Reopening the app must not resurrect
+  the cancelled original invitation. A newer invitation must remain intact.
 - [ ] Password recovery still opens the password-change screen before any
   pending invitation. A new account must not inherit an old account's intent.
 - [ ] Join twice using the same code: one membership. Invalid code/network loss
@@ -28,7 +33,7 @@ isolated SQL fixtures do not establish the following iPhone results:
 
 Fresh backend verification confirms app report execution and unused event
 writes are denied, with existing joining/check-in/ranking definitions and
-permissions unchanged. Phone behavior remains to be tested after build 32 is
+permissions unchanged. Phone behavior remains to be tested after build 33 is
 installed.
 
 ## Compact month row — build 31 preparation, October 28, 2026

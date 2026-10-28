@@ -3,9 +3,21 @@
 October 28, 2026. The founder explicitly approved this reporting migration and
 a new TestFlight build after reviewing the local implementation. The single
 migration committed at 21:59:39 UTC and was verified from fresh requests.
-Commito 1.0.2 (32) is being prepared for TestFlight; installed build 31 does not
-contain these invitation changes. The next retention batch and a public App
-Store release are outside this approval.
+Commito 1.0.2 (33) is the corrected TestFlight candidate being prepared;
+installed build 31 does not contain these invitation changes. The next
+retention batch and a public App Store release are outside this approval.
+
+Superseded build-32 source: `6e215b66c2297eeda92b067c3393b4449d0a2fd0`.
+The [build-32 job](https://expo.dev/accounts/keke12/projects/microhabit/builds/548fbc21-2c05-40bc-b1e0-faac54d7fe61)
+finished at 22:09:05 UTC. Its
+[automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/4c6e6268-78aa-4901-9014-acde8fcff471)
+was verified `FINISHED` at 22:11:12 UTC, using existing credentials and App
+Store Connect app ID 6759626676. Final review found that editing a prefilled
+code detached Back/success cleanup from its original pending invitation. A new
+screen-handler test failed before the fix. Cleanup now uses the route's nonce
+and preserves newer intents. Build 32 had already uploaded before cancellation
+was attempted; it is superseded by build 33. This is an app-only correction:
+the verified database migration was not changed or reapplied.
 
 ## Observable outcome
 
@@ -101,7 +113,7 @@ a full data-backup/restore procedure.
 
 ## Verification and remaining boundaries
 
-- Automated: TypeScript and full ESLint passed. 71 Node tests passed, including
+- Automated: TypeScript and full ESLint passed. 73 Node tests passed, including
   installed Expo link generation, strict parser, storage/account/expiry races,
   password-recovery navigation priority, actual screen-handler retry/duplicate/
   account-switch behavior, explicit SDK token preservation, and existing auth,

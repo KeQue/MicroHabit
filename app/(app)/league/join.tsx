@@ -48,6 +48,13 @@ export default function JoinLeagueScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
 
+  function pendingNonceForThisRoute() {
+    if (!pending || pending.userId !== user?.id) return undefined;
+    // The field can change; cancellation still belongs to the opened intent.
+    if (typeof params.inviteNonce === "string") return pending.nonce === params.inviteNonce ? pending.nonce : undefined;
+    return pending.code === code.trim().toUpperCase() ? pending.nonce : undefined;
+  }
+
   async function joinByCode() {
     if (busy.current) return;
     let normalized: string;
@@ -57,7 +64,7 @@ export default function JoinLeagueScreen() {
     if (!uid) { setError("Sign in before joining this league."); return; }
     const attempt = ++generation.current;
     const capturedRoute = routeKey;
-    const capturedPending = pending?.code === normalized && pending.userId === uid ? pending.nonce : undefined;
+    const capturedPending = pendingNonceForThisRoute();
     const current = () => mounted.current && attempt === generation.current &&
       identity.current.routeKey === capturedRoute && identity.current.userId === uid &&
       (!capturedPending || identity.current.pendingNonce === capturedPending);
@@ -114,7 +121,7 @@ export default function JoinLeagueScreen() {
 
   async function goBack() {
     const leavingRoute = routeKey;
-    const nonce = pending?.code === code && pending.userId === user?.id ? pending.nonce : undefined;
+    const nonce = pendingNonceForThisRoute();
     generation.current += 1;
     if (nonce) await clear(nonce);
     if (!mounted.current || identity.current.routeKey !== leavingRoute) return;

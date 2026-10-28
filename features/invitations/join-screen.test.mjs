@@ -102,3 +102,29 @@ test('invalid invite remains retryable, input changes are respected, and cancell
   h.input().props.onChangeText('ABC123'); h.render(); await h.button('Go back').props.onPress();
   assert.deepEqual(h.clears, ['intent-a']); assert.deepEqual(h.navigation, ['/(app)']); h.unmount();
 });
+
+test('editing an invite code does not detach Back or a successful join from the original intent', async () => {
+  for (const action of ['back', 'join']) {
+    const h = harness();
+    h.input().props.onChangeText('DEF456'); h.render();
+    if (action === 'back') await h.button('Go back').props.onPress();
+    else {
+      const request = h.button('Join league').props.onPress(); await h.flush();
+      h.joins[0].resolve({ data: 'league-a', error: null }); await request; await h.flush();
+    }
+    assert.deepEqual(h.clears, ['intent-a']);
+    assert.equal(h.state.pending, null);
+    h.unmount();
+  }
+});
+
+test('cancelling an old screen after editing never clears a newer invitation', async () => {
+  const h = harness();
+  h.input().props.onChangeText('DEF456'); h.render();
+  h.state.pending = { code: 'NEW789', nonce: 'intent-b', userId: 'user-a' };
+  h.render();
+  await h.button('Go back').props.onPress();
+  assert.deepEqual(h.clears, []);
+  assert.equal(h.state.pending.nonce, 'intent-b');
+  h.unmount();
+});

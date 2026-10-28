@@ -3,6 +3,20 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Bind invitation cancellation to the opened intent
+
+- Observation: final Batch-2 review found that editing a prefilled code detached
+  Back/success cleanup from the remembered invitation. A screen-handler test
+  reproduced the stale intent before correction; build 32 had already uploaded.
+- Correction: use the route's immutable invitation nonce for cleanup, with a
+  conditional clear that cannot erase a newer invitation. Review this before
+  starting native delivery rather than relying only on unchanged-input cases.
+- Executed transfer checks: cancel after editing, successfully join after
+  editing, and cancel an old screen while a newer intent exists. The first two
+  clear the original intent; the third preserves the newer one. Build 33
+  replaces build 32 for testing. These are synthetic screen-handler checks,
+  not native-device results.
+
 ## Separate functional passes from release security
 
 - Observation: successful sign-in/recovery and a saved review branch were

@@ -3,6 +3,21 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Distinguish an app address from a usable shared invitation
+
+- Observation: the founder reported the build-33 app-only URI unclickable both
+  in Commito's preview and after sharing. The preview was a plain Text element;
+  a correct Expo URI did not establish that a messenger would make it tappable.
+- Correction: share a published HTTPS invitation page, make its preview link
+  explicitly interactive, and preserve manual code entry. Keep web sharing off
+  until publication is verified. Do not claim universal/deferred linking or
+  automatic installation handoff from a web bridge with an Open button.
+- Executed transfer checks: web mode shares HTTPS; unpublished mode contains
+  no dead link; the bridge rejects duplicate/unsafe input and matches the actual
+  installed Expo native URL. Copy denial retains manual entry. Chrome checks at
+  actual 320px/390px viewports show no horizontal overflow. Actual iPhone and
+  messenger behavior remains pending publication and device testing.
+
 ## Bind invitation cancellation to the opened intent
 
 - Observation: final Batch-2 review found that editing a prefilled code detached

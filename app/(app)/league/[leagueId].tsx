@@ -4,13 +4,13 @@ import { MonthlyResults } from "@/components/MonthlyResults";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { deleteCurrentAccount } from "@/features/auth/account";
-import { buildInviteMessage } from "@/features/invitations/links";
+import { buildInviteMessage, buildInviteShareContent, buildInviteWebUrl } from "@/features/invitations/links";
 import { usePendingInvite } from "@/features/invitations/pending-invite";
 import { canEditUtcDate, millisecondsUntilNextUtcDay, utcCalendar, utcDateKey } from "@/features/leagues/utc-calendar";
 import { getLeagueMembers } from "@/features/leagues/api";
 import { compareRankNames } from "@/features/leagues/monthly-results";
 import { useMonthlyHistory } from "@/features/leagues/use-monthly-history";
-import { MONTHLY_RESULTS_AVAILABLE } from "@/constants/launch";
+import { INVITE_WEB_PAGE_AVAILABLE, MONTHLY_RESULTS_AVAILABLE } from "@/constants/launch";
 import { scheduleGentleTestNotification } from "@/features/notifications/local";
 import { supabase } from "@/lib/supabase";
 import * as Clipboard from "expo-clipboard";
@@ -22,6 +22,7 @@ import {
   AppState,
   Alert,
   Animated,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -425,7 +426,7 @@ export default function LeagueDetailScreen() {
   async function onShareInvite() {
     if (!inviteCode) return;
     try {
-      await Share.share({ message: buildInviteMessage(inviteCode) });
+      await Share.share(buildInviteShareContent(inviteCode));
     } catch {
       Alert.alert("Could not share invitation", "Please copy the invite code and send it instead.");
     }
@@ -789,6 +790,14 @@ export default function LeagueDetailScreen() {
       : ([UI.bgTop, UI.bgBottom] as const);
 
   const inviteMessage = inviteCode ? buildInviteMessage(inviteCode) : "";
+  const inviteWebUrl = inviteCode && INVITE_WEB_PAGE_AVAILABLE ? buildInviteWebUrl(inviteCode) : null;
+  const inviteLinkIndex = inviteWebUrl ? inviteMessage.indexOf(inviteWebUrl) : -1;
+
+  async function openInvitePreview() {
+    if (!inviteWebUrl) return;
+    try { await Linking.openURL(inviteWebUrl); }
+    catch { Alert.alert("Could not open invitation", "You can still share or copy the invite code."); }
+  }
 
   return (
     <ThemedView style={styles.container}>
@@ -820,7 +829,16 @@ export default function LeagueDetailScreen() {
               <Text style={styles.modalMessageLabel}>Message</Text>
               <View style={styles.messageBox}>
                 <ScrollView style={{ maxHeight: 180 }}>
-                  <Text style={styles.messageText}>{inviteMessage}</Text>
+                  <Text style={styles.messageText}>
+                    {inviteWebUrl && inviteLinkIndex >= 0 ? <>
+                      {inviteMessage.slice(0, inviteLinkIndex)}
+                      <Text accessibilityRole="link" accessibilityLabel="Open league invitation"
+                        onPress={openInvitePreview} style={{ color: "#D6BAFF", textDecorationLine: "underline" }}>
+                        {inviteWebUrl}
+                      </Text>
+                      {inviteMessage.slice(inviteLinkIndex + inviteWebUrl.length)}
+                    </> : inviteMessage}
+                  </Text>
                 </ScrollView>
               </View>
 

@@ -87,6 +87,9 @@ Commito may use third-party services to operate the app, including:
 
 - Supabase for authentication and database services.
 - Expo for app development and delivery services.
+- GitHub Pages for public support, privacy and invitation pages. An invitation
+  page address contains its invite code; hosting providers may process page
+  requests. The invitation page does not look up accounts or league activity.
 - Apple and Google for supported sign-in methods and app distribution.
 - Google's email service for account confirmation and password-reset emails
   sent through Supabase Auth.

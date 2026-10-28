@@ -31,6 +31,46 @@ than superseded build 32 for testing.
 
 ## Observable outcome
 
+### Follow-up: tappable sharing, local preparation
+
+The founder reports build 33's `microhabit:///` address is unclickable both in
+the app's preview and after sending the shared message. The preview was plain
+Text. A valid app-only address does not make it a usable messenger link.
+
+The prepared fix shortens the message and, after publication, shares
+`https://keque.github.io/MicroHabit/join/?code=…`. Its preview uses an explicit
+accessible link handler; native iOS sharing also receives the URL separately.
+The new static `docs/join/index.html` and `invite.js` show a code, Open Commito
+and Copy invite code. They perform no account/league lookup or automatic join.
+The Open button uses the exact existing native URI validated by the app.
+Missing installation or blocked clipboard/browser handoff retains manual code
+entry. No store URL, new domain, analytics service or universal-link entitlement
+is introduced. This is a web page with an explicit app button, not a promise of
+one-tap universal linking or retaining a code automatically through installation.
+
+`INVITE_WEB_PAGE_AVAILABLE=false` until publication and a fresh HTTPS check.
+While disabled, the prepared share message uses code instructions and shares no
+unpublished URL or misleading app-only address. Installed build 33 is unchanged.
+Read-only HTTP checks confirm the existing support page returns 200 and the new
+join path returns 404; no page has been published and no new build was uploaded
+for this fix. Privacy sources now describe the existing GitHub hosting and the
+invitation code in the page URL; these edits are also local.
+
+Verification: all 76 Node tests pass, as do TypeScript and full ESLint. New
+checks cover web-sharing enabled/disabled, explicit app address matching the
+installed Expo builder, invalid/duplicate input and clipboard failure. Actual
+Chrome with device viewport overrides at 320px and 390px loaded the page/script
+under its content security policy, displayed the expected app button and showed
+no horizontal overflow. This does not prove iOS app handoff, native preview
+touches, VoiceOver or messenger auto-linking; those need a published page and
+the next TestFlight candidate. No database change is needed.
+
+Publication needs approval because it adds a new publicly hosted page. After
+approval, inspect the actual Pages source, publish only the reviewed invitation
+files and associated disclosure without merging unrelated app work, verify
+HTTPS HTML/JS, then enable the flag and prepare the next TestFlight candidate.
+Leave the flag off and stop delivery if the live page fails verification.
+
 A friend can share an invitation through the existing native Share sheet.
 The message contains a readable code, an installed-app link, and manual
 signup/code instructions. The existing purple league screen is preserved.

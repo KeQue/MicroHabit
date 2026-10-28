@@ -19,7 +19,7 @@ function moduleFrom(file, dependencies) {
   return module.exports;
 }
 
-function linksFixture(expoGo = false) {
+function linksFixture(expoGo = false, webAvailable = false) {
   const constants = {
     executionEnvironment: expoGo ? 'store' : 'bare',
     expoConfig: { scheme: 'microhabit', ios: { bundleIdentifier: 'com.sadik.microhabit' }, ...(expoGo ? { hostUri: '192.0.2.1:8082' } : {}) },
@@ -31,7 +31,8 @@ function linksFixture(expoGo = false) {
   };
   const schemes = moduleFrom('node_modules/expo-linking/src/Schemes.ts', native);
   const linking = moduleFrom('node_modules/expo-linking/src/createURL.ts', { ...native, './Schemes': schemes, './validateURL': { validateURL() {} } });
-  return moduleFrom('features/invitations/links.ts', { 'expo-linking': linking, './invite': invite });
+  return moduleFrom('features/invitations/links.ts', { 'expo-linking': linking, './invite': invite,
+    '../../constants/launch': { INVITE_WEB_PAGE_AVAILABLE: webAvailable } });
 }
 
 test('codes normalize without accepting ambiguous characters or unbounded input', () => {
@@ -72,14 +73,62 @@ test('installed Expo Go builder remains limited to its exact development host, p
   }
 });
 
-test('shared message keeps the readable code and honest manual installation fallback', () => {
+test('unpublished web page never becomes a dead shared link; fallback remains short and usable', () => {
   const links = linksFixture();
   const message = links.buildInviteMessage('abc234');
   assert.match(message, /Invite code: ABC234/);
-  assert.ok(message.includes(links.buildInviteUrl('abc234')));
-  assert.match(message, /create an account/);
-  assert.match(message, /Keep this code if you need to install first/);
-  assert.doesNotMatch(message, /apps\.apple\.com|https:\/\/|automatically join/i);
+  assert.match(message, /choose Join and enter the code/);
+  assert.match(message, /keep this code for after signup/);
+  assert.doesNotMatch(message, /microhabit:|exp:|https:|automatically join/i);
+  assert.equal(links.buildInviteShareContent('abc234').url, undefined);
+});
+
+test('enabled sharing uses one normal HTTPS address plus a separate native share URL', () => {
+  const links = linksFixture(false, true);
+  const expected = 'https://keque.github.io/MicroHabit/join/?code=ABC234';
+  assert.equal(links.buildInviteWebUrl(' abc234 '), expected);
+  const content = links.buildInviteShareContent('abc234');
+  assert.equal(content.url, expected);
+  assert.ok(content.message.includes(expected));
+  assert.match(content.message, /Invite code: ABC234/);
+  assert.doesNotMatch(content.message, /microhabit:|exp:|automatically join/i);
+  assert.equal(links.parseInviteUrl(expected), null, 'web bridge is not an authentication or native callback');
+});
+
+function bridgeFixture(search, hash = '', clipboard = { writeText: async () => {} }) {
+  const nodes = Object.fromEntries(['intro', 'invitation', 'invite-code', 'open-app', 'copy-code', 'status']
+    .map(id => [id, { hidden: true, textContent: '', addEventListener(_, callback) { this.click = callback; } }]));
+  vm.runInNewContext(fs.readFileSync('docs/join/invite.js', 'utf8'), {
+    URL, URLSearchParams, document: { getElementById: id => nodes[id] },
+    location: { search, hash }, navigator: { clipboard },
+  });
+  return nodes;
+}
+
+test('web invitation shows only a code and explicit app link matching the installed Expo builder', async () => {
+  let copied;
+  const page = bridgeFixture('?code=abc234', '', { writeText: async value => { copied = value; } });
+  assert.equal(page['invite-code'].textContent, 'ABC234');
+  assert.equal(page['open-app'].href, linksFixture().buildInviteUrl('ABC234'));
+  assert.equal(page.invitation.hidden, false);
+  await page['copy-code'].click();
+  assert.equal(copied, 'ABC234');
+  assert.match(page.status.textContent, /copied/);
+});
+
+test('web bridge rejects ambiguous or unsafe input and offers manual fallback when copying is blocked', async () => {
+  for (const search of ['', '?code=', '?code=A&code=B', '?code=ABC&next=https://example.invalid',
+    '?code=%3Cscript%3E', '?code=' + 'A'.repeat(65), '?code=%D0%90BC']) {
+    const page = bridgeFixture(search);
+    assert.equal(page.invitation.hidden, true);
+    assert.equal(page['open-app'].href, undefined);
+    assert.match(page.intro.textContent, /invalid/);
+  }
+  assert.equal(bridgeFixture('?code=ABC234', '#other').invitation.hidden, true);
+  const page = bridgeFixture('?code=ABC234', '', { writeText: async () => { throw new Error('denied'); } });
+  await page['copy-code'].click();
+  assert.match(page.status.textContent, /enter it in Commito/);
+  assert.equal(page['invite-code'].textContent, 'ABC234');
 });
 
 test('stored invitations expire at seven days and old accounts are hidden immediately', () => {

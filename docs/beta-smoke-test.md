@@ -37,13 +37,17 @@ entire subsequent audit. Installed build 28 does not contain these changes.
   SMTP and all other auth fields remained unchanged. The prior allowlist was
   saved outside the repository for rollback. No wildcard redirects or relaxed
   client validation were added. This correction needs no new app binary.
-  Founder retesting of both providers after this correction is pending.
+  The founder subsequently retried both providers as requested and reported
+  that both worked on October 28. This resolves the observed social-login
+  regression for those iPhone attempts; cancellation and account-linking edge
+  cases are not established by this result.
 - Four new regression tests execute the installed Expo URL/Scheme code and the
   actual app link wrapper, with only native manifest/platform and backend
   dependencies mocked. They check standalone allowlist alignment, a synthetic
   code exchange, the rejected fallback-address shape/unrelated origins, and
   exact Expo Go host/port isolation. All 27 automated tests pass. This does not
-  substitute for the pending native provider retest.
+  substitute for native provider testing. The founder's successful post-fix
+  Google/Apple attempts are recorded separately above.
 - **Deferred at the founder's request October 28:** Repeating password recovery
   on build 29 was skipped because the founder had tested it previously. The
   build-28 result remains a pass; build-29 native recovery is unverified.

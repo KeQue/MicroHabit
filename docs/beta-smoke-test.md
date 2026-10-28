@@ -10,15 +10,22 @@ The [iOS build](https://expo.dev/accounts/keke12/projects/microhabit/builds/23f5
 finished successfully with version 1.0.2, build 29 and that exact commit. Expo
 reports a ready artifact and completion at 15:44:10 UTC on October 27. The
 [TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/dd26e04a-b015-4377-8f22-6ecc9cb3ee20)
-was scheduled using existing EAS credentials. Its latest checked status is
-`IN_QUEUE`, without a reported error; it is no longer waiting for compilation.
-The upload and Apple processing are not yet verified complete. No public App
-Store review/release has been performed.
+was scheduled using existing EAS credentials. A fresh Expo check on October 28
+confirms the submission is `FINISHED`, without a reported error. This verifies
+the upload; it does not independently inspect Apple processing or the build
+number installed on the phone. No public App Store review/release was performed.
 
 **Public release remains NO-GO.** The earlier build-28 functional results did
 not establish security or public-release readiness. This candidate addresses
 native callback trust, PKCE and local session storage; it does not close the
 entire subsequent audit. Installed build 28 does not contain these changes.
+
+- **Pass, narrow device observation (founder reported October 28, 2026):**
+  Following the instruction to update to build 29 without uninstalling, the
+  founder reported that the app remained signed in. The displayed build number
+  and a subsequent full restart were not separately confirmed in that report.
+  This supports session continuity after the instructed update, not independent
+  verification of Keychain contents, plaintext removal or every recovery flow.
 
 - Fresh protected Supabase inspection succeeded through read-only management
   queries: 27 public functions, 29 policies, and RLS enabled on all public tables.

@@ -18,6 +18,11 @@ current plan; standard submission succeeded without a plan change or rebuild.
 
 ## Product rules
 
+The founder subsequently reported the monthly-history screen working and asked
+for a compact layout revision. Build 31 preparation moves the current-month
+label into the existing Past results row; this changes no cycle rules or backend
+objects. See the build-31 entry in [beta checks](beta-smoke-test.md).
+
 - Use UTC calendar months: 28, 29, 30 or 31 days. The old May launch plan's
   fixed 30-day wording is superseded by the current free strategy.
 - Continue automatically in the same league, with the same members and invite

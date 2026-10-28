@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 type Props = {
+  currentMonth: string;
   cycles: MonthlyCycle[];
   currentUserId: string;
   loading: boolean;
@@ -27,7 +28,7 @@ function closingLabel(value: string) {
 
 /** Displays server-supplied results only; this panel never calculates or edits rankings. */
 export function MonthlyResults({
-  cycles, currentUserId, loading, error, onOpen, onRetry,
+  currentMonth, cycles, currentUserId, loading, error, onOpen, onRetry,
   hasMore = false, loadingMore = false, moreError = null, onLoadMore,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
@@ -35,6 +36,7 @@ export function MonthlyResults({
   const ordered = useMemo(() => [...cycles].sort((a, b) => b.month_start.localeCompare(a.month_start)), [cycles]);
   const selectedIndex = Math.max(0, ordered.findIndex((cycle) => cycle.month_start === selectedMonth));
   const cycle = ordered[selectedIndex];
+  const currentMonthLabel = formatUtcMonth(currentMonth);
 
   useEffect(() => {
     setExpanded(false);
@@ -50,14 +52,15 @@ export function MonthlyResults({
     <View style={styles.panel}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Past results"
+        accessibilityLabel={`Past results. Current month: ${currentMonthLabel}`}
         accessibilityHint={expanded ? "Hide previous monthly results" : "Show previous monthly results"}
         accessibilityState={{ expanded }}
         onPress={toggle}
         style={({ pressed }) => [styles.toggle, pressed && styles.pressed]}
       >
         <Ionicons name="calendar-outline" size={18} color="#BCA3E3" accessible={false} />
-        <Text style={styles.title}>Past results</Text>
+        <Text style={styles.title} numberOfLines={1}>Past results</Text>
+        <Text style={styles.currentMonth} numberOfLines={1}>{currentMonthLabel}</Text>
         <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={16} color="#BCA3E3" accessible={false} />
       </Pressable>
       {expanded ? (
@@ -151,7 +154,8 @@ export function MonthlyResults({
 const styles = StyleSheet.create({
   panel: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(162,89,255,0.16)", backgroundColor: "rgba(162,89,255,0.08)", overflow: "hidden", marginBottom: 8 },
   toggle: { minHeight: 46, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  title: { flex: 1, color: "#EDE7FF", fontSize: 14, fontWeight: "600" },
+  title: { flex: 1, minWidth: 0, color: "#EDE7FF", fontSize: 14, fontWeight: "600" },
+  currentMonth: { flexShrink: 1, color: "rgba(237,231,255,0.65)", fontSize: 12, textAlign: "right" },
   pressed: { backgroundColor: "rgba(162,89,255,0.18)" },
   content: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(237,231,255,0.10)", paddingHorizontal: 12, paddingBottom: 10 },
   message: { alignItems: "center", gap: 8, paddingVertical: 14 },

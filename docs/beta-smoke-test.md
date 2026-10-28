@@ -3,6 +3,20 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
+## Compact month row — build 31 preparation, October 28, 2026
+
+The founder reported the monthly-history screen working and supplied a native
+screenshot. They requested moving the separate current-month label into the
+Past results control to reduce scrolling. This is a layout-only revision:
+`October 2026` now appears beside `Past results` in its existing row. Removing
+the standalone text and its bottom margin moves the member cards upward.
+
+TypeScript and targeted lint pass. A synthetic React Native Web / headless
+Chrome preview fits the row at 320px and 390px widths, including September's
+longer label. Icons were substituted in that preview; actual iPhone layout and
+VoiceOver remain pending. No database, scoring or check-in behavior changed.
+Build 31 is being prepared; installed build 30 retains the previous layout.
+
 ## Monthly history Batch 1 — build 30, October 28, 2026
 
 See [monthly cycle rules and verification](monthly-cycles.md). The founder

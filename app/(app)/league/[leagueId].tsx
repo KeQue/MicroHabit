@@ -6,7 +6,7 @@ import { UserCard } from "@/components/UserCard";
 import { deleteCurrentAccount } from "@/features/auth/account";
 import { canEditUtcDate, millisecondsUntilNextUtcDay, utcCalendar, utcDateKey } from "@/features/leagues/utc-calendar";
 import { getLeagueMembers } from "@/features/leagues/api";
-import { compareRankNames, formatUtcMonth } from "@/features/leagues/monthly-results";
+import { compareRankNames } from "@/features/leagues/monthly-results";
 import { useMonthlyHistory } from "@/features/leagues/use-monthly-history";
 import { MONTHLY_RESULTS_AVAILABLE } from "@/constants/launch";
 import { scheduleGentleTestNotification } from "@/features/notifications/local";
@@ -1024,10 +1024,10 @@ Open Commito \u2192 Join \u2192 Paste the code`;
             </View>
           ) : null}
 
-          <Text style={styles.monthLabel}>{formatUtcMonth(start)}</Text>
           {MONTHLY_RESULTS_AVAILABLE && !loading && !error && hasCurrentCalendarData && myId && leagueIsFree === true ? (
             <MonthlyResults
               key={`${leagueId}:${myId}`}
+              currentMonth={start}
               cycles={history.cycles}
               currentUserId={myId}
               loading={history.loading}
@@ -1130,7 +1130,6 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 }
 
 const styles = StyleSheet.create({
-  monthLabel: { color: UI.muted, fontSize: 12, fontWeight: "600", textAlign: "center", marginBottom: 12 },
   container: { flex: 1, backgroundColor: "transparent" },
   bg: { flex: 1 },
 

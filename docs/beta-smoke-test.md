@@ -20,6 +20,34 @@ not establish security or public-release readiness. This candidate addresses
 native callback trust, PKCE and local session storage; it does not close the
 entire subsequent audit. Installed build 28 does not contain these changes.
 
+- **Build-29 social-login regression reported October 28:** The founder's
+  iPhone showed `Could not complete Google sign-in` and the corresponding Apple
+  error. The actual installed Expo Linking implementation generates
+  `microhabit:///sign-in` and `microhabit:///update-password` for the app's
+  leading-slash inputs. Supabase allowed only the two-slash forms, with the
+  two-slash sign-in address as Site URL. The stricter build-29 callback wrapper
+  rejects that different return-address shape. A test executing the installed
+  Expo implementation reproduced the mismatch; the older mock URL builder had
+  removed the leading slash and concealed it. No native interception attack or
+  new provider-credential failure was established by these screenshots.
+- **Targeted live correction October 28:** Added only the exact addresses
+  `microhabit:///sign-in` and `microhabit:///update-password` to the existing
+  Supabase redirect allowlist. A fresh configuration read verified that only
+  `uri_allow_list` changed; Site URL, existing addresses, provider credentials,
+  SMTP and all other auth fields remained unchanged. The prior allowlist was
+  saved outside the repository for rollback. No wildcard redirects or relaxed
+  client validation were added. This correction needs no new app binary.
+  Founder retesting of both providers after this correction is pending.
+- Four new regression tests execute the installed Expo URL/Scheme code and the
+  actual app link wrapper, with only native manifest/platform and backend
+  dependencies mocked. They check standalone allowlist alignment, a synthetic
+  code exchange, the rejected fallback-address shape/unrelated origins, and
+  exact Expo Go host/port isolation. All 27 automated tests pass. This does not
+  substitute for the pending native provider retest.
+- **Deferred at the founder's request October 28:** Repeating password recovery
+  on build 29 was skipped because the founder had tested it previously. The
+  build-28 result remains a pass; build-29 native recovery is unverified.
+
 - **Pass, narrow device observation (founder reported October 28, 2026):**
   Following the instruction to update to build 29 without uninstalling, the
   founder reported that the app remained signed in. The displayed build number

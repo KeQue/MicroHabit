@@ -18,6 +18,21 @@ a roadmap, confidence score, or claim that the model has been retrained.
   partial protected data. The build-29 automated tests exercise these cases.
   Actual native Keychain/provider flows remain pending until device testing.
 
+## Test real return-address generation
+
+- Observation: the build-29 integration fixture mocked Expo createURL by
+  stripping a leading slash. The installed Expo implementation retains it in
+  standalone links, producing three slashes. The server allowed only two-slash
+  forms; strict callback validation then rejected the different return shape.
+- Correction: execute the installed URL builder with controlled native manifest
+  inputs and compare its exact output with the configured server allowlist.
+  Mock native dependencies instead of replacing the transformation under test.
+- Transfer checks: standalone sign-in and recovery addresses must both be
+  explicitly allowed; Expo Go must still reject a different host or port; an
+  unrelated origin must remain rejected. All four new regression tests pass.
+  The live fix adds two exact addresses and preserves strict PKCE validation;
+  native Google/Apple retesting remains separate evidence.
+
 ## Assess the requested subject
 
 - Observation: a request to improve assistant quality became a founder-training

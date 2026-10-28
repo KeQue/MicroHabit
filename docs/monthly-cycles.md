@@ -10,18 +10,18 @@ Build-30 source checkpoint: `68cb3e9171b179a36a58061c86e06371dd2ab0d3`.
 The [Expo build](https://expo.dev/accounts/keke12/projects/microhabit/builds/94ff94ab-b2d6-413c-b1ee-3751ed6fb846)
 finished at 20:24:05 UTC on October 28 with the expected version/build/source
 and an available binary. The [TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/ed0f5aae-1b5d-4c16-a7da-1f6132df57f3)
-was still `IN_QUEUE` at 20:37:29 UTC on October 28, with no reported error.
-Poll that same submission before retrying; do not create duplicate submissions.
-A queued submission is not confirmation of completed Apple upload or
-TestFlight availability. Optional Expo-hosted test notes were rejected by the
+was initially queued, then a fresh check at 20:58:55 UTC confirmed `FINISHED`.
+The founder also reported the monthly-history screen working. Optional
+Expo-hosted test notes were rejected by the
 current plan; standard submission succeeded without a plan change or rebuild.
 
 ## Product rules
 
 The founder subsequently reported the monthly-history screen working and asked
-for a compact layout revision. Build 31 preparation moves the current-month
+for a compact layout revision. Build 31 moves the current-month
 label into the existing Past results row; this changes no cycle rules or backend
-objects. See the build-31 entry in [beta checks](beta-smoke-test.md).
+objects. Its build is underway with automatic TestFlight submission scheduled.
+See the build-31 entry in [beta checks](beta-smoke-test.md).
 
 - Use UTC calendar months: 28, 29, 30 or 31 days. The old May launch plan's
   fixed 30-day wording is superseded by the current free strategy.

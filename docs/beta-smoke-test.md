@@ -15,7 +15,11 @@ TypeScript and targeted lint pass. A synthetic React Native Web / headless
 Chrome preview fits the row at 320px and 390px widths, including September's
 longer label. Icons were substituted in that preview; actual iPhone layout and
 VoiceOver remain pending. No database, scoring or check-in behavior changed.
-Build 31 is being prepared; installed build 30 retains the previous layout.
+The [build-31 job](https://expo.dev/accounts/keke12/projects/microhabit/builds/458a5369-7223-4352-99c6-5270dd8ce2d1)
+has started from source checkpoint `183fb51`. Its [automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/32f4ab67-53ef-4df0-9eec-4a3778ff1ebd)
+is scheduled using existing credentials. This is not confirmation that the new
+binary is already available on the phone; installed build 30 retains the old
+layout. A fresh Expo check confirms build 30's submission is now `FINISHED`.
 
 ## Monthly history Batch 1 — build 30, October 28, 2026
 

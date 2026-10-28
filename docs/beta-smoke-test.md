@@ -3,6 +3,29 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
+## HTTPS invitations — build 34 preparation, October 28, 2026
+
+The founder confirmed build 33's app-only address was unclickable both in the
+preview and after sending. They approved publication and a new TestFlight build.
+Only the reviewed invitation/disclosure files were published to Pages `main`;
+its exact commit, public HTML/JS and privacy text were verified. Live Chrome
+checks at 320px/390px passed with synthetic code and no database requests.
+All 76 Node tests, TypeScript and full lint pass. Build 34 enables the published
+web link; build 33 retains the old share text. Native checks remain pending:
+
+- [ ] Update Commito to **1.0.2 (34)** and share a **new** invitation. Its address
+  should start with `https://keque.github.io/MicroHabit/join/`, with the same code.
+- [ ] Tap that address in Commito's preview: the invitation page opens.
+- [ ] Send it in a messenger and tap the received HTTPS link. On the page, tap
+  **Open Commito**; the Join screen is prefilled. Membership requires a tap.
+- [ ] Repeat while signed out: sign in, retain the invitation and join once.
+- [ ] Copy invite code on the page. With blocked clipboard or no installed app,
+  manual instructions and the code remain available. Keep the code through
+  installation; this is not deferred-install/universal linking.
+
+No production migration or public App Store release is part of this fix. See
+[publication evidence and boundaries](invitations-engagement.md).
+
 ## Invitations and measurement — Batch 2 / build 33, October 28, 2026
 
 See [implementation, metric definitions and evidence](invitations-engagement.md).

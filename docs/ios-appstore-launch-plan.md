@@ -29,6 +29,11 @@ migration is now committed and verified; build 33 and its TestFlight upload
 finished. Native testing remains pending. This does not close the public
 release gates below.
 
+The founder subsequently approved a normal HTTPS invitation page and build 34
+after reporting the shared app-only address unclickable. The website-only
+publication is verified; native delivery/testing remain pending. See the same
+Batch-2 record for exact source and deployment boundaries.
+
 ## Current Launch Gate
 
 Before the next App Store submission, finish the security/accessibility gate tracked in `docs/security-accessibility-audit.md`.

@@ -3,8 +3,9 @@
 October 28, 2026. The founder explicitly approved this reporting migration and
 a new TestFlight build after reviewing the local implementation. The single
 migration committed at 21:59:39 UTC and was verified from fresh requests.
-Commito 1.0.2 (33) is the corrected TestFlight candidate, built and uploaded;
-installed build 31 does not contain these invitation changes. The next
+Commito 1.0.2 (34) is being prepared with published HTTPS invitations; build 33
+still shares the app-only address. Installed build 31 lacks the Batch-2
+invitation changes. The next
 retention batch and a public App Store release are outside this approval.
 
 Superseded build-32 source: `6e215b66c2297eeda92b067c3393b4449d0a2fd0`.
@@ -31,13 +32,13 @@ than superseded build 32 for testing.
 
 ## Observable outcome
 
-### Follow-up: tappable sharing, local preparation
+### Follow-up: published web invitations / build 34
 
 The founder reports build 33's `microhabit:///` address is unclickable both in
 the app's preview and after sending the shared message. The preview was plain
 Text. A valid app-only address does not make it a usable messenger link.
 
-The prepared fix shortens the message and, after publication, shares
+The approved fix shortens the message and shares
 `https://keque.github.io/MicroHabit/join/?code=…`. Its preview uses an explicit
 accessible link handler; native iOS sharing also receives the URL separately.
 The new static `docs/join/index.html` and `invite.js` show a code, Open Commito
@@ -48,28 +49,37 @@ entry. No store URL, new domain, analytics service or universal-link entitlement
 is introduced. This is a web page with an explicit app button, not a promise of
 one-tap universal linking or retaining a code automatically through installation.
 
-`INVITE_WEB_PAGE_AVAILABLE=false` until publication and a fresh HTTPS check.
-While disabled, the prepared share message uses code instructions and shares no
-unpublished URL or misleading app-only address. Installed build 33 is unchanged.
-Read-only HTTP checks confirm the existing support page returns 200 and the new
-join path returns 404; no page has been published and no new build was uploaded
-for this fix. Privacy sources now describe the existing GitHub hosting and the
-invitation code in the page URL; these edits are also local.
+The founder approved publishing the page and a new TestFlight build. Pages
+configuration was inspected: source `main`, directory `/docs`. A separate
+[website-only commit](https://github.com/KeQue/MicroHabit/commit/59c847eda6b200345445627e98c53e520e6de415)
+updates exactly four files: the invitation HTML/JS and both privacy sources.
+It is based on remote `ba145724ad2f3b1aaf24325bd776f3903867265b`, with a guarded
+fast-forward of `main`; no app branch or unrelated app work was merged/pushed.
+GitHub reports this exact Pages commit built successfully. Fresh HTTPS requests
+to the invitation HTML, script and privacy page all returned 200 and matched
+the reviewed source after line-ending normalization. The script is served as
+JavaScript. Privacy now describes GitHub hosting, URL codes and aggregate usage.
+
+Only after those checks, `INVITE_WEB_PAGE_AVAILABLE=true` was set for build 34.
+Installed build 33 is unchanged. Turning the flag off keeps manual code sharing
+and omits a web link; do not remove a published page while shared links use it.
+Any recovery should restore a reviewed safe page at the same address, preserving
+the code fallback, rather than reset `main` or overwrite unrelated updates.
 
 Verification: all 76 Node tests pass, as do TypeScript and full ESLint. New
 checks cover web-sharing enabled/disabled, explicit app address matching the
 installed Expo builder, invalid/duplicate input and clipboard failure. Actual
-Chrome with device viewport overrides at 320px and 390px loaded the page/script
-under its content security policy, displayed the expected app button and showed
-no horizontal overflow. This does not prove iOS app handoff, native preview
-touches, VoiceOver or messenger auto-linking; those need a published page and
-the next TestFlight candidate. No database change is needed.
+Chrome with device viewport overrides at 320px and 390px loaded both the local
+and now-public HTTPS page/script under its content security policy, displayed
+the expected app button and showed no horizontal overflow. The live test used
+only synthetic `ABC234`, performed no account lookup and created no membership.
+This does not prove iOS app handoff, native preview touches, VoiceOver or
+messenger auto-linking; these remain device checks for build 34. No database
+change or public App Store release was performed for this fix.
 
-Publication needs approval because it adds a new publicly hosted page. After
-approval, inspect the actual Pages source, publish only the reviewed invitation
-files and associated disclosure without merging unrelated app work, verify
-HTTPS HTML/JS, then enable the flag and prepare the next TestFlight candidate.
-Leave the flag off and stop delivery if the live page fails verification.
+The native candidate preserves the app identity, sign-in validation, join RPC,
+league rules and paid-disabled flag. Test sharing afresh from build 34; old
+messages containing `microhabit:///` do not change automatically.
 
 A friend can share an invitation through the existing native Share sheet.
 The message contains a readable code, an installed-app link, and manual

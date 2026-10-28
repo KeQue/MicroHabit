@@ -16,7 +16,7 @@ const config: ExpoConfig = {
 
     // IMPORTANT: increment this every TestFlight/App Store upload
     // Must be higher than the last uploaded build number
-    buildNumber: "33",
+    buildNumber: "34",
 
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,

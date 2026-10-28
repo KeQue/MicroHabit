@@ -1,6 +1,26 @@
 # MicroHabit / Commito iOS App Store Launch Plan
 
-Last updated: 2026-05-08
+Original plan: 2026-05-08. Current-direction clarification: 2026-10-28.
+
+## Current direction takes precedence over the historical plan below
+
+The founder's immediate objective is to validate **free social habit leagues**.
+Payments, prizes, gift cards, simulated financial stakes and charity claims are
+outside the public free release. The paid strategy below is historical context,
+not authorization to enable it. Existing security and App Store gates remain.
+
+Cycles follow **UTC calendar months**, including February and leap years; the
+older "30 days" statement below is superseded. Members continue in the same
+league with the same invite code. New-month check-ins start on day 1 without
+deleting older logs. The founder confirmed on October 28 that the previous
+month's last day remains correctable throughout day 1; results become final at
+**00:00 UTC on day 2**. See [monthly-cycle implementation](monthly-cycles.md)
+for Batch 1 rules, verification, limitations and deployment status.
+
+The current retention batches are: monthly history first; invitations and
+minimal engagement measurement second; recap/reminder improvements third;
+safeguarded nudges and voluntary achievements last. Each batch requires review
+before starting the next. This does not approve any production migration.
 
 ## Current Launch Gate
 

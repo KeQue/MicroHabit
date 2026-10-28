@@ -63,3 +63,9 @@ a roadmap, confidence score, or claim that the model has been retrained.
 - Future check: distinguish representation differences from semantic changes
   before retrying an operation. An unexpected mismatch is not permission to
   remove the safety check.
+- Applied to monthly history: a snapshot equality test failed after changing
+  the database session timezone. Scores and names were unchanged; JSON's
+  timestamp representation differed. The API now emits an explicit UTC value.
+  The original cross-timezone equality assertion remains and passes; checking
+  the exact day-2 cutoff separately prevents formatting fixes from hiding a
+  business-rule error.

@@ -1,5 +1,17 @@
 import { supabase } from "../../lib/supabase";
 import { utcCalendar } from "./utc-calendar";
+import { parseMonthlyCycles, type MonthlyCycle } from "./monthly-results";
+
+/** Authoritative, member-only results. No client-side settlement fallback. */
+export async function getFreeLeagueHistory(
+  leagueId: string, before: string | null = null, limit = 12
+): Promise<MonthlyCycle[]> {
+  const { data, error } = await supabase.rpc("get_free_league_history", {
+    p_league_id: leagueId, p_before: before, p_limit: limit,
+  });
+  if (error) throw error;
+  return parseMonthlyCycles(data);
+}
 
 /**
  * Data types

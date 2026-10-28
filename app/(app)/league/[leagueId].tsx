@@ -1,10 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { AccountMenuSheet } from "@/components/AccountMenuSheet";
+import { MonthlyResults } from "@/components/MonthlyResults";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { deleteCurrentAccount } from "@/features/auth/account";
 import { canEditUtcDate, millisecondsUntilNextUtcDay, utcCalendar, utcDateKey } from "@/features/leagues/utc-calendar";
 import { getLeagueMembers } from "@/features/leagues/api";
+import { compareRankNames, formatUtcMonth } from "@/features/leagues/monthly-results";
+import { useMonthlyHistory } from "@/features/leagues/use-monthly-history";
+import { MONTHLY_RESULTS_AVAILABLE } from "@/constants/launch";
 import { scheduleGentleTestNotification } from "@/features/notifications/local";
 import { supabase } from "@/lib/supabase";
 import * as Clipboard from "expo-clipboard";
@@ -348,6 +352,11 @@ export default function LeagueDetailScreen() {
   const [leagueActivity, setLeagueActivity] = useState<string>("");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [leagueIsFree, setLeagueIsFree] = useState<boolean | null>(null);
+  const history = useMonthlyHistory(
+    MONTHLY_RESULTS_AVAILABLE && leagueIsFree === true && hasCurrentCalendarData ? leagueId : "",
+    myId, utcDay
+  );
+  const refreshHistory = history.refresh;
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -600,10 +609,11 @@ Open Commito \u2192 Join \u2192 Paste the code`;
     setRefreshing(true);
     try {
       await load();
+      refreshHistory();
     } finally {
       setRefreshing(false);
     }
-  }, [load]);
+  }, [load, refreshHistory]);
 
   useEffect(() => {
     void load();
@@ -686,7 +696,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
         .map((m) => ({ m, s: scoreDays(m.days) }))
         .sort((a, b) => {
           if (b.s !== a.s) return b.s - a.s;
-          const n = a.m.name.localeCompare(b.m.name);
+          const n = compareRankNames(a.m.name, b.m.name);
           if (n !== 0) return n;
           return a.m.id.localeCompare(b.m.id);
         });
@@ -834,7 +844,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
             setMenuOpen(false);
             Alert.alert(
               "Check-in rules",
-              "You can mark today and yesterday complete or incomplete. Earlier days and future days are locked. All league members share the same day boundary: 00:00 UTC. The calendar and monthly rankings follow this cutoff."
+              "You can mark today and yesterday complete or incomplete. Earlier days and future days are locked. All league members share the same day boundary: 00:00 UTC. Each calendar month starts fresh in the same league. The previous month stays open for its last-day correction on day 1, then becomes final at 00:00 UTC on day 2. Rankings use completed days, then display name and member ID for equal scores. Longest streak does not break ties."
             );
           }}
           onBack={() => {
@@ -1014,6 +1024,22 @@ Open Commito \u2192 Join \u2192 Paste the code`;
             </View>
           ) : null}
 
+          <Text style={styles.monthLabel}>{formatUtcMonth(start)}</Text>
+          {MONTHLY_RESULTS_AVAILABLE && !loading && !error && hasCurrentCalendarData && myId && leagueIsFree === true ? (
+            <MonthlyResults
+              key={`${leagueId}:${myId}`}
+              cycles={history.cycles}
+              currentUserId={myId}
+              loading={history.loading}
+              error={history.error}
+              onOpen={history.open}
+              onRetry={history.retry}
+              hasMore={history.hasMore}
+              loadingMore={history.loadingMore}
+              moreError={history.moreError}
+              onLoadMore={history.loadMore}
+            />
+          ) : null}
           {!loading && hasCurrentCalendarData && yesterdayOutsideMonth && myId && leagueIsFree !== false ? (
             <View style={{ alignItems: "flex-start", gap: 8, marginBottom: 16 }}>
               <PillButton
@@ -1104,6 +1130,7 @@ Open Commito \u2192 Join \u2192 Paste the code`;
 }
 
 const styles = StyleSheet.create({
+  monthLabel: { color: UI.muted, fontSize: 12, fontWeight: "600", textAlign: "center", marginBottom: 12 },
   container: { flex: 1, backgroundColor: "transparent" },
   bg: { flex: 1 },
 

@@ -86,7 +86,7 @@ export default function ChoosePlanScreen() {
         <View style={styles.list}>
           <PlanCard
             title="Free"
-            subtitle="Start with one league and keep the habit simple."
+            subtitle="Build habits with friends in free leagues during the beta."
             badge="FREE"
             accent="free"
             onPress={() => setPlan("free")}

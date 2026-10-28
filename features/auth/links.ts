@@ -1,99 +1,38 @@
 import * as Linking from "expo-linking";
-import { supabase } from "../../lib/supabase";
+import { AUTH_STORAGE_KEY, authStorage, supabase } from "../../lib/supabase";
+import { consumeAuthCallback, parseAuthCallbackUrl as parseCallback } from "./callback";
+import { pendingPkceFlow } from "./pkce-flow";
 
-type AuthCallbackResult =
-  | { kind: "none" }
-  | { kind: "recovery" }
-  | { kind: "signed-in" }
-  | { kind: "error"; message: string };
-
-function normalizedPath(path: string) {
-  return path.startsWith("/") ? path : `/${path}`;
-}
-
-const ALLOWED_AUTH_CALLBACK_PATHS = new Set(["/sign-in", "/update-password"]);
-
-function collectParams(url: string) {
-  const parsed = Linking.parse(url);
-  const params = new Map<string, string>();
-
-  const addValue = (key: string, value: unknown) => {
-    if (typeof value === "string" && value) params.set(key, value);
-  };
-
-  Object.entries(parsed.queryParams ?? {}).forEach(([key, value]) => addValue(key, value));
-
-  const hashIndex = url.indexOf("#");
-  if (hashIndex >= 0) {
-    const hash = url.slice(hashIndex + 1);
-    const hashParams = new URLSearchParams(hash);
-    hashParams.forEach((value, key) => addValue(key, value));
-  }
-
-  return params;
+export function parseAuthCallbackUrl(url: string) {
+  return parseCallback(url, [buildAuthRedirectUrl("/sign-in"), buildAuthRedirectUrl("/update-password")]);
 }
 
 export function buildAuthRedirectUrl(path: string) {
-  return Linking.createURL(normalizedPath(path));
-}
-
-function parseAuthCallbackUrl(url: string) {
-  const params = collectParams(url);
-  const parsed = Linking.parse(url);
-  const host = typeof parsed.hostname === "string" ? parsed.hostname : undefined;
-  const rawPath = parsed.path ?? host ?? "/";
-  const path = normalizedPath(rawPath);
-
-  return {
-    path,
-    code: params.get("code") ?? undefined,
-    accessToken: params.get("access_token") ?? undefined,
-    refreshToken: params.get("refresh_token") ?? undefined,
-    type: params.get("type") ?? undefined,
-    errorDescription: params.get("error_description") ?? params.get("error") ?? undefined,
-  };
+  return Linking.createURL(path.startsWith("/") ? path : `/${path}`);
 }
 
 export function isAuthCallbackUrl(url: string) {
-  const params = parseAuthCallbackUrl(url);
-  if (!ALLOWED_AUTH_CALLBACK_PATHS.has(params.path)) return false;
-
-  return (
-    !!params.code ||
-    !!params.accessToken ||
-    !!params.refreshToken ||
-    !!params.errorDescription ||
-    params.type === "recovery"
-  );
+  return parseAuthCallbackUrl(url).isCallback;
 }
 
-export async function consumeAuthCallbackUrl(url: string): Promise<AuthCallbackResult> {
-  const params = parseAuthCallbackUrl(url);
-  if (!ALLOWED_AUTH_CALLBACK_PATHS.has(params.path)) {
-    return { kind: "none" };
-  }
+// OAuth's browser callback and the native link event can report the same URL.
+// Share the exchange, since a one-use code must not be consumed twice.
+let lastCallback: { url: string; result: ReturnType<typeof consumeAuthCallback> } | undefined;
+export function consumeAuthCallbackUrl(url: string) {
+  if (lastCallback?.url === url) return lastCallback.result;
+  const result = consumeAuthCallback(url, {
+    exchangeCodeForSession: (code) => supabase.auth.exchangeCodeForSession(code),
+    getPendingFlow: getPendingAuthFlow,
+  }, [buildAuthRedirectUrl("/sign-in"), buildAuthRedirectUrl("/update-password")]);
+  lastCallback = { url, result };
+  return result;
+}
 
-  if (params.errorDescription) {
-    return {
-      kind: "error",
-      message: decodeURIComponent(params.errorDescription.replace(/\+/g, " ")),
-    };
-  }
+export async function getPendingAuthFlow() {
+  return pendingPkceFlow(await authStorage.getItem(`${AUTH_STORAGE_KEY}-code-verifier`));
+}
 
-  if (params.code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(params.code);
-    if (error) return { kind: "error", message: error.message };
-    return params.type === "recovery" ? { kind: "recovery" } : { kind: "signed-in" };
-  }
-
-  if (params.accessToken && params.refreshToken) {
-    const { error } = await supabase.auth.setSession({
-      access_token: params.accessToken,
-      refresh_token: params.refreshToken,
-    });
-    if (error) return { kind: "error", message: error.message };
-    return params.type === "recovery" ? { kind: "recovery" } : { kind: "signed-in" };
-  }
-
-  return { kind: "none" };
+export async function cancelPendingAuthFlow() {
+  lastCallback = undefined;
+  await authStorage.removeItem(`${AUTH_STORAGE_KEY}-code-verifier`);
 }

@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { utcCalendar } from "./utc-calendar";
 
 /**
  * Data types
@@ -29,7 +30,6 @@ export type Profile = {
   id: string;
   username: string | null; // preferred short handle
   name: string | null; // optional full name
-  email: string | null; // fallback (not ideal long-term)
 };
 
 export type LeagueMember = {
@@ -44,30 +44,17 @@ export type LeagueMember = {
 /**
  * Helpers
  */
-function emailPrefix(email: string | null) {
-  if (!email) return null;
-  const at = email.indexOf("@");
-  return at > 0 ? email.slice(0, at) : email;
-}
-
 function displayNameFromProfile(p: Profile | null) {
   if (!p) return "User";
   return (
     p.username?.trim() ||
     p.name?.trim() ||
-    emailPrefix(p.email)?.trim() ||
     "User"
   );
 }
 
 function currentMonthBoundsISO(): { start: string; end: string } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-    .toISOString()
-    .slice(0, 10);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    .toISOString()
-    .slice(0, 10);
+  const { start, end } = utcCalendar();
   return { start, end };
 }
 
@@ -169,11 +156,24 @@ export async function getLeagueMembers(
   const userIds = (members ?? []).map((m: any) => m.user_id);
   if (userIds.length === 0) return [];
 
-  // 2) profiles
-  const { data: profiles, error: profErr } = await supabase
-    .from("profiles")
-    .select("id, username, name, email")
-    .in("id", userIds);
+  // 2) Only public display fields, scoped to a league the caller belongs to.
+  // Direct profiles reads are restricted to the account holder by RLS.
+  let { data: profiles, error: profErr } = await supabase.rpc(
+    "get_league_member_profiles",
+    { p_league_id: leagueId }
+  );
+
+  // Compatibility for older backends that do not have the display-profile RPC.
+  // Fetch only display fields; this does not fix the old server's broad RLS.
+  // Never hide permission, network, or other errors behind this fallback.
+  if (profErr && (profErr.code === "PGRST202" || profErr.code === "42883")) {
+    const legacy = await supabase
+      .from("profiles")
+      .select("id, username, name")
+      .in("id", userIds);
+    profiles = legacy.data;
+    profErr = legacy.error;
+  }
 
   if (profErr) throw profErr;
 
@@ -183,7 +183,6 @@ export async function getLeagueMembers(
       id: p.id,
       username: p.username ?? null,
       name: p.name ?? null,
-      email: p.email ?? null,
     });
   });
 

@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +12,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../features/auth/useAuth";
+import { PolicyLinks } from "../../components/PolicyLinks";
 
 const INPUT_BG = "rgba(255,255,255,0.04)";
 const INPUT_BORDER = "rgba(255,255,255,0.12)";
@@ -54,7 +56,7 @@ export default function SignInScreen() {
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={styles.flex}
       >
-        <View style={styles.shell}>
+        <ScrollView contentContainerStyle={styles.shell} keyboardShouldPersistTaps="handled">
           <View style={styles.hero}>
             <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Sign in</Text>
@@ -163,8 +165,6 @@ export default function SignInScreen() {
               <Text style={styles.primaryBtnText}>{loading ? "Signing in..." : "Sign in"}</Text>
             </Pressable>
 
-            <Text style={styles.helperText}>Email sign-in for now. Social login can come next.</Text>
-
             <Link href="/(auth)/forgot-password" style={styles.secondaryLink}>
               Forgot password?
             </Link>
@@ -172,8 +172,9 @@ export default function SignInScreen() {
             <Link href="/(auth)/sign-up" style={styles.secondaryLink}>
               Create an account
             </Link>
+            <PolicyLinks />
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -187,7 +188,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   shell: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 22,
     paddingTop: 88,
     paddingBottom: 28,

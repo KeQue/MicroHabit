@@ -1,7 +1,8 @@
 import type { Session, User } from "@supabase/supabase-js";
 import * as WebBrowser from "expo-web-browser";
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { buildAuthRedirectUrl, consumeAuthCallbackUrl } from "./links";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { buildAuthRedirectUrl, cancelPendingAuthFlow, consumeAuthCallbackUrl, getPendingAuthFlow, parseAuthCallbackUrl } from "./links";
+import type { AuthCallbackResult } from "./callback";
 import { ensureProfileForUser } from "./profile";
 import { supabase } from "../../lib/supabase";
 
@@ -13,6 +14,10 @@ type AuthContextValue = {
   user: User | null;
   session: Session | null;
   initializing: boolean;
+  passwordRecovery: boolean;
+  processingAuthLink: boolean;
+  handleAuthCallback: (url: string) => Promise<AuthCallbackResult>;
+  finishPasswordRecovery: () => void;
 
   // actions
   signUp: (email: string, password: string) => Promise<void>;
@@ -52,6 +57,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [pendingAuthLinks, setPendingAuthLinks] = useState(0);
+
+  const handleAuthCallback = useCallback(async (url: string) => {
+    const callback = parseAuthCallbackUrl(url);
+    if (!callback.isCallback) return { kind: "none" } as const;
+    // Mark recovery before setSession/exchange emits SIGNED_IN. Otherwise the
+    // normal signed-in route guard can win the race and open leagues.
+    setPendingAuthLinks((count) => count + 1);
+    setPasswordRecovery(callback.recovery && !callback.error);
+    try {
+      const result = await consumeAuthCallbackUrl(url);
+      setPasswordRecovery(result.kind === "recovery");
+      return result;
+    } finally {
+      setPendingAuthLinks((count) => count - 1);
+    }
+  }, []);
+
+  const finishPasswordRecovery = useCallback(() => setPasswordRecovery(false), []);
 
   useEffect(() => {
     let mounted = true;
@@ -80,8 +105,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return;
+      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
+      if (event === "SIGNED_OUT") setPasswordRecovery(false);
       syncRealtimeAuth(newSession ?? null);
       setSession(newSession ?? null);
       setUser(newSession?.user ?? null);
@@ -99,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- actions ---
   async function signUp(email: string, password: string) {
+    await cancelPendingAuthFlow();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -120,7 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function signInWithProvider(provider: SocialAuthProvider) {
+  const signInWithProvider = useCallback(async (provider: SocialAuthProvider) => {
+    await cancelPendingAuthFlow();
     const redirectTo = buildAuthRedirectUrl("/sign-in");
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -137,12 +166,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(`Could not start ${provider === "apple" ? "Apple" : "Google"} sign-in.`);
     }
 
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
+    let result: WebBrowser.WebBrowserAuthSessionResult;
+    try {
+      result = await WebBrowser.openAuthSessionAsync(authUrl, redirectTo);
+    } catch (error) {
+      await cancelPendingAuthFlow();
+      throw error;
+    }
     if (result.type !== "success" || !result.url) {
+      await cancelPendingAuthFlow();
       return "cancelled";
     }
 
-    const callbackResult = await consumeAuthCallbackUrl(result.url);
+    const callbackResult = await handleAuthCallback(result.url);
     if (callbackResult.kind === "error") {
       throw new Error(normalizeAuthErrorMessage(callbackResult.message));
     }
@@ -157,10 +193,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await ensureProfileForUser(nextUser);
     }
 
-    return "signed-in";
-  }
+    return "signed-in" as const;
+  }, [handleAuthCallback]);
 
   async function resetPassword(email: string) {
+    await cancelPendingAuthFlow();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: buildAuthRedirectUrl("/update-password"),
     });
@@ -173,6 +210,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resendSignUpConfirmation(email: string) {
+    if (await getPendingAuthFlow() !== "sign-in") {
+      throw new Error("Start signup again on this device to request a new confirmation link. Then open the newest email here.");
+    }
     const { error } = await supabase.auth.resend({
       type: "signup",
       email,
@@ -184,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function signOut() {
+    await cancelPendingAuthFlow();
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }
@@ -193,6 +234,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       initializing,
+      passwordRecovery,
+      processingAuthLink: pendingAuthLinks > 0,
+      handleAuthCallback,
+      finishPasswordRecovery,
       signUp,
       signIn,
       signInWithProvider,
@@ -201,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       resendSignUpConfirmation,
       signOut,
     }),
-    [user, session, initializing]
+    [user, session, initializing, passwordRecovery, pendingAuthLinks, handleAuthCallback, finishPasswordRecovery, signInWithProvider]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -32,6 +32,10 @@ with friends. Users can create an account, create a free league, share an invite
 code, join a league, track today/yesterday habit completion, and compare progress
 in My View and Ranking.
 
+Check-in dates and monthly rankings use UTC. Only today and yesterday in UTC
+are editable. On the first day of a UTC month, a separate yesterday check-in
+control allows editing the previous month's final day.
+
 Demo account:
 Email: [REVIEWER_DEMO_EMAIL]
 Password: [REVIEWER_DEMO_PASSWORD]

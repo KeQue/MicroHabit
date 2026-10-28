@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -19,7 +20,7 @@ const PLACEHOLDER = "rgba(255,255,255,0.44)";
 
 export default function UpdatePasswordScreen() {
   const router = useRouter();
-  const { updatePassword } = useAuth();
+  const { updatePassword, finishPasswordRecovery, processingAuthLink, initializing, user } = useAuth();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -69,10 +70,10 @@ export default function UpdatePasswordScreen() {
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
-              disabled={loading}
+              disabled={loading || initializing || processingAuthLink || !user}
               accessibilityRole="button"
               accessibilityLabel="Update password"
-              accessibilityState={{ disabled: loading }}
+              accessibilityState={{ disabled: loading || initializing || processingAuthLink || !user }}
               onPress={async () => {
                 try {
                   setError(null);
@@ -86,10 +87,9 @@ export default function UpdatePasswordScreen() {
                   }
 
                   await updatePassword(password);
-                  router.replace({
-                    pathname: "/(auth)/sign-in",
-                    params: { message: "Password updated. Sign in with your new password." },
-                  });
+                  finishPasswordRecovery();
+                  router.replace("/(app)");
+                  Alert.alert("Password updated", "Your new password has been saved.");
                 } catch (e: any) {
                   setError(e?.message ?? "Could not update password");
                 } finally {

@@ -5,7 +5,6 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -18,9 +17,9 @@ import { ensureProfileForCurrentUser } from "../../features/auth/profile";
 import { createLeague, getMyLeagues, type League } from "../../features/leagues/api";
 import { supabase } from "../../lib/supabase";
 import { planLabel, type PlanTier, type UserTier } from "../../constants/plans";
+import { AccountMenuSheet } from "../../components/AccountMenuSheet";
 
-const getMonthKey = (d = new Date()) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+const getMonthKey = (d = new Date()) => d.toISOString().slice(0, 7);
 
 function normalizeErr(e: any): string {
   if (!e) return "Unknown error";
@@ -192,7 +191,7 @@ export default function LeaguesScreen() {
 
     Alert.alert(
       "Delete account?",
-      "This permanently deletes your account, profile, league memberships, and activity logs. This cannot be undone.",
+      "This permanently deletes your account, profile, league memberships, and activity logs. Leagues you own will also be deleted, including every member's shared history in those leagues. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -250,40 +249,13 @@ export default function LeaguesScreen() {
         </Pressable>
       </View>
 
-      <Modal
+      <AccountMenuSheet
         visible={accountMenuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setAccountMenuOpen(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setAccountMenuOpen(false)}
-          accessible={false}
-        >
-          <Pressable style={styles.accountCard} onPress={() => {}} accessible={false}>
-            <Text style={styles.accountTitle}>Account</Text>
-            <Pressable onPress={onSignOut} accessibilityRole="button" accessibilityLabel="Sign out" style={styles.accountButton}>
-              <Text style={styles.accountButtonText}>Sign out</Text>
-            </Pressable>
-            <Pressable
-              onPress={onDeleteAccount}
-              disabled={deletingAccount}
-              accessibilityRole="button"
-              accessibilityLabel="Delete account"
-              accessibilityState={{ disabled: deletingAccount }}
-              style={[styles.accountButton, styles.accountDangerButton]}
-            >
-              <Text style={styles.accountDangerText}>
-                {deletingAccount ? "Deleting..." : "Delete account"}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => setAccountMenuOpen(false)} accessibilityRole="button" accessibilityLabel="Close account menu" style={styles.accountButton}>
-              <Text style={styles.accountButtonText}>Close</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+        onClose={() => setAccountMenuOpen(false)}
+        onSignOut={onSignOut}
+        onDeleteAccount={onDeleteAccount}
+        deletingAccount={deletingAccount}
+      />
 
       {error ? (
         <View style={styles.errorBox}>
@@ -473,51 +445,6 @@ const styles = StyleSheet.create({
     color: "#C8D0DB",
     fontSize: 15,
     fontWeight: "500",
-  },
-  modalOverlay: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  accountCard: {
-    width: "100%",
-    maxWidth: 360,
-    borderRadius: 20,
-    padding: 18,
-    gap: 12,
-    backgroundColor: "#101826",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  accountTitle: {
-    color: "white",
-    fontSize: 22,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  accountButton: {
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-  },
-  accountDangerButton: {
-    borderColor: "rgba(248,113,113,0.28)",
-  },
-  accountButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  accountDangerText: {
-    color: "#FCA5A5",
-    fontSize: 16,
-    fontWeight: "700",
   },
   errorBox: {
     marginTop: 14,

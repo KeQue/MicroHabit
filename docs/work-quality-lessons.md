@@ -1,0 +1,65 @@
+# Lessons for assistant work
+
+Record observed gaps and concrete changes to the working method. This is not
+a roadmap, confidence score, or claim that the model has been retrained.
+
+## Separate functional passes from release security
+
+- Observation: successful sign-in/recovery and a saved review branch were
+  described as completing the agreed checks, but a subsequent audit exposed
+  callback-origin and implicit-flow risks outside those functional tests.
+- Correction: label the verification scope explicitly. A functional pass does
+  not close authentication trust boundaries, provider deletion integration,
+  native storage, or public-release requirements. Skipped device checks remain
+  skipped even when related SQL assertions pass.
+- Transfer checks: an unrelated-origin callback and URL-supplied recovery type
+  must not authenticate; wrong/missing PKCE verifiers must fail; failed secure
+  storage migration must retain the old session for retry without publishing
+  partial protected data. The build-29 automated tests exercise these cases.
+  Actual native Keychain/provider flows remain pending until device testing.
+
+## Test real return-address generation
+
+- Observation: the build-29 integration fixture mocked Expo createURL by
+  stripping a leading slash. The installed Expo implementation retains it in
+  standalone links, producing three slashes. The server allowed only two-slash
+  forms; strict callback validation then rejected the different return shape.
+- Correction: execute the installed URL builder with controlled native manifest
+  inputs and compare its exact output with the configured server allowlist.
+  Mock native dependencies instead of replacing the transformation under test.
+- Transfer checks: standalone sign-in and recovery addresses must both be
+  explicitly allowed; Expo Go must still reject a different host or port; an
+  unrelated origin must remain rejected. All four new regression tests pass.
+  The live fix adds two exact addresses and preserves strict PKCE validation;
+  native Google/Apple retesting remains separate evidence.
+
+## Assess the requested subject
+
+- Observation: a request to improve assistant quality became a founder-training
+  tutorial. Correct tooling and polished documentation did not fix that mismatch.
+- Correction: state whose work or knowledge is being assessed before producing
+  the artifact. For this request, both workflows assess the assistant's work.
+- Transfer check: a request to review a completed migration should produce
+  evidence about that migration and its boundaries, not quiz the founder on SQL.
+  The revised skills explicitly preserve this distinction. This is an artifact
+  review, not a claim of proven behavior across future sessions.
+
+## Review legacy access paths
+
+- Observation: an initially narrow database review missed a legacy purchase
+  function that bypassed paid-access restrictions. An isolated test demonstrated
+  the issue; the approved permission fix was deployed and verified afterward.
+- Correction: enumerate relevant exposed backend entry points during access
+  reviews, including legacy functions, rather than infer security from the UI.
+- Future check: document the role, callable route, controlled inputs, and
+  observed server decision for the boundary being changed.
+
+## Compare content reliably across platforms
+
+- Observation: Windows line-ending conversion caused a deployment comparison
+  to stop despite unchanged database definitions. The transaction rolled back.
+- Correction: use reliable content checksums or deliberate normalization when
+  line endings cross client/database boundaries; retain a real drift check.
+- Future check: distinguish representation differences from semantic changes
+  before retrying an operation. An unexpected mismatch is not permission to
+  remove the safety check.

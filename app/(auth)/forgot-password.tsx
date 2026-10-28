@@ -40,7 +40,7 @@ export default function ForgotPasswordScreen() {
           <View style={styles.hero}>
             <Text style={styles.eyebrow}>COMMITO</Text>
             <Text style={styles.title}>Reset password</Text>
-            <Text style={styles.subtitle}>We will send a secure reset link to your email.</Text>
+            <Text style={styles.subtitle}>Enter your account email to request a secure reset link.</Text>
           </View>
 
           <View style={styles.card}>
@@ -57,7 +57,7 @@ export default function ForgotPasswordScreen() {
               style={styles.input}
             />
 
-            {sent ? <Text style={styles.info}>Reset email sent. Open the link on this device.</Text> : null}
+            {sent ? <Text style={styles.info}>If an account exists for this email, you will receive a reset link. Check your inbox and Spam or Junk folder, then open the link on this device.</Text> : null}
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <Pressable
@@ -97,7 +97,7 @@ export default function ForgotPasswordScreen() {
               onPress={() =>
                 router.replace({
                   pathname: "/(auth)/sign-in",
-                  params: { message: sent ? "Password reset email sent." : undefined },
+                  params: { message: sent ? "Reset requested. Check your inbox and Spam or Junk folder." : undefined },
                 })
               }
             >

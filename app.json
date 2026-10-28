@@ -11,7 +11,7 @@
     "ios": {
   "supportsTablet": false,
   "usesAppleSignIn": true,
-  "buildNumber": "25"
+  "buildNumber": "29"
 },
     "android": {
       "adaptiveIcon": {
@@ -42,7 +42,8 @@
         }
       ],
       "expo-font",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

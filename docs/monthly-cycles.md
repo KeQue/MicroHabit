@@ -1,8 +1,10 @@
 # Free monthly cycles — Batch 1
 
 Updated October 28, 2026. Implementation and review record, not a public-release
-approval. Payments remain disabled. No production migration or app upload was
-performed for this batch. Installed Commito 1.0.2 (29) does not contain this work.
+approval. Payments remain disabled. The founder approved deployment and a new
+TestFlight candidate on October 28. The single migration is now deployed and
+verified on production PostgreSQL 17.6. Commito 1.0.2 (30) is being prepared;
+installed build 29 does not contain the history panel.
 
 ## Product rules
 
@@ -76,8 +78,9 @@ financial records. Existing `v_month_results` / `v_member_month_stats` are also
 unused for this feature: inspection found false-row counting and streak issues.
 This batch does not certify or change those dormant legacy calculations.
 
-`MONTHLY_RESULTS_AVAILABLE` stays **false** until deployment is approved and
-verified. The hook makes no history requests while disabled. New history is
+`MONTHLY_RESULTS_AVAILABLE` was kept false until deployment was approved and
+verified. It is now **true** for the build-30 candidate. The hook makes no
+history requests while disabled. New history is
 cleared on account/league/day changes; late responses cannot publish into the
 new scope. Loading errors show a retry, not fabricated results. Returned display
 fields and numeric results are validated before rendering.
@@ -110,13 +113,39 @@ fields and numeric results are validated before rendering.
 
 Boundaries: browser checks mock React Native primitives, and the hook tests use
 a deterministic hook scheduler. These are not iPhone or VoiceOver tests. The
-isolated database is PostgreSQL 18; captured production is PostgreSQL 17, so
-target-server verification remains necessary before activation. Adversarial
+isolated database is PostgreSQL 18; production is PostgreSQL 17.6. The deployed
+function bodies, permissions and member/outsider history access were separately
+verified on that target. Adversarial
 multi-league writes can deadlock and abort; the current app writes one check-in
 at a time. The tested two-connection scenario does not establish every possible
 concurrent schedule.
 
-## Approval and release checks still required
+## Deployment evidence and remaining release checks
+
+- Approval received October 28 for this batch's production migration and
+  TestFlight preparation; no public App Store release or Batch 2 approval.
+- Fresh live schema matched the tested baseline: 27 existing public functions,
+  29 policies and 499 table grants. The read-only API route hides grant metadata
+  for its restricted role; the definitive comparison used the management role
+  inside a SQL read-only transaction rather than discarding the grant check.
+- Applied only `20261028_free_monthly_cycles.sql` in one transaction, with an
+  exact baseline guard, short lock timeout, migration-history record and
+  PostgREST schema reload. No old migration was replayed.
+- Fresh requests verified seven exact function bodies, both new RLS tables and
+  triggers, authenticated-only RPC execution, inaccessible private helpers and
+  no direct snapshot writes. All previous public definitions/policies/grants
+  remained unchanged after filtering only the intended additions.
+- A live rollback-only functional transaction verified member history access and
+  outsider rejection; it left no snapshots or account/activity changes behind.
+- Recovery metadata and the tested disable script were saved outside the repo.
+  Supabase reported no listed completed backups and PITR disabled. This was an
+  additive schema deployment with a non-destructive disable rollback; a verified
+  full-data restore point was not established. Automatic approval review rejected
+  a proposed local user-data export as outside deployment authorization. That
+  command did not run, and no user records were exported afterward.
+
+The rollout sequence is retained below for reference. Steps 1–2 are complete;
+the flag is enabled for build 30, with binary upload and iPhone checks pending.
 
 1. Review and explicitly approve the **single new migration**; do not replay the
    old migration directory. Freshly compare live schema/grants/policies against

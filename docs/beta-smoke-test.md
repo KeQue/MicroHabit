@@ -3,18 +3,24 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
-## Monthly history Batch 1 — local candidate, October 28, 2026
+## Monthly history Batch 1 — build 30 preparation, October 28, 2026
 
 See [monthly cycle rules and verification](monthly-cycles.md). The founder
 confirmed keeping day-1 corrections and finalizing the previous month at
 00:00 UTC on day 2. New migration, snapshots, history panel and tests are local
-review work; `MONTHLY_RESULTS_AVAILABLE=false`. No production migration or new
-TestFlight upload occurred for this batch. Installed build 29 lacks this feature.
+review work was approved for deployment. The single monthly-cycle migration is
+now committed on production PostgreSQL 17.6 and separately verified: prior
+functions/policies/grants unchanged, new permissions restricted, member access
+works, outsider access rejected. The live functional transaction rolled back.
+`MONTHLY_RESULTS_AVAILABLE=true` for the new 1.0.2 (30) candidate; its build and
+upload are being prepared. Installed build 29 lacks this feature.
 
 Isolated tests cover calendar boundaries, server finality, scoring, membership
 permissions, next-month continuation, deletion and overlapping save/finalization.
-Native history/VoiceOver and approved PostgreSQL-17 deployment verification are
-pending. Prior device passes below do not verify this new feature.
+Native history/VoiceOver checks are pending. Prior device passes below do not
+verify this new feature. The managed backup API lists no completed backups and
+PITR is disabled; recovery for this additive rollout uses the tested disable
+script and retained schema metadata, not a verified full-data restore point.
 
 ## Authentication hardening candidate 1.0.2 (29), October 27, 2026
 

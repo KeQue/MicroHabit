@@ -3,7 +3,7 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
-## Monthly history Batch 1 — build 30 preparation, October 28, 2026
+## Monthly history Batch 1 — build 30, October 28, 2026
 
 See [monthly cycle rules and verification](monthly-cycles.md). The founder
 confirmed keeping day-1 corrections and finalizing the previous month at
@@ -12,8 +12,16 @@ review work was approved for deployment. The single monthly-cycle migration is
 now committed on production PostgreSQL 17.6 and separately verified: prior
 functions/policies/grants unchanged, new permissions restricted, member access
 works, outsider access rejected. The live functional transaction rolled back.
-`MONTHLY_RESULTS_AVAILABLE=true` for the new 1.0.2 (30) candidate; its build and
-upload are being prepared. Installed build 29 lacks this feature.
+`MONTHLY_RESULTS_AVAILABLE=true` for the new 1.0.2 (30) candidate.
+Source checkpoint: `68cb3e9171b179a36a58061c86e06371dd2ab0d3`.
+The [build-30 job](https://expo.dev/accounts/keke12/projects/microhabit/builds/94ff94ab-b2d6-413c-b1ee-3751ed6fb846)
+finished at 20:24:05 UTC, with an available binary and the expected
+version/build/source. The [TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/ed0f5aae-1b5d-4c16-a7da-1f6132df57f3)
+was `IN_QUEUE` at 20:37:29 UTC with no error reported; Apple upload, processing
+and actual iPhone installation are not yet
+verified. The standard submission uses existing credentials; no Expo plan
+upgrade or public App Store release was requested.
+Installed build 29 lacks this feature.
 
 Isolated tests cover calendar boundaries, server finality, scoring, membership
 permissions, next-month continuation, deletion and overlapping save/finalization.
@@ -21,6 +29,23 @@ Native history/VoiceOver checks are pending. Prior device passes below do not
 verify this new feature. The managed backup API lists no completed backups and
 PITR is disabled; recovery for this additive rollout uses the tested disable
 script and retained schema metadata, not a verified full-data restore point.
+
+Focused build-30 iPhone checks, **pending**:
+
+- [ ] In TestFlight, update **Commito**, then confirm Settings shows 1.0.2 (30).
+  My Expo Go is a separate preview application and is not this candidate.
+- [ ] Open an existing free league. Members, invite code and current check-ins
+  remain available. Change today's check-in, refresh, and confirm it persists.
+- [ ] Open **Past results**. A league with earlier months shows their server
+  results with read-only status; a first-month league shows the empty explanation.
+- [ ] Switch between available months. Scores, longest streaks and ranks remain
+  consistent after refresh. Completed months have no editing controls.
+- [ ] Open history without connectivity: show a retry rather than fabricated
+  results. Reconnect and retry successfully.
+- [ ] Check readable layout and VoiceOver labels on the actual iPhone.
+- [ ] At a real UTC month boundary, or in an isolated operator-controlled test
+  environment, verify new-month continuation, day-1 correction and day-2 finality.
+  Do not fake the phone clock against the production server.
 
 ## Authentication hardening candidate 1.0.2 (29), October 27, 2026
 

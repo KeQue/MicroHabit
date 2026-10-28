@@ -69,3 +69,16 @@ a roadmap, confidence score, or claim that the model has been retrained.
   The original cross-timezone equality assertion remains and passes; checking
   the exact day-2 cutoff separately prevents formatting fixes from hiding a
   business-rule error.
+
+## Verify the role used for schema introspection
+
+- Observation: the Supabase Management API's restricted read-only route returned
+  no rows from `information_schema.role_table_grants`, while the captured owner
+  baseline had 499. That was visibility, not evidence that grants were removed.
+- Correction: retain the drift check and compare with the same management role
+  inside an explicitly read-only SQL transaction. Do not reinterpret a hidden
+  catalog view as an empty set of permissions.
+- Executed transfer check after the monthly migration: the restricted role saw
+  zero grant rows and the owner saw 515; both explicit checks of the authenticated
+  history RPC privilege returned true. Account for introspection role and use
+  explicit privilege checks when assessing authorization.

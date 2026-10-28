@@ -3,8 +3,18 @@
 Updated October 28, 2026. Implementation and review record, not a public-release
 approval. Payments remain disabled. The founder approved deployment and a new
 TestFlight candidate on October 28. The single migration is now deployed and
-verified on production PostgreSQL 17.6. Commito 1.0.2 (30) is being prepared;
+verified on production PostgreSQL 17.6. Commito 1.0.2 (30) has finished building;
 installed build 29 does not contain the history panel.
+
+Build-30 source checkpoint: `68cb3e9171b179a36a58061c86e06371dd2ab0d3`.
+The [Expo build](https://expo.dev/accounts/keke12/projects/microhabit/builds/94ff94ab-b2d6-413c-b1ee-3751ed6fb846)
+finished at 20:24:05 UTC on October 28 with the expected version/build/source
+and an available binary. The [TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/ed0f5aae-1b5d-4c16-a7da-1f6132df57f3)
+was still `IN_QUEUE` at 20:37:29 UTC on October 28, with no reported error.
+Poll that same submission before retrying; do not create duplicate submissions.
+A queued submission is not confirmation of completed Apple upload or
+TestFlight availability. Optional Expo-hosted test notes were rejected by the
+current plan; standard submission succeeded without a plan change or rebuild.
 
 ## Product rules
 
@@ -137,6 +147,12 @@ concurrent schedule.
   remained unchanged after filtering only the intended additions.
 - A live rollback-only functional transaction verified member history access and
   outsider rejection; it left no snapshots or account/activity changes behind.
+- The app-facing PostgREST route separately rejected anonymous invocation with
+  HTTP 401 / SQLSTATE 42501. An independent agent compared captured deployment
+  artifacts: all seven bodies match source, the production clock is genuine
+  `clock_timestamp()`, both trigger bindings are correct, private ACLs are
+  owner-only, and prior public schema entries remain intact. This is a scoped
+  deployment review, not a full-schema backup or native-device certification.
 - Recovery metadata and the tested disable script were saved outside the repo.
   Supabase reported no listed completed backups and PITR disabled. This was an
   additive schema deployment with a non-destructive disable rollback; a verified
@@ -145,7 +161,8 @@ concurrent schedule.
   command did not run, and no user records were exported afterward.
 
 The rollout sequence is retained below for reference. Steps 1–2 are complete;
-the flag is enabled for build 30, with binary upload and iPhone checks pending.
+the flag is enabled for finished build 30, with Apple upload and iPhone checks
+pending.
 
 1. Review and explicitly approve the **single new migration**; do not replay the
    old migration directory. Freshly compare live schema/grants/policies against

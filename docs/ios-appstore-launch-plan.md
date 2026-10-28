@@ -25,8 +25,9 @@ before starting the next. This does not approve any production migration.
 Batch 2 local implementation and verification are recorded in
 [invitations and engagement](invitations-engagement.md). The founder subsequently
 approved its single database migration and a TestFlight candidate. That
-migration is now committed and verified; build 33 preparation does not close
-the public release gates below.
+migration is now committed and verified; build 33 and its TestFlight upload
+finished. Native testing remains pending. This does not close the public
+release gates below.
 
 ## Current Launch Gate
 

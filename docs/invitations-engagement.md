@@ -3,7 +3,7 @@
 October 28, 2026. The founder explicitly approved this reporting migration and
 a new TestFlight build after reviewing the local implementation. The single
 migration committed at 21:59:39 UTC and was verified from fresh requests.
-Commito 1.0.2 (33) is the corrected TestFlight candidate being prepared;
+Commito 1.0.2 (33) is the corrected TestFlight candidate, built and uploaded;
 installed build 31 does not contain these invitation changes. The next
 retention batch and a public App Store release are outside this approval.
 
@@ -18,6 +18,16 @@ screen-handler test failed before the fix. Cleanup now uses the route's nonce
 and preserves newer intents. Build 32 had already uploaded before cancellation
 was attempted; it is superseded by build 33. This is an app-only correction:
 the verified database migration was not changed or reapplied.
+
+Corrected source checkpoint: `f8830071ed4058781091bbaf3e6f65ea9143596e`.
+The [build-33 job](https://expo.dev/accounts/keke12/projects/microhabit/builds/d73bd69c-f393-4580-b672-c1af9c209f06)
+finished at 22:19:00 UTC. Its
+[automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/06be5e43-68ed-454f-98f8-5d86707b57f6)
+was verified `FINISHED` at 22:19:25 UTC. The expected version, build and corrected
+source identity were verified, and a binary is available. This establishes
+build/upload completion, not Apple processing, actual iPhone installation,
+native invitation behavior or public-release readiness. Use build 33 rather
+than superseded build 32 for testing.
 
 ## Observable outcome
 

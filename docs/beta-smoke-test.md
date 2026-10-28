@@ -11,8 +11,15 @@ single reporting migration and a new TestFlight build. The migration is now
 committed and verified. Build 32 finished and uploaded, but is superseded by
 build 33: final review found and reproduced an edited-code cancellation gap,
 then fixed it using the original intent's nonce. Use build 33 for these checks.
-Its delivery is being prepared. Automated checks and
+Its [build](https://expo.dev/accounts/keke12/projects/microhabit/builds/d73bd69c-f393-4580-b672-c1af9c209f06)
+from corrected source `f883007` and
+[automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/06be5e43-68ed-454f-98f8-5d86707b57f6)
+both finished: the build at 22:19:00 UTC and submission verified at 22:19:25 UTC.
+Apple processing and actual iPhone installation remain unverified. Automated checks and
 isolated SQL fixtures do not establish the following iPhone results:
+
+- [ ] Update Commito in TestFlight and confirm Settings shows **1.0.2 (33)**.
+  Build 32 is superseded; My Expo Go is a separate preview app.
 
 - [ ] Share an invite using the existing Share button. Check readable code,
   native-app link and manual signup instructions; cancel sharing safely.

@@ -1,8 +1,11 @@
 # Invitations and engagement measurement — Batch 2
 
-October 28, 2026. **Local implementation; not deployed.** The founder approved
-continuing this batch after monthly history. This record does not authorize a
-production migration, a TestFlight upload, or the next retention batch.
+October 28, 2026. The founder explicitly approved this reporting migration and
+a new TestFlight build after reviewing the local implementation. The single
+migration committed at 21:59:39 UTC and was verified from fresh requests.
+Commito 1.0.2 (32) is being prepared for TestFlight; installed build 31 does not
+contain these invitation changes. The next retention batch and a public App
+Store release are outside this approval.
 
 ## Observable outcome
 
@@ -73,7 +76,7 @@ historical database state. Current completed check-ins are therefore useful for
 product validation, but this does not measure screen opens, share deliveries,
 notification impressions, or users who installed and never joined.
 
-## Database change prepared for review
+## Approved database deployment
 
 `supabase/migrations/20261028210000_private_engagement.sql` adds only the private
 operator report and closes unused app access to `public.analytics_events`.
@@ -84,10 +87,10 @@ RLS; this finding does **not** establish that ordinary clients could read it.
 
 Before preparing this migration, fresh schema-only production metadata matched
 the verified Batch-1 baseline. No user records were read for this batch.
-Production must still be freshly compared immediately before any approved
-deployment. Apply only this migration, transactionally, with targeted checks;
-do not replay the historical directory. The app's invitation changes do not
-depend on this report being installed.
+The approved deployment repeated that comparison immediately before applying
+only this migration in a guarded transaction, with a five-second lock timeout
+and an explicit migration-history record. No historical migration was replayed.
+The app's invitation changes do not depend on this report being installed.
 
 `supabase/reports/free_engagement.sql` is the read-only operator entry point with
 a 30-second timeout. Never place operator credentials in the app. The disable
@@ -111,8 +114,20 @@ a full data-backup/restore procedure.
   column privileges on the unused event table and confirmed the genuine clock.
   The disable script also passed in a separate disposable recovery clone:
   report removed, unused writer still closed, existing joining preserved.
-- Live backend: schema-only comparison only. **No Batch-2 migration, report
-  execution, production settings change, or public release was performed.**
+- Live backend: the approved migration `20261028210000` is committed. Fresh
+  requests verified its exact report body, empty search path, invoker execution,
+  and denied report execution for anon/authenticated/service roles. Unused app
+  event writes are denied; existing service event permissions are preserved.
+  All 28 public function definitions, previous private helpers, RLS, constraints
+  and user triggers are unchanged. Only the intended event-table grants/policy
+  and new migration-history entry differ. A read-only operator report shape
+  check returned 12 weeks, 12 months and 12 activation cohorts with no UUID
+  fields. No user rows were exported, no settings changed and no public release
+  was performed. These checks do not establish real-device joining behavior.
+- Recovery: protected before/after schema and permission metadata, migration,
+  transaction and tested disable script were retained outside the repository.
+  The fresh managed backup response still lists zero completed backups and PITR
+  disabled. No full-data restore point or user-data export was established.
 - Founder device results: earlier monthly-history and sign-in results remain
   separate evidence. These invitation changes are not in TestFlight build 31
   and have not been tested on an actual iPhone.

@@ -3,11 +3,12 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
-## Invitations and measurement — Batch 2 local review, October 28, 2026
+## Invitations and measurement — Batch 2 / build 32, October 28, 2026
 
 See [implementation, metric definitions and evidence](invitations-engagement.md).
-The local changes are not included in build 31. No new TestFlight upload or
-production migration was performed for this batch. Automated checks and
+The invitation changes are not included in build 31. The founder approved the
+single reporting migration and a new TestFlight build. The migration is now
+committed and verified; build 32 is being prepared. Automated checks and
 isolated SQL fixtures do not establish the following iPhone results:
 
 - [ ] Share an invite using the existing Share button. Check readable code,
@@ -25,9 +26,10 @@ isolated SQL fixtures do not establish the following iPhone results:
   and with larger text/VoiceOver. Custom-scheme clickability varies by messenger;
   the readable code remains the installation fallback.
 
-The private operator report requires separate migration approval. After any
-approved deployment, verify app report access is denied, unused event writes
-are denied, and ordinary joining/check-ins/rankings still work.
+Fresh backend verification confirms app report execution and unused event
+writes are denied, with existing joining/check-in/ranking definitions and
+permissions unchanged. Phone behavior remains to be tested after build 32 is
+installed.
 
 ## Compact month row — build 31 preparation, October 28, 2026
 

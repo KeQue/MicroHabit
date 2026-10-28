@@ -23,9 +23,10 @@ safeguarded nudges and voluntary achievements last. Each batch requires review
 before starting the next. This does not approve any production migration.
 
 Batch 2 local implementation and verification are recorded in
-[invitations and engagement](invitations-engagement.md). Its new database
-migration and app delivery are pending review; it does not close the public
-release gates below.
+[invitations and engagement](invitations-engagement.md). The founder subsequently
+approved its single database migration and a TestFlight candidate. That
+migration is now committed and verified; build 32 preparation does not close
+the public release gates below.
 
 ## Current Launch Gate
 

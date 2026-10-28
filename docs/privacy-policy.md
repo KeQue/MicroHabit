@@ -1,6 +1,6 @@
 # Commito Privacy Policy
 
-Last updated: October 27, 2026
+Last updated: October 28, 2026
 
 Commito helps people create or join monthly accountability leagues with friends.
 This policy explains what information the app collects, why it is used, and how
@@ -27,10 +27,18 @@ We use information to:
 - Let users create, join, and participate in leagues.
 - Show league members, progress, rankings, and activity history.
 - Support invite-code sharing.
+- Understand product use through aggregate counts of saved league creation,
+  participation, check-ins, and activity across weeks and months.
 - Keep the app secure and reliable.
 - Provide support when users contact us.
 
 We do not sell personal information.
+
+These participation reports use the account and league records already stored
+to run Commito. They do not add an advertising or analytics SDK. Report output
+contains counts rather than names, email addresses, or invitation codes. The
+underlying records remain personal information and follow this policy's access
+and deletion rules.
 
 ## League Visibility
 
@@ -79,6 +87,9 @@ Commito may use third-party services to operate the app, including:
 
 - Supabase for authentication and database services.
 - Expo for app development and delivery services.
+- GitHub Pages for public support, privacy and invitation pages. An invitation
+  page address contains its invite code; hosting providers may process page
+  requests. The invitation page does not look up accounts or league activity.
 - Apple and Google for supported sign-in methods and app distribution.
 - Google's email service for account confirmation and password-reset emails
   sent through Supabase Auth.

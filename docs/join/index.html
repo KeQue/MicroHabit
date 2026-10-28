@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" />
+    <title>Join a Commito league</title>
+    <style>
+      :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d0619; color: #f4efff; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 32px 18px; }
+      main { max-width: 440px; margin: 8vh auto; padding: 26px; border: 1px solid #39274c; border-radius: 24px; background: #1c112d; }
+      h1 { font-size: 28px; line-height: 1.2; margin: 8px 0 18px; }
+      p { color: #c0b5cf; line-height: 1.6; }
+      .brand { color: #c4a1ff; font-size: 13px; letter-spacing: 2px; font-weight: 700; }
+      #invite-code { display: block; padding: 18px 8px; text-align: center; font-size: 28px; font-weight: 700; letter-spacing: 3px; overflow-wrap: anywhere; user-select: all; }
+      .action { display: block; width: 100%; padding: 14px; margin-top: 12px; border: 1px solid #8053ba; border-radius: 14px; background: #34204f; color: #fff; font: inherit; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
+      .action:focus-visible { outline: 3px solid #dec8ff; outline-offset: 3px; }
+      #copy-code { background: transparent; }
+      #status { min-height: 24px; font-size: 14px; }
+      .help { font-size: 14px; }
+      a { color: #d6baff; }
+      [hidden] { display: none !important; }
+      @media (max-height: 650px) { main { margin: 0 auto; } }
+    </style>
+    <script src="./invite.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <div class="brand">COMMITO</div>
+      <h1>Join a league with friends</h1>
+      <p id="intro">Checking your invitation…</p>
+      <section id="invitation" hidden aria-label="League invitation">
+        <span id="invite-code" aria-label="Invite code"></span>
+        <a id="open-app" class="action" hidden>Open Commito</a>
+        <button id="copy-code" class="action" type="button">Copy invite code</button>
+        <p id="status" role="status" aria-live="polite"></p>
+        <p class="help">Already installed? Tap Open Commito, sign in if needed, then choose Join league.</p>
+        <p class="help">Need the app? Ask your friend for access. Keep this code, then enter it in Commito → Join after signing up.</p>
+        <p class="help">If your browser does not open the app, open Commito yourself and enter the code above.</p>
+      </section>
+      <noscript><p>To open the invitation here, enable JavaScript. You can also ask your friend for the code and enter it in Commito → Join.</p></noscript>
+      <p class="help"><a href="../support/">Support</a> · <a href="../privacy/">Privacy</a></p>
+    </main>
+  </body>
+</html>

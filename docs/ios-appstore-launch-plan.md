@@ -38,8 +38,13 @@ Batch-2 record for exact source and deployment boundaries.
 On October 29 the founder chose to allow repeated display names, including
 within a league. Accounts and progress remain tied to UUIDs. The narrow index
 removal passed eight isolated SQL suites and was approved, deployed and verified
-on October 29 at 10:17:51 UTC. No new app build is needed. The iPhone rename
-check remains pending; see the current name-check entry in `beta-smoke-test.md`.
+on October 29 at 10:17:51 UTC. No new app build is needed. The founder confirmed
+the iPhone rename worked; see the remaining checks in `beta-smoke-test.md`.
+
+The founder approved local Batch 3 on October 29: weekly recap and reminder
+controls. See [implementation and verification](weekly-recaps-reminders.md).
+Production deployment, disclosure publication and native delivery remain
+separate approval steps; this does not enable Batch 4 or a public release.
 
 ## Current Launch Gate
 

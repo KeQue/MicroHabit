@@ -1,140 +1,76 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 import { getGentleNotificationCopy } from "./copy";
+import { createReminderController, REMINDER_KIND, REMINDER_STORAGE_KEY, TEST_KIND } from "./reminder-controller";
+export type { ReminderPreferences, ReminderState } from "./reminder-controller";
 
 const CHANNEL_ID = "gentle-reminders";
-const REMINDER_KIND = "gentle-daily-reminder";
-
 let configured = false;
-
 export function configureNotifications() {
   if (configured || Platform.OS === "web") return;
-
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-
+  Notifications.setNotificationHandler({ handleNotification: async () => ({
+    shouldShowAlert: true, shouldPlaySound: false, shouldSetBadge: false,
+    shouldShowBanner: true, shouldShowList: true,
+  }) });
   configured = true;
 }
-
 async function ensureChannel() {
   if (Platform.OS !== "android") return;
-
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-    name: "Gentle reminders",
-    importance: Notifications.AndroidImportance.DEFAULT,
-    sound: null,
-    vibrationPattern: [0],
-    lightColor: "#7C3AED",
+    name: "Gentle reminders", importance: Notifications.AndroidImportance.DEFAULT,
+    sound: null, vibrationPattern: [0], lightColor: "#7C3AED",
   });
 }
+const controller = createReminderController({
+  read: () => AsyncStorage.getItem(REMINDER_STORAGE_KEY),
+  write: (value) => AsyncStorage.setItem(REMINDER_STORAGE_KEY, value),
+  timezone: () => Intl.DateTimeFormat().resolvedOptions().timeZone || "local",
+  permission: async (request) => {
+    if (Platform.OS === "web") return false;
+    configureNotifications();
+    const current = await Notifications.getPermissionsAsync();
+    if (current.granted) return true;
+    if (!request || !current.canAskAgain) return false;
+    return (await Notifications.requestPermissionsAsync()).granted;
+  },
+  list: () => Platform.OS === "web" ? Promise.resolve([]) : Notifications.getAllScheduledNotificationsAsync(),
+  cancel: (id) => Notifications.cancelScheduledNotificationAsync(id),
+  schedule: async (preferences, timezone) => {
+    await ensureChannel();
+    return Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Commito", body: getGentleNotificationCopy("light_encouragement", new Date().getDay()),
+        sound: false,
+        data: { kind: REMINDER_KIND, signature: `${preferences.hour}:${preferences.minute}:${timezone}` },
+      },
+      trigger: Platform.OS === "ios" ? {
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+        hour: preferences.hour, minute: preferences.minute, repeats: true,
+      } : {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: preferences.hour, minute: preferences.minute, channelId: CHANNEL_ID,
+      },
+    });
+  },
+  test: async () => {
+    await ensureChannel();
+    await Notifications.scheduleNotificationAsync({
+      content: { title: "Commito", body: getGentleNotificationCopy("light_encouragement"), sound: false,
+        data: { kind: TEST_KIND } },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 10, channelId: CHANNEL_ID },
+    });
+  },
+});
 
-async function hasPermission() {
-  const existing = await Notifications.getPermissionsAsync();
-  let status = existing.status;
-
-  if (status !== "granted" && existing.canAskAgain) {
-    const requested = await Notifications.requestPermissionsAsync();
-    status = requested.status;
-  }
-
-  return status === "granted";
-}
-
-async function cancelMatchingReminders() {
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-
-  const matches = scheduled.filter(
-    (item) =>
-      item.content.data &&
-      typeof item.content.data === "object" &&
-      "kind" in item.content.data &&
-      item.content.data.kind === REMINDER_KIND
-  );
-
-  await Promise.all(
-    matches.map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier))
-  );
-}
-
-export async function ensureGentleDailyReminder() {
-  if (Platform.OS === "web") return false;
-
-  configureNotifications();
-
-  const permitted = await hasPermission();
-  if (!permitted) return false;
-
-  await ensureChannel();
-
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  const alreadyScheduled = scheduled.some(
-    (item) =>
-      item.content.data &&
-      typeof item.content.data === "object" &&
-      "kind" in item.content.data &&
-      item.content.data.kind === REMINDER_KIND
-  );
-
-  if (alreadyScheduled) return true;
-
-  const weekdayIndex = new Date().getDay();
-  const reminderBody = getGentleNotificationCopy("light_encouragement", weekdayIndex);
-
-  const trigger: Notifications.NotificationTriggerInput = {
-    type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-    hour: 17,
-    minute: 0,
-    repeats: true,
-  };
-
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Commito",
-      body: reminderBody,
-      sound: false,
-      data: { kind: REMINDER_KIND },
-    },
-    trigger,
-  });
-
-  return true;
-}
-
-export async function cancelGentleDailyReminder() {
-  if (Platform.OS === "web") return;
-  await cancelMatchingReminders();
-}
-
+export const setReminderAccount = controller.setAccount;
+export const refreshGentleDailyReminder = controller.refresh;
+export const saveReminderPreferences = controller.save;
+export const getReminderState = controller.getState;
+export const subscribeReminderState = controller.subscribe;
+export async function ensureGentleDailyReminder() { return (await controller.refresh()).scheduled; }
+export async function cancelGentleDailyReminder() { await controller.setAccount(null); }
 export async function scheduleGentleTestNotification() {
-  if (Platform.OS === "web") return false;
-
-  configureNotifications();
-
-  const permitted = await hasPermission();
-  if (!permitted) return false;
-
-  await ensureChannel();
-
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Commito",
-      body: getGentleNotificationCopy("light_encouragement"),
-      sound: false,
-      data: { kind: "gentle-test-reminder" },
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: 10,
-    },
-  });
-
-  return true;
+  return controller.test();
 }

@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Application from "expo-application";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import type { ComponentProps } from "react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Modal,
@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { appVersionLabel } from "../features/app/version-label";
 import { openPolicyPage, POLICY_PAGES } from "./PolicyLinks";
+import { ReminderSettings } from "./ReminderSettings";
 
 type Action = () => void | Promise<void>;
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
   onBack?: Action;
   onCheckInRules?: Action;
   onTestNotification?: Action;
+  onWeeklyRecap?: Action;
 };
 
 type Row = {
@@ -74,8 +76,9 @@ function MenuGroup({ rows, onAction }: { rows: Row[]; onAction: (action: Action)
 
 export function AccountMenuSheet({
   visible, onClose, onSignOut, onDeleteAccount, deletingAccount,
-  onBack, onCheckInRules, onTestNotification,
+  onBack, onCheckInRules, onTestNotification, onWeeklyRecap,
 }: Props) {
+  const [remindersOpen, setRemindersOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const pendingAction = useRef<Action | null>(null);
@@ -141,9 +144,11 @@ export function AccountMenuSheet({
   });
   const leagueRows: Row[] = [];
   if (onCheckInRules) leagueRows.push({ label: "Check-in rules", icon: "calendar-outline", onPress: onCheckInRules, navigation: true });
+  if (onWeeklyRecap) leagueRows.push({ label: "Weekly recap", icon: "stats-chart-outline", onPress: onWeeklyRecap, navigation: true });
   if (onBack) leagueRows.push({ label: "Back to leagues", icon: "arrow-back-outline", onPress: onBack });
 
   return (
+    <>
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={finishDismissal} statusBarTranslucent>
       <View style={styles.overlay}>
         <Pressable
@@ -177,6 +182,9 @@ export function AccountMenuSheet({
           </View>
           <ScrollView bounces={false} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {leagueRows.length ? <MenuGroup rows={leagueRows} onAction={closeAndRun} /> : null}
+            <MenuGroup onAction={closeAndRun} rows={[
+              { label: "Daily reminder", icon: "notifications-outline", onPress: () => setRemindersOpen(true), navigation: true },
+            ]} />
             <MenuGroup onAction={closeAndRun} rows={POLICY_PAGES.map(({ label, url }, index) => ({
               label, icon: index === 0 ? "hand-left-outline" : "help-circle-outline",
               link: true, onPress: () => openPolicyPage(label, url),
@@ -196,6 +204,8 @@ export function AccountMenuSheet({
         </Animated.View>
       </View>
     </Modal>
+    <ReminderSettings visible={remindersOpen} onClose={() => setRemindersOpen(false)} />
+    </>
   );
 }
 

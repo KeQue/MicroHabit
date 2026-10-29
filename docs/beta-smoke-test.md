@@ -3,6 +3,13 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
+## Weekly recaps and reminders — local Batch 3, October 29, 2026
+
+See [rules, implementation, evidence and pending device checks](weekly-recaps-reminders.md).
+The founder approved local implementation. These changes are not in installed
+build 34 and have not been deployed to production. Existing successful phone
+checks below do not establish Batch-3 behavior.
+
 ## Repeated display names — deployed October 29, 2026
 
 The founder reported that changing Saddu to Sadu failed although nobody in
@@ -40,10 +47,13 @@ baseline. Fresh post-commit requests verified that only the display-name index
 was removed and its migration record added. Public functions, policies, RLS,
 grants, constraints, profile columns/triggers, views and private functions were
 unchanged. The profile primary key and name-length check remain in place.
-No live user records were changed or exported. No iPhone rename pass after
-deployment is recorded yet; isolated SQL passes are not device results.
+No live user records were changed or exported during deployment. The founder
+subsequently confirmed that saving Sadu worked on their iPhone. Refresh/reopen
+persistence and a two-account duplicate-name device check were not separately
+reported; isolated SQL passes are not device results.
 
-- [ ] Retry Sadu in the existing app and refresh/reopen the league.
+- [x] Retry Sadu in the existing app (founder-reported success, October 29).
+- [ ] Confirm the renamed profile after refresh/reopening the league.
 - [ ] With two disposable accounts, use the same name and verify progress stays
   separate. Equal names do not grant access to anyone else's profile/check-ins.
 

@@ -2,17 +2,18 @@ import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import * as Linking from "expo-linking";
 import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, AppState } from "react-native";
 import { isAuthCallbackUrl } from "../features/auth/links";
 import { postAuthRoute } from "../features/auth/post-auth-route";
 import { parseInviteUrl } from "../features/invitations/links";
 import { PendingInviteProvider, usePendingInvite } from "../features/invitations/pending-invite";
 import {
-  cancelGentleDailyReminder,
   configureNotifications,
-  ensureGentleDailyReminder,
+  refreshGentleDailyReminder,
+  setReminderAccount,
 } from "../features/notifications/local";
 import { AuthProvider, useAuth } from "../features/auth/useAuth";
+import { supabase } from "../lib/supabase";
 
 function RouteGate() {
   const { user, initializing, passwordRecovery, processingAuthLink, handleAuthCallback } = useAuth();
@@ -96,14 +97,17 @@ function RouteGate() {
 
   useEffect(() => {
     if (initializing) return;
-
-    if (!user) {
-      void cancelGentleDailyReminder();
-      return;
-    }
-
-    void ensureGentleDailyReminder();
-  }, [user, initializing]);
+    // Observe auth events directly so cancellation invalidates pending schedules
+    // before React has rendered the signed-out/account-replacement state.
+    void setReminderAccount(user?.id ?? null).catch(() => undefined);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      void setReminderAccount(session?.user.id ?? null).catch(() => undefined);
+    });
+    const foreground = AppState.addEventListener("change", (status) => {
+      if (status === "active") void refreshGentleDailyReminder().catch(() => undefined);
+    });
+    return () => { subscription.unsubscribe(); foreground.remove(); };
+  }, [user?.id, initializing]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

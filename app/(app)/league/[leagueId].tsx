@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { AccountMenuSheet } from "@/components/AccountMenuSheet";
 import { MonthlyResults } from "@/components/MonthlyResults";
+import { WeeklyRecap } from "@/components/WeeklyRecap";
 import { ThemedView } from "@/components/themed-view";
 import { UserCard } from "@/components/UserCard";
 import { deleteCurrentAccount } from "@/features/auth/account";
@@ -10,7 +11,7 @@ import { canEditUtcDate, millisecondsUntilNextUtcDay, utcCalendar, utcDateKey } 
 import { getLeagueMembers } from "@/features/leagues/api";
 import { compareRankNames } from "@/features/leagues/monthly-results";
 import { useMonthlyHistory } from "@/features/leagues/use-monthly-history";
-import { INVITE_WEB_PAGE_AVAILABLE, MONTHLY_RESULTS_AVAILABLE } from "@/constants/launch";
+import { INVITE_WEB_PAGE_AVAILABLE, MONTHLY_RESULTS_AVAILABLE, WEEKLY_RECAP_AVAILABLE } from "@/constants/launch";
 import { scheduleGentleTestNotification } from "@/features/notifications/local";
 import { supabase } from "@/lib/supabase";
 import * as Clipboard from "expo-clipboard";
@@ -364,6 +365,7 @@ export default function LeagueDetailScreen() {
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [recapOpen, setRecapOpen] = useState(false);
   const [editNameOpen, setEditNameOpen] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState("");
   const [savingDisplayName, setSavingDisplayName] = useState(false);
@@ -860,6 +862,7 @@ export default function LeagueDetailScreen() {
         <AccountMenuSheet
           visible={menuOpen}
           onClose={() => setMenuOpen(false)}
+          onWeeklyRecap={WEEKLY_RECAP_AVAILABLE && leagueIsFree === true ? () => setRecapOpen(true) : undefined}
           onCheckInRules={() => {
             setMenuOpen(false);
             Alert.alert(
@@ -882,6 +885,8 @@ export default function LeagueDetailScreen() {
             await scheduleGentleTestNotification();
           } : undefined}
         />
+
+        {WEEKLY_RECAP_AVAILABLE ? <WeeklyRecap visible={recapOpen} leagueId={leagueId} onClose={() => setRecapOpen(false)} /> : null}
 
         <Modal
           visible={editNameOpen}

@@ -10,7 +10,9 @@ fine. They reported the floating recap did not close on outside taps and
 approved the sheet/menu refinements recorded in
 [Batch-3 presentation follow-up](weekly-recaps-reminders.md).
 The change passes 111 automated tests and local synthetic web previews; it is
-prepared for build 36, with upload pending. Check outside tap, X, header swipe,
+included in build 36, which finished at 11:44:16 UTC; its automatic TestFlight
+upload was verified FINISHED at 11:45:36 UTC. Apple processing and actual
+installation remain pending. Check outside tap, X, header swipe,
 body scrolling, large text and unchanged Daily reminder on an iPhone.
 
 ## Weekly recaps and reminders — candidate 35, October 29, 2026

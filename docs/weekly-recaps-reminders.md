@@ -188,5 +188,14 @@ by this preview. Actual iPhone swipe feel, backdrop taps, VoiceOver focus and
 Dynamic Type remain pending. The primary self-assessment reviewed the diff,
 callers and evidence boundaries. Candidate 1.0.2 (36) carries this refinement
 within the approved Batch-3 TestFlight delivery. No backend or website change
-is needed. Build/upload and actual iPhone results remain pending; installed
-build 35 still has the old recap.
+is needed. Build/upload are complete; Apple processing, actual installation
+and iPhone results remain pending. Installed build 35 still has the old recap.
+
+Build-36 source checkpoint: `a8a9cf4fa93a7d3d389516b66be5c16ee60fc562`.
+The [build](https://expo.dev/accounts/keke12/projects/microhabit/builds/30b3d044-7b76-48e6-afe1-a5ec03cfa56c)
+and [automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/0d742c67-c89c-463e-a7df-1ffd7113c59b)
+were created using the existing app/signing configuration. Fresh status at
+11:45:36 UTC verified exact source, version 1.0.2 and build 36. Compilation
+finished at **11:44:16 UTC** with an available binary. The automatic submission
+was **FINISHED** when checked. Apple processing and iPhone installation are
+not established by Expo's successful upload status. No public release occurred.

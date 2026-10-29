@@ -1,6 +1,13 @@
 ﻿{
   "cli": { "version": ">= 12.0.0" },
   "build": {
+    "e2e": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "autoIncrement": false,
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true, "buildConfiguration": "Release" }
+    },
     "production": {
       "ios": { "resourceClass": "m-medium" }
     }

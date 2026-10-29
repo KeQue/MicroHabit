@@ -45,3 +45,12 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Mobile E2E: sanitized results and potentially sensitive raw tool artifacts
+/tests/e2e/results/
+**/.maestro/
+/tests/e2e/.tools/
+*.apk
+*.aab
+*.ipa
+*.app/

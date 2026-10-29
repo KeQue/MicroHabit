@@ -1,0 +1,30 @@
+appId: ${MAESTRO_E2E_APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: e2e-login-email
+    timeout: 30000
+- assertVisible:
+    id: e2e-login-password
+- assertVisible:
+    id: e2e-login-submit
+- assertNotVisible:
+    id: e2e-leagues-loaded
+- tapOn:
+    id: e2e-login-email
+- inputText:
+    text: ${MAESTRO_E2E_EMAIL}
+    label: Enter runtime account email
+- tapOn:
+    id: e2e-login-password
+- inputText:
+    text: ${MAESTRO_E2E_PASSWORD}
+    label: Enter runtime account password
+- hideKeyboard
+- tapOn:
+    id: e2e-login-submit
+- runFlow: assert-authenticated.yaml
+# A fresh app process must restore the saved session and load from the server.
+- stopApp
+- launchApp
+- runFlow: assert-authenticated.yaml

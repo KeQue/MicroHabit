@@ -103,6 +103,7 @@ export default function SignInScreen() {
             </View>
 
             <TextInput
+              testID="e2e-login-email"
               placeholder="Email"
               placeholderTextColor={PLACEHOLDER}
               autoCapitalize="none"
@@ -116,6 +117,7 @@ export default function SignInScreen() {
             />
 
             <TextInput
+              testID="e2e-login-password"
               placeholder="Password"
               placeholderTextColor={PLACEHOLDER}
               secureTextEntry
@@ -127,10 +129,11 @@ export default function SignInScreen() {
             />
 
             {params.message ? <Text style={styles.info}>{params.message}</Text> : null}
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            {!error && params.error ? <Text style={styles.error}>{params.error}</Text> : null}
+            {error ? <Text testID="e2e-auth-error" style={styles.error}>{error}</Text> : null}
+            {!error && params.error ? <Text testID="e2e-auth-error" style={styles.error}>{params.error}</Text> : null}
 
             <Pressable
+              testID="e2e-login-submit"
               disabled={loading || !!socialLoading}
               accessibilityRole="button"
               accessibilityLabel="Sign in"

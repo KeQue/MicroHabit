@@ -1,0 +1,6 @@
+appId: ${MAESTRO_E2E_APP_ID}
+name: TC-001 Android successful login
+---
+- launchApp:
+    clearState: true
+- runFlow: shared/login.yaml

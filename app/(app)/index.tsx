@@ -261,7 +261,7 @@ export default function LeaguesScreen() {
       />
 
       {error ? (
-        <View style={styles.errorBox}>
+        <View testID="e2e-leagues-error" style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
@@ -361,7 +361,7 @@ export default function LeaguesScreen() {
         </View>
       ) : null}
 
-      <View style={styles.listWrap}>
+      <View testID={!loading && !error && userId ? "e2e-leagues-loaded" : undefined} style={styles.listWrap}>
         {loading ? (
           <View style={styles.loadingState}>
             <ActivityIndicator />

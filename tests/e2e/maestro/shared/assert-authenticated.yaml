@@ -1,0 +1,14 @@
+appId: ${MAESTRO_E2E_APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: e2e-leagues-loaded
+    timeout: 60000
+- assertNotVisible:
+    id: e2e-auth-error
+- assertNotVisible:
+    id: e2e-leagues-error
+- assertNotVisible:
+    id: e2e-login-email
+- assertNotVisible:
+    id: e2e-login-password

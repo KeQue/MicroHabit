@@ -1,0 +1,8 @@
+appId: ${MAESTRO_E2E_APP_ID}
+name: TC-002 iOS successful login
+---
+# Dedicated disposable Simulator only: this clears its entire Keychain.
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- runFlow: shared/login.yaml

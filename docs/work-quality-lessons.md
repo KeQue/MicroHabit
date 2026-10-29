@@ -3,6 +3,22 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Check every mobile automation artifact destination
+
+- Observation: the first QA runner design assumed private Java home and explicit
+  output directories contained Maestro logs. Maestro 2.12.0 also writes Windows
+  JUL DebugLogStore archives through the native application-data folder, which
+  ignores Java home. A friendly input label does not redact raw command reports.
+- Correction: inspect actual artifact writers before using account credentials.
+  Disable JUL through a private logging configuration, suppress Log4j messages
+  and automatic exception traces, and delete raw command/screenshot outputs.
+  Preserve only a whitelisted execution summary; do not override system HOME.
+- Executed transfer checks: the actual DebugLogStore class with a synthetic
+  sentinel produced an empty log when JUL was disabled. A different Log4j probe
+  suppressed both its message and thrown exception only with `%ex{0}` included.
+  Maestro startup and both flow syntax checks still succeeded with these guards.
+  These are logging checks, not native login or general security certification.
+
 ## Verify the browser viewport, not just screenshot dimensions
 
 - Observation: a headless Chrome window requested at 390px rendered a 504px

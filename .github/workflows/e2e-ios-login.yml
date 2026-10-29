@@ -67,8 +67,10 @@ jobs:
           PRIVATE_DIR=$(mktemp -d "$RUNNER_TEMP/commito-build.XXXXXX")
           chmod 700 "$PRIVATE_DIR"
           trap 'rm -rf "$PRIVATE_DIR"' EXIT
+          echo 'Installing JavaScript dependencies.'
           npm ci --no-audit --no-fund >"$PRIVATE_DIR/npm.log" 2>&1 || { echo 'BLOCKED: dependency installation failed; raw logs discarded.'; exit 2; }
           mkdir -p tests/e2e/.tools
+          echo 'Downloading and verifying Maestro 2.12.0.'
           curl --fail --silent --show-error --location https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.0/maestro.zip --output "$PRIVATE_DIR/maestro.zip"
           printf '%s  %s\n' 'a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e' "$PRIVATE_DIR/maestro.zip" | shasum -a 256 -c -
           unzip -q "$PRIVATE_DIR/maestro.zip" -d tests/e2e/.tools
@@ -81,17 +83,21 @@ jobs:
           CI: '1'
         run: |
           set -euo pipefail
-          [[ -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]] || { echo 'BLOCKED: configure the public backend anon key as an environment secret.'; exit 2; }
+          [[ -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]] || { echo 'BLOCKED: configure the public backend anon key as an environment secret or variable.'; exit 2; }
           PRIVATE_DIR=$(mktemp -d "$RUNNER_TEMP/commito-xcode.XXXXXX")
           chmod 700 "$PRIVATE_DIR"
           trap 'rm -rf "$PRIVATE_DIR"' EXIT
+          echo 'Generating the iOS project and installing CocoaPods dependencies.'
           npx --no-install expo prebuild --platform ios --clean >"$PRIVATE_DIR/prebuild.log" 2>&1 || { echo 'BLOCKED: Expo prebuild failed; raw logs discarded.'; exit 2; }
+          echo 'Selecting and booting a disposable iPhone Simulator.'
           DEVICE=$(xcrun simctl list devices available --json | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const d=Object.entries(JSON.parse(s).devices).filter(([r])=>r.includes("iOS")).flatMap(([,ds])=>ds).find(d=>d.name.startsWith("iPhone"));if(!d)process.exit(2);process.stdout.write(d.udid)')
           xcrun simctl boot "$DEVICE" >"$PRIVATE_DIR/boot.log" 2>&1 || true
           xcrun simctl bootstatus "$DEVICE" -b >"$PRIVATE_DIR/bootstatus.log" 2>&1 || { echo 'BLOCKED: Simulator did not boot.'; exit 2; }
+          echo 'Compiling the unsigned Simulator Release app.'
           xcodebuild -workspace ios/Commito.xcworkspace -scheme Commito -configuration Release -sdk iphonesimulator -destination "id=$DEVICE" -derivedDataPath "$PRIVATE_DIR/build" CODE_SIGNING_ALLOWED=NO build >"$PRIVATE_DIR/xcode.log" 2>&1 || { echo 'BLOCKED: unsigned Release build failed; raw logs discarded.'; exit 2; }
           APP="$PRIVATE_DIR/build/Build/Products/Release-iphonesimulator/Commito.app"
           [[ -f "$APP/main.jsbundle" ]] || { echo 'BLOCKED: Release app has no embedded JS bundle.'; exit 2; }
+          echo 'Installing the built app on the Simulator.'
           xcrun simctl install "$DEVICE" "$APP" >"$PRIVATE_DIR/install.log" 2>&1 || { echo 'BLOCKED: Simulator install failed.'; exit 2; }
           echo "E2E_IOS_DEVICE=$DEVICE" >> "$GITHUB_ENV"
       - name: Run TC-002 twice with scoped account secrets
@@ -106,4 +112,3 @@ jobs:
         shell: bash
         run: |
           find tests/e2e/results -maxdepth 1 -type d -name '.private-*' -exec rm -rf {} + 2>/dev/null || true
-

@@ -54,6 +54,19 @@ export function weeklyRecapDateLabel(date: string): string {
     .format(new Date(`${date}T00:00:00Z`));
 }
 
+/** Compact display only; UTC week boundaries and scores still come from RPC. */
+export function weeklyRecapRangeLabel(start: string, end: string): string {
+  const first = new Date(`${start}T00:00:00Z`);
+  const last = new Date(`${end}T00:00:00Z`);
+  const month = (date: Date) => new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }).format(date);
+  if (first.getUTCFullYear() !== last.getUTCFullYear()) {
+    return `${first.getUTCDate()} ${month(first)} ${first.getUTCFullYear()} – ${last.getUTCDate()} ${month(last)} ${last.getUTCFullYear()} · UTC`;
+  }
+  const firstLabel = first.getUTCMonth() === last.getUTCMonth()
+    ? String(first.getUTCDate()) : `${first.getUTCDate()} ${month(first)}`;
+  return `${firstLabel}–${last.getUTCDate()} ${month(last)} ${last.getUTCFullYear()} · UTC`;
+}
+
 /** Invalidate before any await; late success/failure cannot publish an old scope. */
 export function createRecapRequest<T>(publish: (value: { data: T | null; loading: boolean; error: boolean }) => void) {
   let generation = 0;

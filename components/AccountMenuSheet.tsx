@@ -41,6 +41,7 @@ type Row = {
   disabled?: boolean;
   link?: boolean;
   navigation?: boolean;
+  accent?: boolean;
 };
 
 function MenuGroup({ rows, onAction }: { rows: Row[]; onAction: (action: Action) => void }) {
@@ -60,7 +61,7 @@ function MenuGroup({ rows, onAction }: { rows: Row[]; onAction: (action: Action)
             <Ionicons
               name={row.icon}
               size={19}
-              color={row.danger ? "#FCA5A5" : "#BCA3E3"}
+              color={row.danger ? "#FCA5A5" : row.accent ? "#C49AFF" : "#BCA3E3"}
               accessible={false}
             />
             <Text style={[styles.rowText, row.danger && styles.danger]}>{row.label}</Text>
@@ -143,8 +144,8 @@ export function AccountMenuSheet({
     configuredVersion: Constants.expoConfig?.version,
   });
   const leagueRows: Row[] = [];
+  if (onWeeklyRecap) leagueRows.push({ label: "Weekly recap", icon: "stats-chart-outline", onPress: onWeeklyRecap, navigation: true, accent: true });
   if (onCheckInRules) leagueRows.push({ label: "Check-in rules", icon: "calendar-outline", onPress: onCheckInRules, navigation: true });
-  if (onWeeklyRecap) leagueRows.push({ label: "Weekly recap", icon: "stats-chart-outline", onPress: onWeeklyRecap, navigation: true });
   if (onBack) leagueRows.push({ label: "Back to leagues", icon: "arrow-back-outline", onPress: onBack });
 
   return (

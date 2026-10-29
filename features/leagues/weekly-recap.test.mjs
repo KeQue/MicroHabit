@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseWeeklyRecap, createRecapRequest, weeklyRecapDateLabel } from './weekly-recap.ts';
+import { parseWeeklyRecap, createRecapRequest, weeklyRecapDateLabel, weeklyRecapRangeLabel } from './weekly-recap.ts';
 
 const id = '00000000-0000-4000-8000-000000000001';
 export const recapFixture = () => ({
@@ -17,6 +17,12 @@ test('recap retains separate equal-name members and never invents a rank', () =>
   assert.equal(value.total_member_days, 3);
   assert.equal(value.members[0].position, undefined);
   assert.equal(weeklyRecapDateLabel(value.week_start), 'Oct 19, 2026');
+});
+
+test('compact UTC dates stay clear across months, leap days and years', () => {
+  assert.equal(weeklyRecapRangeLabel('2026-10-19', '2026-10-25'), '19–25 Oct 2026 · UTC');
+  assert.equal(weeklyRecapRangeLabel('2024-02-26', '2024-03-03'), '26 Feb–3 Mar 2024 · UTC');
+  assert.equal(weeklyRecapRangeLabel('2026-12-28', '2027-01-03'), '28 Dec 2026 – 3 Jan 2027 · UTC');
 });
 
 test('recap rejects incompatible or impossible dates, counts and correction status', () => {

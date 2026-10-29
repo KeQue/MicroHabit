@@ -3,6 +3,16 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
+## Recap sheet refinement — candidate 36, October 29, 2026
+
+The founder confirmed build 35 loaded its recap and said Daily reminder looked
+fine. They reported the floating recap did not close on outside taps and
+approved the sheet/menu refinements recorded in
+[Batch-3 presentation follow-up](weekly-recaps-reminders.md).
+The change passes 111 automated tests and local synthetic web previews; it is
+prepared for build 36, with upload pending. Check outside tap, X, header swipe,
+body scrolling, large text and unchanged Daily reminder on an iPhone.
+
 ## Weekly recaps and reminders — candidate 35, October 29, 2026
 
 See [rules, implementation, evidence and pending device checks](weekly-recaps-reminders.md).

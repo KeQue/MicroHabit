@@ -3,6 +3,19 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Verify the browser viewport, not just screenshot dimensions
+
+- Observation: a headless Chrome window requested at 390px rendered a 504px
+  layout viewport, then cropped the screenshot. The first synthetic recap
+  preview hid the right-side controls even though the component was within
+  the browser's actual layout bounds. No native clipping failure was inferred.
+- Correction: use explicit device-metrics emulation and inspect `innerWidth`,
+  document width and control rectangles before judging a small-screen preview.
+  Keep web-rendered previews distinct from native touch and Dynamic Type proof.
+- Executed transfer checks: CDP at 390×844 and a different 320×568 viewport with
+  simulated 1.5× text reported matching document/viewport widths, visible close
+  targets and a scrolling body where needed. Native behavior remains untested.
+
 ## Distinguish an app address from a usable shared invitation
 
 - Observation: the founder reported the build-33 app-only URI unclickable both

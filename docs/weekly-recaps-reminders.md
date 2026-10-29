@@ -153,3 +153,40 @@ flag passed; full lint had passed for the implementation. The published
 privacy HTML matched reviewed source over HTTPS, and the invitation HTML/JS
 still matched their existing reviewed source. No unrelated website file or
 app-branch merge was published.
+
+## Recap presentation follow-up — candidate 36, October 29
+
+The founder supplied build-35 screenshots: the recap loaded but its floating
+card distracted from the league underneath, and outside taps did not close it.
+They approved a large bottom sheet, darker backdrop, X/outside/header-swipe
+dismissal, compact dates, You first, progress bars, shorter copy and placing
+Weekly recap first in the menu with an accented icon. They reported the daily
+reminder looked fine; that establishes appearance feedback, not delivery.
+
+Implemented only presentation files and focused tests. The recap now has a
+solid purple surface, 88% dark backdrop, safe-area-bounded 88%-height sheet,
+fixed 44-point close target and independent scrolling body. Swipe dismissal
+belongs to the header, so scrolling members cannot trigger it. Closing/reopening
+cancels pending dismissal. Equal names retain distinct UUID keys and scores;
+You moves first while peer ordering is preserved. UTC date labels handle month
+and year boundaries. Daily reminder, data loading, server counts, monthly
+rankings and permissions are unchanged.
+
+Verification: all **111 Node tests**, TypeScript, full ESLint and diff whitespace
+checks passed. A separate read-only reviewer ran nine focused tests and found
+no supported blocker. Actual component handlers cover outside/X/system-back/
+accessibility dismissal, short/fast header drags, reopening during animation,
+body scrolling independence, equal names, progress values and retry/loading.
+These are mocked native ports, not actual native touch hit-testing.
+
+Local Chrome previews rendered the actual recap component through React Native
+Web with synthetic data and mocked native hooks/Modal. Explicit CDP viewport
+overrides verified 390×844 and 320×568 with simulated 1.5× text: document width
+matched viewport, the close button stayed inside bounds, and enlarged content
+had a scrollable body. Icons/animation and native font scaling were not tested
+by this preview. Actual iPhone swipe feel, backdrop taps, VoiceOver focus and
+Dynamic Type remain pending. The primary self-assessment reviewed the diff,
+callers and evidence boundaries. Candidate 1.0.2 (36) carries this refinement
+within the approved Batch-3 TestFlight delivery. No backend or website change
+is needed. Build/upload and actual iPhone results remain pending; installed
+build 35 still has the old recap.

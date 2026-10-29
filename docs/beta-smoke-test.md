@@ -3,6 +3,45 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
+## Repeated display names — prepared October 29, 2026; not deployed
+
+The founder reported that changing Saddu to Sadu failed although nobody in
+that league had that name. Schema-only production inspection confirmed the
+case-insensitive global `profiles_username_unique` index. The editor updates
+both username and name, while app identity, profile access, league membership,
+check-ins and ranking joins use account UUIDs. No private account records were
+read to identify who held the name.
+
+The founder chose **allow repeated display names**, including within the same
+league. Names remain account-wide across leagues, not per-league aliases.
+Prepared migration `20261029100000_repeated_display_names.sql` removes only
+that unique display-name index. It preserves the profile ID primary key,
+three-to-twenty-character username check, policies, grants, monthly-name freeze
+trigger and existing UUID tie ordering. It changes no names or saved activity.
+No app source change, new build or payment work is required.
+
+Isolated results: the original cross-league collision reproduced before the
+migration. After it, the new rollback-only SQL fixture passed exact/case-variant
+duplicates, same-league duplicates, distinct profile IDs, independent progress,
+cross-user write/read denial, outsider RPC denial, stable equal-name ranking,
+old finalized names/scores and input bounds. All seven existing SQL suites
+also passed. Genuine clocks were restored. An initial fixture table-reference
+error and old-date RLS rejection were corrected in the fixture; no live policy
+or permission was relaxed to make it pass.
+
+Recovery was tested separately: uniqueness can be restored before duplicates
+exist. Once duplicate names exist, the rollback refuses safely and preserves
+names/accounts; restoring the old rule then requires separate review. The
+rollback must never auto-rename or delete users to recreate the index.
+
+Production is **unchanged**: only schema metadata was inspected and compared
+with the verified Batch-2 baseline. Live migration approval and fresh committed
+schema verification remain pending. No iPhone rename pass is recorded yet.
+
+- [ ] After approved deployment, retry Sadu and refresh/reopen the league.
+- [ ] With two disposable accounts, use the same name and verify progress stays
+  separate. Equal names do not grant access to anyone else's profile/check-ins.
+
 ## HTTPS invitations — build 34, October 28, 2026
 
 The founder confirmed build 33's app-only address was unclickable both in the

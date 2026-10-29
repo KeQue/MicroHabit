@@ -35,6 +35,11 @@ publication is verified; build 34 and its TestFlight upload finished. Apple
 processing, installation and native testing remain pending. See the same
 Batch-2 record for exact source and deployment boundaries.
 
+On October 29 the founder chose to allow repeated display names, including
+within a league. Accounts and progress remain tied to UUIDs. The narrow index
+removal is locally tested and pending production migration approval; it needs
+no new app build. See the current name-check entry in `beta-smoke-test.md`.
+
 ## Current Launch Gate
 
 Before the next App Store submission, finish the security/accessibility gate tracked in `docs/security-accessibility-audit.md`.
@@ -633,7 +638,9 @@ Goal: make the main product experience work from beginning to end.
 - Join the league from a second account.
 - Confirm both accounts appear in the league.
 - Edit display name.
-- Confirm duplicate/invalid display names show useful errors.
+- Allow repeated display names after the approved naming migration; invalid
+  names still show useful errors. Identical names must retain distinct account
+  identities and progress.
 
 Finish line: two real users can get into the same league and recognize each other.
 

@@ -169,7 +169,7 @@ Do not change the existing account password solely to accommodate the test.
 Windows cannot host an iOS Simulator. A cabled iPhone does not provide native iOS
 automation here. Use the prepared manual workflow
 [e2e-ios-login.yml](../../.github/workflows/e2e-ios-login.yml) on GitHub's standard
-`macos-15-intel` runner, which builds an unsigned Simulator Release `.app` and
+`macos-15` Apple Silicon runner, which builds an unsigned Simulator Release `.app` and
 runs Maestro against the installed app. No Apple signing key, App Store release,
 EAS build or paid Maestro Cloud account is required for this route.
 
@@ -298,7 +298,14 @@ and the first inspection still use fresh setup. Failed attempts retain only
 allowlisted completed checkpoints, failed command/target names and fixed app
 error categories. Raw command reports, input values and error text are discarded.
 On iOS, tapping the non-interactive COMMITO heading dismisses the keyboard before
-submission, following Maestro's documented workaround for unreliable swipes.
+submission, following [Maestro's documented workaround](https://docs.maestro.dev/reference/commands-available/hidekeyboard) for unreliable swipes.
+The iOS workflow confirms Simulator readiness again after installation. Test
+preflight allows 90 seconds per Simulator query and one read-only retry for a
+timeout, command failure or observed boot-in-progress. It records fixed categories
+and timings; a genuinely stopped, absent, unavailable or unidentifiable device
+still blocks. A setup blocker is not an executed login failure and has no attempt
+photo. The latest completed iOS follow-up was blocked at this preflight; see the
+execution record for the distinction from the earlier failed native attempt.
 
 Local runs also retain a dated, self-contained HTML report and result JSON under
 `results/history/`. Reports never overwrite one another. Open their private index:

@@ -5,7 +5,7 @@ October 29, 2026. Setup checks and actual native execution are distinguished bel
 | Case | Status | Device / OS | App version/build | Backend | Authentication evidence |
 | --- | --- | --- | --- | --- | --- |
 | Login on Android (TC-001) | PASS: two native attempts, each with its own screenshot | Dedicated Commito_E2E emulator, Android 14 / API 34, emulator-5554 | Installed 1.0.2 / versionCode 1 | Production; normal profile/auth effects approved | Both reached successful authenticated leagues loading, then repeated it after process restart; loaded state verified around each photo |
-| Login on iOS (TC-002) | FAIL: first native attempt; its private screenshot retained | Standard macos-15-intel runner; dedicated iPhone 16 Simulator, iOS 18.5 | Installed 1.0.2 / 36 | Production; scoped environment secrets | Assertions did not complete; authenticated loading/session restoration is not proven |
+| Login on iOS (TC-002) | Latest run BLOCKED in Simulator preflight; earlier native attempt FAIL with a retained photo | Standard macos-15-intel runner; dedicated iPhone 16 Simulator, iOS 18.5 build target | Latest installed version unverified by runner; source 1.0.2 / 36 | Production; scoped environment secrets | No login attempt in latest run; earlier assertions did not complete; authenticated loading/session restoration is not proven |
 
 Initial Android run: October 29 at 14:04:04 UTC (15:04 Berlin), **310 seconds**
 including preflight; attempts **184.1s** and **121.3s**, both PASS. Command:
@@ -69,6 +69,22 @@ Measured native PNG capture was 1.1s/1.4s; hierarchy-before/after inspection
 accounted for most of the remaining capture time. All **124 Node tests** passed
 (111 existing plus 13 report/history checks); the separate 13 synthetic Windows
 store checks also passed. Raw directories and the local run lock were removed.
+
+The diagnostics/keyboard revision `645967448a48c41b7f309140a77d5d9119030044`
+has **126 passing Node checks**. Its Android run at **20:07:00 UTC** passed
+both functional attempts (123.1s/85.3s), but attempt 1's image failed coordinate
+validation and was discarded; attempt 2 retained its image. This run remains
+INCOMPLETE in dated history, with no substitute image or rewritten result.
+The exact transient coordinate mismatch was not retained and remains unknown.
+
+A complete repeat on the same source/account/build started **20:13:28 UTC
+(21:13 Berlin)**. Both native attempts passed (101.3s/68.0s), with distinct
+images captured at **20:15:30 UTC** and **20:17:04 UTC**, each visually reviewed.
+Both showed authenticated leagues loading with no login/error elements, verified
+before and after capture. Total 226.3s; capture 27.1s/25.9s. This was 38.1s less
+than the matching `0731915` baseline, including 16.8s less capture time; timing
+alone does not establish a cause. The protected account was reused automatically.
+Afterward the dedicated Android emulator was closed to free laptop memory.
 
 ## Observed environment
 
@@ -198,7 +214,7 @@ store checks also passed. Raw directories and the local run lock were removed.
   [Run 40937553476](https://github.com/KeQue/MicroHabit/actions/runs/40937553476)
   was accepted at **19:09:49 UTC (20:09 Berlin)**. Dependencies installed
   successfully; the bounded build step started at **19:12:00 UTC**.
-  This entry records an active run, not an iOS login PASS.
+  Its completed build and failed login are recorded below.
 
 ## Completed instrumented iOS run
 
@@ -229,6 +245,58 @@ secret-bearing fields and unknown targets. The iOS flow uses the documented
 non-interactive-header keyboard-dismissal workaround; this remains a proposed
 fix until native iOS execution verifies it. Only the second screenshot hierarchy
 read skips redundant driver reinstall; first reads and tests retain fresh setup.
+
+## Approved follow-up iOS run
+
+The founder explicitly approved **one** follow-up run. Before dispatch, the three
+existing `e2e-login` secrets were encrypted with GitHub's environment public key
+and updated from the Windows-protected Android-verified account and local public
+backend key. Only secret names/update metadata were retained; values, GitHub
+tokens and response bodies were not printed. The helper used the official
+libsodium sealed-box implementation; synthetic roundtrip, wrong-key and tamper
+checks passed. No password was obtained from Supabase or entered again in chat.
+
+[Run 40947806079](https://github.com/KeQue/MicroHabit/actions/runs/40947806079)
+uses exact Android-tested source `6459674`, the unchanged reviewed dispatcher
+on `main`, the same standard Intel Mac/Xcode/runtime, scoped production consent
+and matching report recipient. The public repository, environment's main-only
+policy, secret names and complete Android evidence were freshly verified before
+dispatch. No additional Pages publication or app release was triggered.
+
+The run completed with a **BLOCKED** native result at **20:50:17 UTC**, after
+62.1s of preflight, with zero UI attempts: the runner could not confirm the selected
+Simulator as available/booted. Build/install had succeeded in about **28m 14s**.
+No attempt image exists because no login attempt started. The encrypted report
+was downloaded with its SHA-256 digest verified and opened privately in a browser;
+it remains in dated history beside the earlier failed attempt's image.
+
+The public download cache hit (199 MiB). CocoaPods took about **1m 21s**, compared
+with 2m 32s previously; Xcode took about **18m 06s**, compared with 18m 49s.
+Simulator startup increased to **4m 01s** and installation to **3m 30s**.
+The cache does not cover compilation or Simulator output, and the slower total
+does not establish an overall caching speedup. Configuration/build variability
+and slow Simulator operations remain separate from account authentication.
+
+Review found a concrete diagnostic defect: the same generic "select a booted
+Simulator" blocker covered a 20-second query timeout, command error, invalid JSON,
+missing device and confirmed non-booted state. The old result does not identify
+which occurred; calling it an executed login failure from GitHub's failed step
+alone was incorrect. The prepared correction distinguishes those cases, allows
+90-second queries with one bounded read-only retry, checks readiness again after
+installation and retains fixed diagnostic/state/timing evidence in JSON/HTML.
+The selected available/booted device, installed version, real auth assertions,
+two attempts, screenshot requirements and the 60-minute build limit remain required.
+
+The next dispatcher is prepared locally for the standard `macos-15` Apple Silicon
+runner. Official image documentation confirms installed Xcode 16.4 and iOS 18.5;
+public standard runners remain free. This is a proposed hardware change to measure,
+not a demonstrated fix for the earlier Intel behavior. No further cloud run or
+workflow publication has been authorized or started at this entry's preparation.
+
+A separate read-only configuration check at **20:30:05 UTC** returned HTTP 200
+from the production public Auth settings endpoint using the synchronized public
+key, with email login enabled. It used no account password and changed no setting.
+This verifies public backend configuration, not native iOS authentication.
 
 ## Earlier prepared corrections and visual reports
 
@@ -302,7 +370,8 @@ of the proposed report history/timing improvements and iOS execution. Dated loca
 archives preserve self-contained images, with timing comparisons restricted to
 matching device/build/backend/tool settings and repetition count. Cloud report
 generation creates no plaintext history; local decryption archives downloaded
-iOS reports. Thirteen focused reporting/history checks pass,
+iOS reports. Eighteen focused reporting/history/diagnostic checks pass (129 Node
+checks total),
 including two distinct per-attempt images, explicit browser selection, missing
 image exit status, and evidence-based post-run suggestions. No new app code,
 test assertions or backend behavior changed. iOS now has one failed native

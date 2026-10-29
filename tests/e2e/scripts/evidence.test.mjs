@@ -152,7 +152,7 @@ test('cloud reporting writes no plaintext archive, while a local blocked run ret
   mkdirSync(base, { recursive: true });
   const fixture = mkdtempSync(join(base, 'cloud-'));
   try {
-    const report = { caseId: 'TC-002', status: 'BLOCKED', evidenceStatus: 'NOT_AVAILABLE', attempts: [], startedAt: '2026-10-29T12:00:00.000Z' };
+    const report = { caseId: 'TC-002', status: 'BLOCKED', evidenceStatus: 'NOT_AVAILABLE', attempts: [], startedAt: '2026-10-29T12:00:00.000Z', simulatorReadiness: [{ diagnostic: 'simulator-list-timeout', state: null, durationSeconds: 90 }] };
     recordRun({ ...report }, fixture, { cloud: true });
     const metadata = JSON.parse(readFileSync(join(fixture, 'TC-002-latest.json')));
     assert.equal(metadata.historyStatus, 'LOCAL_DOWNLOAD_ONLY');
@@ -163,6 +163,7 @@ test('cloud reporting writes no plaintext archive, while a local blocked run ret
     assert.ok(existsSync(join(fixture, local.historyFile)));
     const html = readFileSync(join(fixture, local.historyFile), 'utf8');
     assert.ok(html.includes('Login on iOS: BLOCKED'));
+    assert.ok(html.includes('simulator-list-timeout; state unknown; 90s'));
     assert.ok(!html.includes('<img'));
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });

@@ -7,6 +7,7 @@ import { completedReport, resultExitCode } from './maestro-result.mjs';
 import { authenticatedScreen, parseHierarchy, redactScreenshot, safeScreenState } from './screenshot.mjs';
 import { recordRun, writeReport } from './report.mjs';
 import { failureDiagnostics } from './failure-diagnostics.mjs';
+import { inspectSimulator, mayRetrySimulatorProbe } from './ios-readiness.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const resultsDir = join(root, 'tests/e2e/results');
@@ -159,11 +160,6 @@ async function doctor() {
 }
 
 function valid(value, pattern) { return typeof value === 'string' && pattern.test(value); }
-function jsonOutput(result) {
-  if (result.status !== 0) return null;
-  try { return JSON.parse(result.stdout); } catch { return null; }
-}
-
 async function prepare(platform) {
   const android = platform === 'android';
   const key = platform.toUpperCase();
@@ -230,13 +226,26 @@ async function prepare(platform) {
     }
   }
   if (!android && process.platform === 'darwin' && tools.xcrun && metadata.device && metadata.appId) {
-    const list = jsonOutput(await call(tools.xcrun, ['simctl', 'list', 'devices', 'available', '--json']));
-    const entry = Object.entries(list?.devices || {}).flatMap(([runtime, devices]) => devices.map(device => ({ ...device, runtime }))).find(device => device.udid === metadata.device);
-    if (entry?.state !== 'Booted') block('Select an explicitly booted, available iOS Simulator.');
+    console.log('iOS preflight: checking the selected Simulator; no login attempt has started.');
+    const probe = async () => {
+      const started = Date.now();
+      const checked = inspectSimulator(await call(tools.xcrun, ['simctl', 'list', 'devices', 'available', '--json'], { timeout: 90000 }), metadata.device);
+      return { ...checked, durationSeconds: Math.round((Date.now() - started) / 100) / 10 };
+    };
+    let readiness = await probe();
+    const checks = [readiness];
+    if (!readiness.ready && mayRetrySimulatorProbe(readiness)) {
+      console.log(`iOS preflight: ${readiness.diagnostic}; retrying the read-only readiness check once.`);
+      await new Promise(done => setTimeout(done, 5000));
+      readiness = await probe(); checks.push(readiness);
+    }
+    metadata.simulatorReadiness = checks;
+    if (!readiness.ready) block(`iOS readiness blocked: ${readiness.diagnostic}; observed state: ${readiness.state || 'not available'}. No login attempt started.`);
     else {
-      metadata.osVersion = entry.runtime.match(/iOS-([0-9-]+)$/)?.[1]?.replaceAll('-', '.') || null;
-      const container = await call(tools.xcrun, ['simctl', 'get_app_container', metadata.device, metadata.appId, 'app']);
-      if (container.status !== 0) block('The selected iOS Simulator app is not installed.');
+      metadata.osVersion = readiness.osVersion;
+      const container = await call(tools.xcrun, ['simctl', 'get_app_container', metadata.device, metadata.appId, 'app'], { timeout: 90000 });
+      if (container.error?.code === 'ETIMEDOUT') block('iOS app-container query timed out; installation could not be verified.');
+      else if (container.error || container.status !== 0) block('The selected iOS Simulator app container could not be verified.');
       else {
         const plist = join(container.stdout.trim(), 'Info.plist');
         const read = async field => (await call('/usr/libexec/PlistBuddy', ['-c', `Print :${field}`, plist])).stdout?.trim();

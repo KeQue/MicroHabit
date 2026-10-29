@@ -24,7 +24,7 @@ export function suggestedImprovements(report) {
     suggestions.push('System: keep this run as a baseline. Compare later durations and screenshots before expanding test coverage or changing time limits.');
   }
   if (attempts.some(attempt => attempt.screenshot?.durationSeconds > 30)) {
-    suggestions.push('Performance: screenshot inspection exceeded 30 seconds. Measure native tool startup and laptop resource use before adding more parallel work.');
+    suggestions.push('Performance: screenshot inspection exceeded 30 seconds. Measure native tool startup and the test machine\'s resource use before adding more parallel work.');
   }
   suggestions.push('Agents: the Runner/Debugger should review an image for every attempt and report missing evidence separately from the functional result. Change reusable skills only when an observed issue supports it.');
   return suggestions;
@@ -35,6 +35,7 @@ export function writeReport(report, directory = results) {
   const name = report.caseId === 'TC-001' ? 'Login on Android' : 'Login on iOS';
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const rows = [['Test', name], ['Case ID', report.caseId], ['Platform', report.platform], ['Result', report.status], ['Device', report.device], ['OS', report.osVersion], ['App version / build', `${report.appVersion ?? '?'} / ${report.appBuild ?? '?'}`], ['Backend', `${report.backendEnvironment ?? '?'} / ${report.backendHost ?? '?'}`], ['Source revision', report.sourceRevision], ['Started (UTC)', report.startedAt], ['Duration (seconds)', report.durationSeconds], ['Command', report.command], ['Screenshot evidence', report.evidenceStatus ?? 'Unavailable for this earlier run']];
+  if (report.simulatorReadiness) rows.push(['Simulator checks', report.simulatorReadiness.map(check => `${check.diagnostic || 'ready'}; state ${check.state || 'unknown'}; ${check.durationSeconds}s`).join(' / ')]);
   const pictureFor = screenshot => {
     let picture = '<p>Screenshot unavailable: this earlier run did not retain visual evidence.</p>';
     if (screenshot?.status === 'CAPTURED' && /^TC-00[12]-[0-9]+-attempt-[1-5]\.png$/.test(screenshot.file || '')) {
@@ -113,7 +114,7 @@ async function cli() {
       const buildPath = join(results, 'ios-build-summary.json');
       if (existsSync(buildPath)) {
         const build = JSON.parse(readFileSync(buildPath, 'utf8'));
-        const phases = ['not-started', 'configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'xcode-compilation', 'app-installation', 'complete', 'unknown'];
+        const phases = ['not-started', 'configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete', 'unknown'];
         if (phases.includes(build.phase)) result.blockers.push(`Build phase: ${build.phase}. Exit code: ${Number.isInteger(build.exitCode) ? build.exitCode : 'unavailable / interrupted'}.`);
         const categories = (build.diagnostics || []).filter(value => typeof value === 'string' && /^[a-z-]{1,60}$/.test(value));
         if (categories.length) result.blockers.push(`Sanitized build diagnostics: ${categories.join(', ')}.`);

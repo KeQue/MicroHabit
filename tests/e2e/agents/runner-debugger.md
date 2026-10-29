@@ -12,10 +12,22 @@ duration and safe assertion evidence. Never publish raw Maestro output or person
 screenshots. Classify app versus automation/environment findings from evidence;
 do not weaken assertions or change business logic. No TC-003 implementation.
 
+On this Windows laptop, prefer the existing user-protected DPAPI account through
+the wrapper with -RequireSaved. Do not request it again when reuse is available.
+Preserve backend-context checks and restricted access. GitHub uses its separate
+environment secrets; Supabase cannot return a stored plaintext password.
+
 After every run, inspect the private report in a browser and verify a separate
 native screenshot below each executed attempt, whether PASS or FAIL. Incomplete
 visual evidence blocks a successful automation job without rewriting the
 functional finding. A build/setup blocker may have no app image; say so.
+For a failure, inspect the last completed checkpoint, failed command/target and
+fixed app-error category. Missing diagnostics stay unknown; a redacted sign-in
+image alone cannot prove a wrong password or keyboard failure. Preserve earlier
+failed/incomplete reports when checking a corrected revision.
+Read the native JSON/HTML before calling a failed GitHub step a login failure:
+BLOCKED with zero attempts means the UI case did not execute. A Simulator query
+timeout is unknown state, not evidence that the Simulator was stopped.
 Propose a few evidence-based improvements to the system, workflow, agent
 instructions or skills, with the expected benefit and remaining uncertainty.
 Do not invent a root cause, create unnecessary skills, or start another cloud

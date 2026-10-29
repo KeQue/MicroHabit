@@ -19,6 +19,16 @@ a roadmap, confidence score, or claim that the model has been retrained.
   no-account fixture verified the actual pinned CLI schema, including its retained
   JavaScript delimiters. These checks do not establish the iOS login root cause.
 
+- Follow-up observation: a failed GitHub test step actually contained a BLOCKED
+  preflight with zero native attempts. Its broad Simulator message also conflated
+  query timeout/error with a confirmed stopped device. Inspect the native report
+  before classifying an executed failure. Apply fixed diagnostics to preflight
+  as well as assertions; an unknown device state is not an observed shutdown.
+- Transfer checks distinguish timed-out, nonzero, malformed, missing, unavailable,
+  booting, stopped and ready device responses without retaining raw output. A
+  read-only retry must still identify the exact available booted device/runtime;
+  it must never become a login retry or convert unknown state to readiness.
+
 ## Keep private build diagnostics observable
 
 - Observation: the first iOS E2E workflow combined project generation, CocoaPods,

@@ -5,7 +5,7 @@ import { delimiter, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { completedReport, resultExitCode } from './maestro-result.mjs';
 import { authenticatedScreen, parseHierarchy, redactScreenshot } from './screenshot.mjs';
-import { writeReport } from './report.mjs';
+import { recordRun, writeReport } from './report.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const resultsDir = join(root, 'tests/e2e/results');
@@ -257,6 +257,12 @@ async function prepare(platform) {
 async function captureScreenshot(metadata, attempt, output, requireLoaded = false) {
   const started = Date.now();
   let phase = 'hierarchy-before';
+  let phaseStarted = started;
+  const timings = {};
+  const nextPhase = next => {
+    timings[phase] = Math.round((Date.now() - phaseStarted) / 100) / 10;
+    phase = next; phaseStarted = Date.now();
+  };
   try {
     const hierarchy = async () => {
       const child = await call(tools.maestro, ['--device', metadata.device, '--platform', metadata.platform, 'hierarchy'],
@@ -266,27 +272,29 @@ async function captureScreenshot(metadata, attempt, output, requireLoaded = fals
       return parseHierarchy(child.stdout);
     };
     const before = await hierarchy();
-    phase = 'native-capture';
+    nextPhase('native-capture');
     const raw = join(output, 'native-screen.png');
     const image = metadata.platform === 'android'
       ? await call(tools.adb, ['-s', metadata.device, 'exec-out', 'screencap', '-p'], { outputFile: raw, timeout: 20000 })
       : await call(tools.xcrun, ['simctl', 'io', metadata.device, 'screenshot', '--type=png', raw], { timeout: 20000 });
     if (image.status !== 0 || image.error) throw Error('Screenshot unavailable');
     const capturedAt = new Date().toISOString();
-    phase = 'hierarchy-after';
+    nextPhase('hierarchy-after');
     const after = await hierarchy();
-    phase = 'validation-and-redaction';
+    nextPhase('validation-and-redaction');
     if (requireLoaded) {
       if (!authenticatedScreen(before, metadata.appId) || !authenticatedScreen(after, metadata.appId)) throw Error('Authenticated screenshot unavailable');
     }
     const redacted = redactScreenshot(readFileSync(raw), [before, after], [env.MAESTRO_E2E_EMAIL, env.MAESTRO_E2E_PASSWORD]);
     const file = `${metadata.caseId}-${Date.now()}-attempt-${attempt}.png`;
     writeFileSync(join(resultsDir, file), redacted.png, { mode: 0o600 });
-    return { status: 'CAPTURED', file, capturedAt, redactions: redacted.redactions,
+    timings[phase] = Math.round((Date.now() - phaseStarted) / 100) / 10;
+    return { status: 'CAPTURED', file, capturedAt, redactions: redacted.redactions, timings,
       durationSeconds: Math.round((Date.now() - started) / 100) / 10 };
   } catch (error) {
+    timings[phase] = Math.round((Date.now() - phaseStarted) / 100) / 10;
     const categories = { 'Hierarchy timed out': 'hierarchy-timeout', 'Hierarchy command failed': 'hierarchy-command-failed', 'Hierarchy unavailable': 'hierarchy-unavailable', 'Screenshot unavailable': 'native-capture-unavailable', 'Authenticated screenshot unavailable': 'authenticated-screen-not-visible', 'Cannot verify screenshot coordinates': 'unverified-coordinates', 'Cannot safely redact an element': 'unverified-redaction-bounds', 'Unsupported screenshot': 'unsupported-image' };
-    return { status: 'UNAVAILABLE', phase, diagnostic: categories[error.message] || 'image-processing-or-output', durationSeconds: Math.round((Date.now() - started) / 100) / 10, finding: 'Native screenshot could not be captured and safely redacted; raw pixels were discarded.' };
+    return { status: 'UNAVAILABLE', phase, timings, diagnostic: categories[error.message] || 'image-processing-or-output', durationSeconds: Math.round((Date.now() - started) / 100) / 10, finding: 'Native screenshot could not be captured and safely redacted; raw pixels were discarded.' };
   }
 }
 
@@ -334,9 +342,11 @@ async function run(platform, prerequisite = null) {
   }
   report.durationSeconds = Math.round((Date.now() - started) / 100) / 10;
   report.evidenceStatus = !report.attempts.length ? 'NOT_AVAILABLE' : report.attempts.every(attempt => attempt.screenshot?.status === 'CAPTURED') ? 'COMPLETE' : 'INCOMPLETE';
-  try { writeReport(report); }
-  catch { report.evidenceStatus = 'INCOMPLETE'; report.evidenceFinding = 'The private HTML report could not be written.'; }
-  writeFileSync(join(resultsDir, `${metadata.caseId}-latest.json`), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+  try { recordRun(report); }
+  catch {
+    report.evidenceStatus = 'INCOMPLETE'; report.historyStatus = 'UNAVAILABLE'; report.evidenceFinding = 'The private HTML report or dated history could not be written.';
+    writeFileSync(join(resultsDir, `${metadata.caseId}-latest.json`), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+  }
   console.log(JSON.stringify(report, null, 2));
   return report;
 }

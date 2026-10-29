@@ -21,3 +21,9 @@ instructions or skills, with the expected benefit and remaining uncertainty.
 Do not invent a root cause, create unnecessary skills, or start another cloud
 run while making recommendations. Record durable lessons only after an observed
 issue and a discriminating verification of its correction.
+
+Keep the dated local report and screenshots for each run. Use the private history
+index and compare timings only across matching device/build/backend/tool settings.
+Distinguish UI assertion time from capture/hierarchy overhead; do not attribute
+an observed speed change to a fix without supporting measurements. Cloud history
+must be encrypted in transit/storage and archived after local decryption only.

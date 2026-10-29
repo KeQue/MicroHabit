@@ -51,7 +51,12 @@ roundtrip, no plaintext fields, permitted access rules, backend mismatch,
 corruption, replacement, removal, missing store and rejected external path.
 The first permission implementation required a security privilege; restricting
 changes to access rules corrected this without changing ownership/audit rules.
-The real account has not yet been saved or reused through that new path.
+The real account was subsequently saved by the founder in the masked local
+window. Both fields can be decrypted by the current Windows user without
+printing either value. The saved-account native run on `f18f68f` started at
+**18:57:11 UTC (19:57 Berlin)** and passed both attempts (**77.9s**, **85.1s**),
+with each photo retained (**34.9s**, **28.9s** capture time). Total **231.4s**.
+The wrapper reused the encrypted account automatically without another prompt.
 
 ## Observed environment
 
@@ -237,9 +242,13 @@ existing GitHub Pages rebuild/deployment; the site content was unchanged.
 Unrelated Apple account-deletion work appearing in
 the shared workspace is outside this review and must be preserved.
 
-Android passed on source `abb5d0f`, with complete per-attempt visual evidence.
-The later local credential-store change still needs its one-time account save
-and native reuse verification. Ten focused reporting checks pass,
+Android passed on sources `abb5d0f` and `f18f68f`, with complete per-attempt visual
+evidence and real saved-account reuse. The founder then requested implementation
+of the proposed report history/timing improvements and iOS execution. Dated local
+archives preserve self-contained images, with timing comparisons restricted to
+matching device/build/backend/tool settings and repetition count. Cloud report
+generation creates no plaintext history; local decryption archives downloaded
+iOS reports. Thirteen focused reporting/history checks pass,
 including two distinct per-attempt images, explicit browser selection, missing
 image exit status, and evidence-based post-run suggestions. No new app code,
 test assertions or backend behavior changed. iOS remains BLOCKED, with zero

@@ -3,6 +3,7 @@ import { constants, createCipheriv, createDecipheriv, createHash, createPrivateK
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { archiveReport, comparePreviousRun, timingTotals } from './history.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const results = join(root, 'tests/e2e/results');
@@ -40,16 +41,28 @@ export function writeReport(report, directory = results) {
       const png = readFileSync(join(directory, screenshot.file));
       picture = `<p>Native device screenshot captured ${escape(screenshot.capturedAt)}. Opaque credential/keyboard masks: ${escape(screenshot.redactions)}.</p><img alt="Native app state after this attempt" src="data:image/png;base64,${png.toString('base64')}">`;
     } else if (screenshot) picture = `<p>Screenshot unavailable: ${escape(screenshot.finding)}</p><p>Capture phase: ${escape(screenshot.phase)}. Diagnostic: ${escape(screenshot.diagnostic)}.</p>`;
-    return picture;
+    const timings = screenshot?.timings ? `<p>Capture phase times (seconds): ${Object.entries(screenshot.timings).map(([phase, seconds]) => `${escape(phase)}: ${escape(seconds)}`).join('; ')}.</p>` : '';
+    return picture + timings;
   };
   const attempts = (report.attempts || []).map(attempt => {
     return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(attempt.durationSeconds)} seconds)</p>${pictureFor(attempt.screenshot)}</section>`;
   }).join('');
   const improvements = `<aside><h2>Suggested improvements after this run</h2><ul>${suggestedImprovements(report).map(item => `<li>${escape(item)}</li>`).join('')}</ul></aside>`;
+  const totals = timingTotals(report);
+  const timing = `<aside><h2>Timing</h2><p>UI assertions: ${escape(totals.uiSeconds)} seconds. Screenshot capture and inspection: ${escape(totals.captureSeconds)} seconds. Total including setup: ${escape(totals.runSeconds)} seconds.</p>${report.timingComparison ? `<p>Compared with the passing run started ${escape(report.timingComparison.startedAt)}: total change ${escape(report.timingComparison.deltaSeconds.runSeconds)} seconds; screenshot-time change ${escape(report.timingComparison.deltaSeconds.captureSeconds)} seconds. Negative values mean less time.</p><p>${escape(report.timingComparison.finding)}</p>` : '<p>No earlier comparable complete passing run is available.</p>'}</aside>`;
   const supplemental = report.supplementalScreenshot ? `<section><h2>Supplemental screenshot</h2><p>${escape(report.supplementalScreenshot.context)}</p>${pictureFor(report.supplementalScreenshot)}</section>` : '';
   const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${escape(name)} | Commito report</title><style>body{font:16px system-ui;margin:32px auto;padding:0 20px;max-width:900px;color:#222}table{border-collapse:collapse;width:100%}td,th{padding:9px;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}img{display:block;max-width:390px;width:100%;height:auto;border:1px solid #ddd}section{margin-top:32px}h1{font-size:25px}</style><h1>${escape(name)}: ${escape(report.status)}</h1><p>Real UI and backend test. A screenshot supports visual review; the executed assertions determine the functional result.</p><table>${rows.map(([label, value]) => `<tr><th>${escape(label)}</th><td>${escape(value)}</td></tr>`).join('')}</table><p>${escape(report.authenticationEvidence)}</p>${(report.blockers || []).map(blocker => `<p>BLOCKED: ${escape(blocker)}</p>`).join('')}${attempts || '<p>No native attempt or app screenshot was available.</p>'}<p>Keep this report private. Redaction preserves the remaining native screenshot pixels; it does not recreate the app.</p></html>`;
   const path = join(directory, `${report.caseId}-latest.html`);
-  writeFileSync(path, html.replace('</html>', `${supplemental}${improvements}</html>`), { mode: 0o600 });
+  writeFileSync(path, html.replace('</html>', `${supplemental}${timing}${improvements}</html>`), { mode: 0o600 });
+  return path;
+}
+
+export function recordRun(report, directory = results, { cloud = process.env.GITHUB_ACTIONS === 'true' } = {}) {
+  report.timingComparison = cloud ? null : comparePreviousRun(report, directory);
+  report.historyStatus = cloud ? 'LOCAL_DOWNLOAD_ONLY' : 'RETAINED';
+  const path = writeReport(report, directory);
+  if (!cloud) report.historyFile = archiveReport(report, readFileSync(path, 'utf8'), directory);
+  writeFileSync(join(directory, `${report.caseId}-latest.json`), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
   return path;
 }
 
@@ -103,7 +116,7 @@ async function cli() {
         const categories = (build.diagnostics || []).filter(value => typeof value === 'string' && /^[a-z-]{1,60}$/.test(value));
         if (categories.length) result.blockers.push(`Sanitized build diagnostics: ${categories.join(', ')}.`);
       }
-      writeReport(result);
+      recordRun(result);
     }
     if (!process.env.E2E_REPORT_PUBLIC_KEY) throw Error('Configure E2E_REPORT_PUBLIC_KEY before uploading a report');
     const encrypted = encryptReport(readFileSync(path, 'utf8'), process.env.E2E_REPORT_PUBLIC_KEY);
@@ -117,6 +130,7 @@ async function cli() {
     const html = decryptReport(readFileSync(process.argv[3], 'utf8'), readFileSync(join(keys, 'private.pem')));
     const path = join(results, 'downloaded-ios-report.html');
     writeFileSync(path, html, { mode: 0o600 });
+    archiveReport({ caseId: 'TC-002', status: 'DOWNLOADED — open report for result', evidenceStatus: 'See report', startedAt: new Date().toISOString(), kind: 'downloaded-report' }, html, results);
     console.log(`Private report: ${path}`);
   } else throw Error('Usage: node tests/e2e/scripts/report.mjs keys|encrypt-ios|decrypt <encrypted-file>');
 }

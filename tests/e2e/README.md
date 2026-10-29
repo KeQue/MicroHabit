@@ -294,6 +294,19 @@ Each screenshot belongs to the attempt directly above it. Hierarchy inspection
 has a 90-second limit per inspection to accommodate native tool startup on this
 laptop; any capture failure records its phase and a fixed diagnostic category.
 
+Local runs also retain a dated, self-contained HTML report and result JSON under
+`results/history/`. Reports never overwrite one another. Open their private index:
+
+```powershell
+npm.cmd run e2e:report -- history
+```
+
+Timing comparisons use the previous complete passing run only when device, OS,
+installed build, backend, Maestro version and attempt count match. They separate
+UI-test time from screenshot time. A shorter run is not proof of an improvement's
+cause. Cloud runners create no plaintext history; downloading/decrypting an iOS
+report archives a private local copy instead.
+
 Every HTML report includes suggested improvements based on its observed result,
 capture completeness and timings. The run review should also consider workflow,
 agent instructions and skills, state what is untested, and preserve the original
@@ -328,10 +341,11 @@ node tests/e2e/scripts/report.mjs decrypt "$env:USERPROFILE\Downloads\TC-002-rep
 npm.cmd run e2e:report -- downloaded-ios
 ```
 
-The encrypted artifact expires after seven days. No new iOS run is authorized by
-these reporting changes. Publishing to `main` also triggers the repository's
-existing Pages rebuild, so publication is held under the founder's latest
-no-new-cloud-run instruction until approval.
+The encrypted artifact expires after seven days. Reporting changes alone do not
+authorize a cloud run. Publishing the dispatcher to `main` also triggers the
+repository's existing Pages rebuild. The founder subsequently requested the
+prepared improvements and iOS execution; this authorizes that manual verification.
+Keep future cloud execution manual and within the founder's current instructions.
 
 ## Reuse the QA roles
 

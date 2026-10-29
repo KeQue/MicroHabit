@@ -2,11 +2,11 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { PNG } from 'pngjs';
-import { decryptReport, encryptReport, suggestedImprovements, writeReport } from './report.mjs';
+import { decryptReport, encryptReport, recordRun, suggestedImprovements, writeReport } from './report.mjs';
 import { authenticatedScreen, parseHierarchy, redactScreenshot } from './screenshot.mjs';
 import { browserCommand } from './view-report.mjs';
 import { resultExitCode } from './maestro-result.mjs';
@@ -145,4 +145,24 @@ test('post-run suggestions follow observed evidence without inventing a root cau
   const incomplete = suggestedImprovements({ status: 'PASS', evidenceStatus: 'INCOMPLETE', attempts: [{ screenshot: { status: 'UNAVAILABLE' } }] });
   assert.ok(incomplete.some(item => item.includes('capture phase')));
   assert.ok(!incomplete.some(item => item.includes('baseline')));
+});
+
+test('cloud reporting writes no plaintext archive, while a local blocked run retains an honest dated report', () => {
+  const base = resolve('tests/e2e/.tools/report-checks');
+  mkdirSync(base, { recursive: true });
+  const fixture = mkdtempSync(join(base, 'cloud-'));
+  try {
+    const report = { caseId: 'TC-002', status: 'BLOCKED', evidenceStatus: 'NOT_AVAILABLE', attempts: [], startedAt: '2026-10-29T12:00:00.000Z' };
+    recordRun({ ...report }, fixture, { cloud: true });
+    const metadata = JSON.parse(readFileSync(join(fixture, 'TC-002-latest.json')));
+    assert.equal(metadata.historyStatus, 'LOCAL_DOWNLOAD_ONLY');
+    assert.equal(metadata.historyFile, undefined);
+    assert.equal(existsSync(join(fixture, 'history')), false);
+    const local = { ...report };
+    recordRun(local, fixture, { cloud: false });
+    assert.ok(existsSync(join(fixture, local.historyFile)));
+    const html = readFileSync(join(fixture, local.historyFile), 'utf8');
+    assert.ok(html.includes('Login on iOS: BLOCKED'));
+    assert.ok(!html.includes('<img'));
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
 });

@@ -21,8 +21,8 @@ export function browserCommand(platform, path, environment = process.env, exists
 }
 
 export function openReport(mode) {
-  const reports = { android: 'TC-001-latest.html', ios: 'TC-002-latest.html', 'downloaded-ios': 'downloaded-ios-report.html' };
-  if (!reports[mode]) throw Error('Usage: npm run e2e:report -- android|ios|downloaded-ios');
+  const reports = { android: 'TC-001-latest.html', ios: 'TC-002-latest.html', 'downloaded-ios': 'downloaded-ios-report.html', history: 'history/index.html' };
+  if (!reports[mode]) throw Error('Usage: npm run e2e:report -- android|ios|downloaded-ios|history');
   const path = join(root, 'tests/e2e/results', reports[mode]);
   if (!existsSync(path)) throw Error('No report exists yet for this test.');
   const command = browserCommand(process.platform, path);

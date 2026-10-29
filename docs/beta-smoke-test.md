@@ -3,12 +3,13 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
-## Weekly recaps and reminders — local Batch 3, October 29, 2026
+## Weekly recaps and reminders — candidate 35, October 29, 2026
 
 See [rules, implementation, evidence and pending device checks](weekly-recaps-reminders.md).
-The founder approved local implementation. These changes are not in installed
-build 34 and have not been deployed to production. Existing successful phone
-checks below do not establish Batch-3 behavior.
+The founder approved deployment and native delivery. The single recap migration
+is live and verified; candidate 1.0.2 (35) enables its menu entry. The new app
+controls are not in installed build 34. Build/upload and device verification
+remain pending; existing successful phone checks do not establish Batch-3 behavior.
 
 ## Repeated display names — deployed October 29, 2026
 

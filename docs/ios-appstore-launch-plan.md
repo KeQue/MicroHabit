@@ -43,8 +43,10 @@ the iPhone rename worked; see the remaining checks in `beta-smoke-test.md`.
 
 The founder approved local Batch 3 on October 29: weekly recap and reminder
 controls. See [implementation and verification](weekly-recaps-reminders.md).
-Production deployment, disclosure publication and native delivery remain
-separate approval steps; this does not enable Batch 4 or a public release.
+The founder subsequently approved its production migration, disclosure
+publication and native delivery. The recap RPC is live and verified; candidate
+35 is prepared. This does not enable Batch 4 or a public release. See the
+Batch-3 record for exact delivery status and pending device checks.
 
 ## Current Launch Gate
 

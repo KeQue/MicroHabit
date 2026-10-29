@@ -1,8 +1,9 @@
 # Weekly recaps and reminder controls — Batch 3
 
-October 29, 2026. The founder approved local implementation. This record does
-not authorize production migration, website publication, a TestFlight upload
-or a public App Store release. Payments and Batch 4 remain outside this work.
+October 29, 2026. The founder approved local implementation and subsequently
+approved the single production migration, reminder privacy publication and a
+new TestFlight build. Public App Store release, payments and Batch 4 remain
+outside this approval.
 
 ## Behavior and rules
 
@@ -57,13 +58,16 @@ and battery restrictions. DST/travel/background delivery remains device-untested
   execution; anon/service roles do not. The response contains only display
   names, member IDs, week/status and counts; no emails or invite codes.
 - The matching rollback script drops only this RPC and deletes no user data.
-- Both local privacy sources describe preferences and older fixed-time builds.
-  These disclosure changes have not been published to the hosted site.
+- Both privacy sources describe preferences and older fixed-time builds. Only
+  these two disclosure files were published to Pages `main`, using guarded
+  fast-forward commit `7259f1b5b95fe8b980b5e1257a3724c3d6e91fb0`; the app
+  branch was not merged or pushed. Fresh HTTPS returned 200 and exactly matched
+  the reviewed HTML at **10:42:00 UTC** after propagation.
 
-`WEEKLY_RECAP_AVAILABLE=false` hides the menu until the exact RPC is deployed
-and verified. Tests exercise the implementation directly. Enable the flag only
-for a reviewed candidate after backend verification. Existing TestFlight build
-34 receives none of these local changes.
+After the exact RPC was deployed and verified, `WEEKLY_RECAP_AVAILABLE=true`
+was set for candidate **1.0.2 (35)**. Effective Expo configuration was checked:
+bundle `com.sadik.microhabit`, existing project and scheme unchanged. Existing
+TestFlight build 34 receives none of the new app-side controls.
 
 Before approved deployment, repeat a fresh schema/function/grant/policy/history
 comparison; never replay old migrations. Read-only production preflight found
@@ -98,15 +102,23 @@ comparison; never replay old migrations. Read-only production preflight found
   all four actual-component handler tests successfully. Native keyboard layout
   remains unverified. The lesson check also exercised dismissal/escape while
   a save was pending, rather than only the original idle-editing scenario.
-- Live backend: read-only preflight only; no Batch-3 migration applied.
+- Live backend: the single migration `20261029120000` committed at
+  **10:38:02 UTC, October 29**. Fresh requests verified the exact function body,
+  postgres ownership, stable execution, empty search path, member grant,
+  anon/service execution denial and missing-identity rejection. All prior
+  public/private functions, policies, RLS, grants, columns, indexes and user
+  triggers remain unchanged; only this RPC and the migration record were added.
+  No live user rows were read or changed. Schema/recovery copies were retained
+  outside the repository. Managed backup status still lists zero completed
+  backups and PITR disabled; no full-data restore point was established.
 - Device: no Batch-3 results. Earlier sign-in/invitation/monthly/rename passes
   remain separate evidence. No broader release-readiness claim is made.
 
 Primary self-assessment checked the final callers, RPC authorization, response
 contract, native adapter and diff against the approved scope. No member-card
 layout, paid flow or live setting change was introduced. Mocked tests, local
-PostgreSQL and independent code review do not replace post-deployment checks
-or an iPhone pass. Deployment and delivery remain the next approval decision.
+PostgreSQL and independent code review do not replace an iPhone pass. Build/upload
+completion and native results must be recorded separately.
 
 Pending iPhone checks after approved deployment/candidate delivery:
 

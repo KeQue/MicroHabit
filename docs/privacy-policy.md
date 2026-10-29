@@ -1,6 +1,6 @@
 # Commito Privacy Policy
 
-Last updated: October 28, 2026
+Last updated: October 29, 2026
 
 Commito helps people create or join monthly accountability leagues with friends.
 This policy explains what information the app collects, why it is used, and how

@@ -20,7 +20,8 @@ concurrency:
 
 jobs:
   ios-login:
-    runs-on: macos-15-intel
+    # Standard Apple Silicon runner; free for this public repository.
+    runs-on: macos-15
     # Build has its own 60-minute limit; leave room for setup, tests and cleanup.
     timeout-minutes: 100
     environment: e2e-login
@@ -58,7 +59,7 @@ jobs:
           if [[ "$E2E_BACKEND_ENV" == production ]]; then
             [[ "$E2E_ALLOW_PRODUCTION_LOGIN" == yes ]] || { echo 'BLOCKED: production login writes require explicit dispatch consent.'; exit 2; }
           fi
-          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs ]] || { echo 'BLOCKED: use an Android-tested source commit with private screenshot reporting.'; exit 2; }
+          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs && -f tests/e2e/scripts/ios-readiness.mjs && -f tests/e2e/scripts/android-readiness.mjs ]] || { echo 'BLOCKED: use an Android-tested source commit with device readiness checks and private reports.'; exit 2; }
           [[ "$E2E_REPORT_PUBLIC_KEY" == '-----BEGIN PUBLIC KEY-----'* ]] || { echo 'BLOCKED: configure the report public key; its private key stays on the laptop.'; exit 2; }
           node --input-type=module -e 'import {createPublicKey} from "node:crypto";try{const key=createPublicKey(process.env.E2E_REPORT_PUBLIC_KEY);if(key.asymmetricKeyType!=="rsa"||key.asymmetricKeyDetails.modulusLength<2048)process.exit(2)}catch{process.exit(2)}' || { echo 'BLOCKED: the report key must be a valid RSA public key of at least 2048 bits.'; exit 2; }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -148,6 +149,9 @@ jobs:
           APP="$PRIVATE_DIR/build/Build/Products/Release-iphonesimulator/Commito.app"
           [[ -f "$APP/main.jsbundle" ]] || { printf missing-embedded-bundle > "$PRIVATE_DIR/reason"; exit 2; }
           xcrun simctl install "$DEVICE" "$APP" >"$PRIVATE_DIR/app-installation.log" 2>&1
+          phase simulator-readiness
+          xcrun simctl bootstatus "$DEVICE" -b >"$PRIVATE_DIR/simulator-readiness.log" 2>&1
+          xcrun simctl list devices available --json 2>>"$PRIVATE_DIR/simulator-readiness.log" | SELECTED_SIMULATOR="$DEVICE" node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const d=Object.values(JSON.parse(s).devices).flat().find(d=>d.udid===process.env.SELECTED_SIMULATOR);if(d?.state!=="Booted"||d?.isAvailable!==true)process.exit(2)' >>"$PRIVATE_DIR/simulator-readiness.log" 2>&1 || { printf simulator-readiness-unconfirmed > "$PRIVATE_DIR/reason"; exit 2; }
           echo "E2E_IOS_DEVICE=$DEVICE" >> "$GITHUB_ENV"
           phase complete
       - name: Report sanitized build diagnostics and remove private build files
@@ -181,7 +185,7 @@ jobs:
             if (dirname(target) !== root) throw Error('Private build directory validation failed.');
             try {
               const read = name => existsSync(join(target, name)) ? readFileSync(join(target, name), 'utf8').trim() : '';
-              const phases = ['configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'xcode-compilation', 'app-installation', 'complete'];
+              const phases = ['configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete'];
               const recorded = read('phase');
               const phase = phases.includes(recorded) ? recorded : 'unknown';
               const log = join(target, `${phase}.log`);
@@ -209,7 +213,7 @@ jobs:
                 ['process-termination', /killed: 9|signal (?:6|9|15)|out of memory/i],
               ];
               const diagnostics = patterns.filter(([, pattern]) => pattern.test(tail)).map(([category]) => category);
-              for (const reason of ['missing-embedded-bundle', 'missing-pinned-runtime', 'missing-cocoapods']) if (read('reason') === reason) diagnostics.push(reason);
+              for (const reason of ['missing-embedded-bundle', 'missing-pinned-runtime', 'missing-cocoapods', 'simulator-readiness-unconfirmed']) if (read('reason') === reason) diagnostics.push(reason);
               const code = read('exit-code');
               const exitCode = /^\d{1,3}$/.test(code) ? Number(code) : null;
               const interrupted = existsSync(join(target, 'interrupted')) || (outcome !== 'success' && exitCode === null);
@@ -217,7 +221,7 @@ jobs:
               const phaseStartedAt = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(started) ? started : null;
               const finding = outcome === 'success' && phase === 'complete' ? 'Simulator Release app built and installed; native login is still a separate test.' : interrupted ? 'Build interrupted during this phase; check GitHub annotations for timeout or cancellation.' : 'Build failed during this phase.';
               summarize({ kind: 'ios-build', outcome, phase, phaseStartedAt, exitCode, interrupted, logBytes, lastLogWriteAt, diagnostics, finding, diagnosticScope: 'Fixed categories from final 64 KiB only; absence of a category does not identify the cause.' });
-              if (process.env.GITHUB_OUTPUT && ['simulator-startup', 'xcode-compilation', 'app-installation', 'complete'].includes(phase)) appendFileSync(process.env.GITHUB_OUTPUT, 'cache-ready=true\n');
+              if (process.env.GITHUB_OUTPUT && ['simulator-startup', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete'].includes(phase)) appendFileSync(process.env.GITHUB_OUTPUT, 'cache-ready=true\n');
             } finally { rmSync(target, { recursive: true, force: true }); rmSync(pointer, { force: true }); }
           }
           NODE

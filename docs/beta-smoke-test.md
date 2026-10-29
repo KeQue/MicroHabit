@@ -15,7 +15,13 @@ web link; build 33 retains the old share text. Its
 [build](https://expo.dev/accounts/keke12/projects/microhabit/builds/d67b95e7-f669-4e24-9a36-abed15de1961)
 from `c281ef1` and [automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/63f2ebb1-5bfe-4d36-963c-2bd39c23df33)
 both finished: build at 22:52:33 UTC, submission verified at 22:52:57 UTC.
-Apple processing/installation and native checks remain pending:
+On October 29, the founder confirmed on their iPhone that the live invitation
+page's **Open Commito** button opened the Join screen with the expected code
+prefilled. The installed build, initial sign-in state and messenger entry path
+were not separately confirmed. Build-34 installation and remaining checks:
+
+- [x] Live invitation page → Open Commito → Join screen with code preserved
+  (founder-reported iPhone result, October 29).
 
 - [ ] Update Commito to **1.0.2 (34)** and share a **new** invitation. Its address
   should start with `https://keque.github.io/MicroHabit/join/`, with the same code.

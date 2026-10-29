@@ -87,10 +87,13 @@ finished at 22:52:33 UTC on October 28. Its
 [automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/63f2ebb1-5bfe-4d36-963c-2bd39c23df33)
 was verified `FINISHED` at 22:52:57 UTC. The version, build and exact source
 identity match, and a binary is available. This verifies Expo build and Apple
-upload completion, not Apple processing or actual installation. No founder
-iPhone or messenger pass has been reported for this fix yet. The founder was
-offered the live invitation page for a separate handoff test with their existing
-app; that result remains pending. No new database work was performed.
+upload completion, not Apple processing or actual installation. On October 29,
+the founder confirmed on their iPhone that the live page's Open Commito button
+opened the Join screen with the expected invite code prefilled. This is a narrow
+web-to-app handoff pass: the installed build, initial sign-in state, new native
+share payload, preview link and messenger entry path were not separately
+confirmed. Signed-out signup/join and other pending device checks remain open.
+No new database work was performed.
 
 A friend can share an invitation through the existing native Share sheet.
 The message contains a readable code, an installed-app link, and manual

@@ -1,0 +1,109 @@
+name: Manual iOS login E2E
+on:
+  workflow_dispatch:
+    inputs:
+      android_pass_sha:
+        description: Full source SHA already passed twice on Android using this backend/account
+        required: true
+        type: string
+      allow_production_login:
+        description: Approve production auth metadata/profile writes if production is configured
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+concurrency:
+  group: commito-existing-login-account
+  cancel-in-progress: false
+
+jobs:
+  ios-login:
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    environment: e2e-login
+    env:
+      E2E_ANDROID_PASS_SHA: ${{ inputs.android_pass_sha }}
+      E2E_BACKEND_ENV: ${{ vars.E2E_BACKEND_ENV }}
+      E2E_BACKEND_HOST: ${{ vars.E2E_BACKEND_HOST }}
+      E2E_IOS_APP_ID: com.sadik.microhabit
+      E2E_BUILD_BACKEND_CONFIRMED: 'yes'
+      E2E_DISPOSABLE_SIMULATOR: 'yes'
+      E2E_ALLOW_PRODUCTION_LOGIN: ${{ inputs.allow_production_login && 'yes' || 'no' }}
+    steps:
+      - name: Validate the tested source commit
+        shell: bash
+        run: |
+          [[ "$E2E_ANDROID_PASS_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo 'BLOCKED: supply a full tested source commit SHA.'; exit 2; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.android_pass_sha }}
+          persist-credentials: false
+      - name: Verify Android prerequisite and backend consent
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$E2E_ANDROID_PASS_SHA" == "$(git rev-parse HEAD)" ]] || { echo 'BLOCKED: Android must pass twice on this exact checked-out revision, backend and account first.'; exit 2; }
+          [[ "$E2E_BACKEND_ENV" == staging || "$E2E_BACKEND_ENV" == production ]] || { echo 'BLOCKED: configure the e2e-login environment variables.'; exit 2; }
+          [[ "$E2E_BACKEND_HOST" =~ ^[a-z0-9][a-z0-9.-]+\.[a-z]{2,20}$ ]] || { echo 'BLOCKED: configure the backend hostname.'; exit 2; }
+          if [[ "$E2E_BACKEND_HOST" == nzpnfrutomyuvrprkrwi.supabase.co ]]; then
+            [[ "$E2E_BACKEND_ENV" == production ]] || { echo 'BLOCKED: known production host must be labelled production.'; exit 2; }
+          fi
+          if [[ "$E2E_BACKEND_ENV" == production ]]; then
+            [[ "$E2E_ALLOW_PRODUCTION_LOGIN" == yes ]] || { echo 'BLOCKED: production login writes require explicit dispatch consent.'; exit 2; }
+          fi
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies and pinned Maestro CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRIVATE_DIR=$(mktemp -d "$RUNNER_TEMP/commito-build.XXXXXX")
+          chmod 700 "$PRIVATE_DIR"
+          trap 'rm -rf "$PRIVATE_DIR"' EXIT
+          npm ci --no-audit --no-fund >"$PRIVATE_DIR/npm.log" 2>&1 || { echo 'BLOCKED: dependency installation failed; raw logs discarded.'; exit 2; }
+          mkdir -p tests/e2e/.tools
+          curl --fail --silent --show-error --location https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.0/maestro.zip --output "$PRIVATE_DIR/maestro.zip"
+          printf '%s  %s\n' 'a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e' "$PRIVATE_DIR/maestro.zip" | shasum -a 256 -c -
+          unzip -q "$PRIVATE_DIR/maestro.zip" -d tests/e2e/.tools
+          chmod +x tests/e2e/.tools/maestro/bin/maestro
+      - name: Build unsigned Simulator Release locally and install
+        shell: bash
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://${{ vars.E2E_BACKEND_HOST }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          CI: '1'
+        run: |
+          set -euo pipefail
+          [[ -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]] || { echo 'BLOCKED: configure the public backend anon key as an environment secret.'; exit 2; }
+          PRIVATE_DIR=$(mktemp -d "$RUNNER_TEMP/commito-xcode.XXXXXX")
+          chmod 700 "$PRIVATE_DIR"
+          trap 'rm -rf "$PRIVATE_DIR"' EXIT
+          npx --no-install expo prebuild --platform ios --clean >"$PRIVATE_DIR/prebuild.log" 2>&1 || { echo 'BLOCKED: Expo prebuild failed; raw logs discarded.'; exit 2; }
+          DEVICE=$(xcrun simctl list devices available --json | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const d=Object.entries(JSON.parse(s).devices).filter(([r])=>r.includes("iOS")).flatMap(([,ds])=>ds).find(d=>d.name.startsWith("iPhone"));if(!d)process.exit(2);process.stdout.write(d.udid)')
+          xcrun simctl boot "$DEVICE" >"$PRIVATE_DIR/boot.log" 2>&1 || true
+          xcrun simctl bootstatus "$DEVICE" -b >"$PRIVATE_DIR/bootstatus.log" 2>&1 || { echo 'BLOCKED: Simulator did not boot.'; exit 2; }
+          xcodebuild -workspace ios/Commito.xcworkspace -scheme Commito -configuration Release -sdk iphonesimulator -destination "id=$DEVICE" -derivedDataPath "$PRIVATE_DIR/build" CODE_SIGNING_ALLOWED=NO build >"$PRIVATE_DIR/xcode.log" 2>&1 || { echo 'BLOCKED: unsigned Release build failed; raw logs discarded.'; exit 2; }
+          APP="$PRIVATE_DIR/build/Build/Products/Release-iphonesimulator/Commito.app"
+          [[ -f "$APP/main.jsbundle" ]] || { echo 'BLOCKED: Release app has no embedded JS bundle.'; exit 2; }
+          xcrun simctl install "$DEVICE" "$APP" >"$PRIVATE_DIR/install.log" 2>&1 || { echo 'BLOCKED: Simulator install failed.'; exit 2; }
+          echo "E2E_IOS_DEVICE=$DEVICE" >> "$GITHUB_ENV"
+      - name: Run TC-002 twice with scoped account secrets
+        shell: bash
+        env:
+          MAESTRO_E2E_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
+          MAESTRO_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+        run: npm run e2e:ios
+      # Deliberately no artifact upload, screenshots, raw reports, or build logs.
+      - name: Remove any interrupted-run raw files
+        if: always()
+        shell: bash
+        run: |
+          find tests/e2e/results -maxdepth 1 -type d -name '.private-*' -exec rm -rf {} + 2>/dev/null || true
+

@@ -4,7 +4,7 @@ October 29, 2026. Setup checks and actual native execution are distinguished bel
 
 | Case | Status | Device / OS | App version/build | Backend | Authentication evidence |
 | --- | --- | --- | --- | --- | --- |
-| Login on Android (TC-001) | Functional PASS: two complete native attempts; image evidence incomplete | Dedicated Commito_E2E emulator, Android 14 / API 34, emulator-5554 | Installed 1.0.2 / versionCode 1 | Production; normal profile/auth effects approved | Both reached successful authenticated leagues loading, then repeated it after process restart; only attempt 1 retained its screenshot |
+| Login on Android (TC-001) | PASS: two native attempts, each with its own screenshot | Dedicated Commito_E2E emulator, Android 14 / API 34, emulator-5554 | Installed 1.0.2 / versionCode 1 | Production; normal profile/auth effects approved | Both reached successful authenticated leagues loading, then repeated it after process restart; loaded state verified around each photo |
 | Login on iOS (TC-002) | BLOCKED: run cancelled at founder request after 55m 12s in combined build/install | Standard macos-15-intel runner; no Simulator app execution observed | Source configuration 1.0.2 / 36; installed version unknown | Production configured; account secrets never reached a test step | None: TC-002 never started |
 
 Initial Android run: October 29 at 14:04:04 UTC (15:04 Berlin), **310 seconds**
@@ -32,7 +32,26 @@ already authenticated emulator, with the loaded marker checked before/after
 capture. These are not login attempts and do not repair the earlier evidence.
 The next local correction gives hierarchy startup more time, records the capture
 phase/category/timing, and makes missing required photos return blocked exit 2
-without rewriting a functional PASS. Its fresh two-attempt login check is pending.
+without rewriting a functional PASS.
+
+The corrected source `abb5d0f894f644a94b35407d09fd616fb6f960dd` ran at
+**18:46:45 UTC (19:46 Berlin)**. Both real login/restart attempts passed
+(**93.1s**, **109.2s**), with distinct native photos captured at **18:48:44 UTC**
+and **18:51:16 UTC**. Capture took **32.3s**, **38.7s**; total **282.8s**.
+Both images were visually inspected, embedded directly under their own attempt,
+and showed the authenticated leagues screen with no credential fields.
+`evidenceStatus=COMPLETE`; no raw directories or run lock remained. The report
+opened through the explicit browser helper. The HTML includes post-run
+improvement suggestions. This is actual Android evidence, not an iOS result.
+
+After the founder requested credential reuse, Windows-only current-user DPAPI
+storage was added locally for both email and password, with restricted folder
+and file access and a backend-context check. Thirteen synthetic checks passed:
+roundtrip, no plaintext fields, permitted access rules, backend mismatch,
+corruption, replacement, removal, missing store and rejected external path.
+The first permission implementation required a security privilege; restricting
+changes to access rules corrected this without changing ownership/audit rules.
+The real account has not yet been saved or reused through that new path.
 
 ## Observed environment
 
@@ -218,9 +237,9 @@ existing GitHub Pages rebuild/deployment; the site content was unchanged.
 Unrelated Apple account-deletion work appearing in
 the shared workspace is outside this review and must be preserved.
 
-Android passed on sources `350486a` and `bda5812`; the latter retained one of two
-required images. The latest capture/report corrections are a later local
-revision awaiting their complete native run. Ten focused reporting checks pass,
+Android passed on source `abb5d0f`, with complete per-attempt visual evidence.
+The later local credential-store change still needs its one-time account save
+and native reuse verification. Ten focused reporting checks pass,
 including two distinct per-attempt images, explicit browser selection, missing
 image exit status, and evidence-based post-run suggestions. No new app code,
 test assertions or backend behavior changed. iOS remains BLOCKED, with zero

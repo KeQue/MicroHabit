@@ -33,7 +33,8 @@ a roadmap, confidence score, or claim that the model has been retrained.
   FAIL-with-image remains failure. Two differently coloured fixture images stay
   under their own attempt. A build-blocked iOS report has no invented image.
   Two successive real native capture probes succeeded without another login.
-  The complete fresh login run remains a separate device verification.
+  A fresh two-attempt login run on `abb5d0f` subsequently passed with both native
+  images embedded under their own attempt; capture took 32.3s and 38.7s.
 - Every run should propose improvements supported by its evidence. A proposal
   does not authorize cloud execution or establish an unobserved root cause.
 

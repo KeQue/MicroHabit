@@ -112,6 +112,32 @@ PowerShell transcription/screen recording while entering or running credentials.
 The prompt hides both email and password, passes them only to the test process,
 and restores the previous process environment afterward.
 
+The founder authorized remembering this account locally. On Windows, save it
+once using the same non-secret backend settings shown below:
+
+```powershell
+.\tests\e2e\scripts\manage-credentials.ps1 -Action save
+```
+
+Both email and password are encrypted with current-user Windows DPAPI in ignored
+`.tools/credentials/login.dpapi.json`. File access is restricted to your Windows
+account and SYSTEM. No password is saved in `.env`, Git, a command line or a
+report. This protects the stored file; programs running as your Windows account
+can decrypt it. Do not share the file or use it as a portable password backup.
+Supabase stores a password hash, which cannot supply the original password.
+
+Subsequent calls to `prompt-credentials.ps1` automatically reuse the saved account
+when the configured backend matches. For automation, add `-RequireSaved` to fail
+instead of prompting when no saved record exists. Corrupt, unreadable or
+different-backend records block without falling back silently. CI continues to
+use its separate GitHub secrets; the local encrypted file is never uploaded.
+To replace or remove the saved account:
+
+```powershell
+.\tests\e2e\scripts\manage-credentials.ps1 -Action save
+.\tests\e2e\scripts\manage-credentials.ps1 -Action forget
+```
+
 Set the following **non-secret** metadata in the same terminal. These production
 values match the currently configured backend; use staging values for a staging
 build. Confirm which backend was built into the installed APK first.
@@ -334,4 +360,6 @@ Sources checked October 29, 2026:
 [dependency cache boundaries](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching),
 [CocoaPods cache location](https://guides.cocoapods.org/using/faq.html),
 [active architecture setting](https://developer.apple.com/documentation/xcode/build-settings-reference),
+[Windows protected strings](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/convertto-securestring),
+[Supabase password storage](https://supabase.com/docs/guides/auth/password-security),
 [observed Mac runner image](https://github.com/actions/runner-images/blob/macos-15/20260824.0482/images/macos/macos-15-Readme.md).

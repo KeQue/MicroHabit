@@ -1,4 +1,4 @@
-param([ValidateSet('android', 'ios', 'all')][string]$Platform = 'android')
+param([ValidateSet('android', 'ios', 'all')][string]$Platform = 'android', [switch]$RequireSaved)
 $ErrorActionPreference = 'Stop'
 $runner = Join-Path $PSScriptRoot 'run.mjs'
 # Check tools without collecting credentials or contacting the backend.
@@ -11,8 +11,18 @@ $emailSecret = $null
 $passwordSecret = $null
 $result = 2
 try {
-    $emailSecret = Read-Host 'Existing test account email (hidden)' -AsSecureString
-    $passwordSecret = Read-Host 'Existing test account password (hidden)' -AsSecureString
+    . (Join-Path $PSScriptRoot 'credential-store.ps1')
+    if (Test-Path -LiteralPath (Join-Path (Get-LoginStoreDirectory) 'login.dpapi.json')) {
+        $saved = Read-LoginCredentials
+        $emailSecret = $saved.Email
+        $passwordSecret = $saved.Password
+        Write-Host 'Using the saved Windows-protected test account.'
+    } elseif ($RequireSaved) {
+        throw 'Save the account locally before an unattended run.'
+    } else {
+        $emailSecret = Read-Host 'Existing test account email (hidden)' -AsSecureString
+        $passwordSecret = Read-Host 'Existing test account password (hidden)' -AsSecureString
+    }
     foreach ($entry in @(
         @{ Name = 'MAESTRO_E2E_EMAIL'; Secret = $emailSecret },
         @{ Name = 'MAESTRO_E2E_PASSWORD'; Secret = $passwordSecret }
@@ -27,6 +37,9 @@ try {
     }
     & node $runner $Platform
     $result = $LASTEXITCODE
+} catch {
+    Write-Host 'Local credential/test operation failed. Check the protected store and tool setup; no credential value was printed.'
+    $result = 2
 } finally {
     [Environment]::SetEnvironmentVariable('MAESTRO_E2E_EMAIL', $previousEmail, 'Process')
     [Environment]::SetEnvironmentVariable('MAESTRO_E2E_PASSWORD', $previousPassword, 'Process')

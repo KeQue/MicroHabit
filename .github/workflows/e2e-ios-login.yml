@@ -77,7 +77,7 @@ jobs:
         shell: bash
         env:
           EXPO_PUBLIC_SUPABASE_URL: https://${{ vars.E2E_BACKEND_HOST }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY || vars.E2E_SUPABASE_ANON_KEY }}
           CI: '1'
         run: |
           set -euo pipefail

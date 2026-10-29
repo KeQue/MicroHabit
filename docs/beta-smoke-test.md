@@ -8,8 +8,19 @@ This is a testing guide, not a product roadmap. Payments must remain disabled.
 See [rules, implementation, evidence and pending device checks](weekly-recaps-reminders.md).
 The founder approved deployment and native delivery. The single recap migration
 is live and verified; candidate 1.0.2 (35) enables its menu entry. The new app
-controls are not in installed build 34. Build/upload and device verification
-remain pending; existing successful phone checks do not establish Batch-3 behavior.
+controls are not in installed build 34. Build 35 finished at 10:48:29 UTC;
+its automatic TestFlight submission was verified FINISHED at 10:49:23 UTC.
+Apple processing, actual installation and device results remain pending.
+Existing successful phone checks do not establish Batch-3 behavior.
+
+- [ ] Update Commito through TestFlight and confirm Settings shows **1.0.2 (35)**.
+- [ ] Open the league menu → Weekly recap. Check last week's UTC date range,
+  per-member days and total group activity; return to the unchanged league view.
+- [ ] Open Daily reminder, choose a local time a few minutes ahead and Save.
+  Confirm the keyboard can be dismissed and the setting survives reopening.
+- [ ] Observe one notification, then turn reminders off and confirm it stays off.
+- [ ] Complete remaining permission/account/timezone/accessibility cases in the
+  Batch-3 record. Actual DST/background delivery remains unverified.
 
 ## Repeated display names — deployed October 29, 2026
 

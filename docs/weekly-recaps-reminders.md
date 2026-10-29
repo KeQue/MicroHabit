@@ -133,3 +133,23 @@ Pending iPhone checks after approved deployment/candidate delivery:
 
 Public release still depends on the existing security, abuse prevention,
 email delivery, backup/recovery and App Store gates.
+
+## Approved build-35 delivery
+
+Source checkpoint: `4d8ae69e3f245c3718e1c74c8cd0c55c7b8f37fa`.
+The [build-35 job](https://expo.dev/accounts/keke12/projects/microhabit/builds/da01868e-444b-4857-a8af-232a8e6fabe0)
+and its [automatic TestFlight submission](https://expo.dev/accounts/keke12/projects/microhabit/submissions/b7298e1c-07d0-4bc8-8733-79ced8b816d2)
+were created using the existing Expo project, remote signing credentials and
+App Store Connect app `6759626676`. Fresh status at 10:49:23 UTC verified
+version 1.0.2, build 35 and the exact source commit. The build finished at
+**10:48:29 UTC**, with an available binary; both build and automatic submission
+were **FINISHED** when checked. This establishes compilation and Apple upload,
+not Apple processing, phone installation, recap rendering or actual reminder
+delivery. No App Store public release was requested.
+
+After enabling the verified RPC for this candidate, all 105 Node tests and
+TypeScript passed again. Targeted lint on the changed build configuration and
+flag passed; full lint had passed for the implementation. The published
+privacy HTML matched reviewed source over HTTPS, and the invitation HTML/JS
+still matched their existing reviewed source. No unrelated website file or
+app-branch merge was published.

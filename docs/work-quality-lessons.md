@@ -3,6 +3,22 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Keep private build diagnostics observable
+
+- Observation: the first iOS E2E workflow combined project generation, CocoaPods,
+  Simulator boot, compilation and installation into one quiet step. After 55
+  minutes the founder requested cancellation. Its exit cleanup removed raw logs;
+  the surviving job log could not identify the stalled subphase.
+- Correction: record fixed phase names before each operation, show safe progress
+  heartbeats, and run a separate always-run diagnostic/cleanup step after a
+  step-level timeout. Emit whitelisted error categories and timing/exit metadata,
+  never raw credentials or arbitrary log text. Keep the job limit long enough
+  for the build step's limit plus reporting and tests.
+- Transfer checks: synthetic compiler, interrupted-boot and missing-bundle cases
+  identify their phase without emitting a credential sentinel. Invalid cleanup
+  paths are rejected and preserved. The revised Mac build still requires a newly
+  approved run; these checks do not establish the old stall's cause or its fix.
+
 ## Check every mobile automation artifact destination
 
 - Observation: the first QA runner design assumed private Java home and explicit

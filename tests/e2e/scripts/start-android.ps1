@@ -63,7 +63,7 @@ $deviceLines = @(& $adbPath devices)
 $devices = @($deviceLines | Where-Object { $_ -match '^emulator-\d+\s' })
 foreach ($deviceLine in $devices) {
     $serial = ($deviceLine -split '\s+')[0]
-    $name = @(& $adbPath -s $serial emu avd name 2>$null)[0]
+    $name = (& $adbPath -s $serial shell getprop ro.boot.qemu.avd_name 2>$null | Out-String).Trim()
     if ($name -eq $avdName -and $deviceLine -match '\sdevice\s*$') {
         Write-Output "Dedicated test emulator already running: $serial"
         exit 0

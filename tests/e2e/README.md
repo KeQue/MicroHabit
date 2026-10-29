@@ -41,7 +41,9 @@ tests/e2e/
 Reuse Node/npm, Expo SDK 54, Java 21, Android SDK and the existing
 Pixel_7 Android 14 image. Maestro CLI is pinned to **2.12.0**. No npm testing
 framework is added. `app.config.ts` resolves to version 1.0.2, iOS build 36 and
-`com.sadik.microhabit` on both platforms. `app.json` still contains build 29;
+`com.sadik.microhabit` on both platforms. The small `pngjs` development utility
+redacts native screenshot pixels; it is not a mobile test framework.
+`app.json` still contains build 29;
 the resolved dynamic configuration is authoritative. Installed build details are
 read from the device when available, rather than assumed from these files.
 
@@ -148,9 +150,9 @@ EAS build or paid Maestro Cloud account is required for this route.
 The repository is public. Standard GitHub-hosted runners are free for public
 repositories; availability and permissions still need checking before launch.
 If the repository becomes private, minutes above its allowance can be billed.
-No cloud job has been authorized or started by preparing this workflow. Keep
-triggers manual and request approval before the first launch. ChatGPT Plus is
-not a mobile CI subscription.
+The founder approved this setup's manual GitHub run. Keep triggers manual;
+future execution must follow the account owner's authorization and budget.
+ChatGPT Plus is not a mobile CI subscription.
 
 After TC-001 passes twice on the final committed source:
 
@@ -159,13 +161,15 @@ After TC-001 passes twice on the final committed source:
    rerun Android if the tested source changed. Never include `.tools`, results,
    `.env` or credentials in the commit.
 2. In GitHub repository **Settings > Environments**, create `e2e-login` and
-   restrict deployment branches to the trusted branch being tested. Add required
-   reviewers if available. This environment gates access to the account secrets.
+   restrict deployment branches to `main`, the trusted dispatcher branch. The
+   dispatcher checks out the separately supplied Android-tested source commit.
+   Add required reviewers if available. This environment gates account secrets.
 3. Add environment **variables** `E2E_BACKEND_ENV` (`production` or `staging`) and
    `E2E_BACKEND_HOST` (hostname only). Add environment **secrets**
-   `E2E_LOGIN_EMAIL`, `E2E_LOGIN_PASSWORD` and `E2E_SUPABASE_ANON_KEY`. Enter the
-   same existing account through GitHub's secret form, never chat. The last key
-   is the app's public Supabase key, never a service-role/management key.
+   `E2E_LOGIN_EMAIL` and `E2E_LOGIN_PASSWORD`. Enter the same existing account
+   through GitHub's secret form, never chat. Add `E2E_SUPABASE_ANON_KEY` as a
+   secret or variable: it is the app's public Supabase key, never a service-role
+   or management key. A secret takes precedence if both are present.
 4. After approval, choose **Actions > Manual iOS login E2E > Run workflow**.
    Supply the full commit SHA whose Android case passed on the same backend and
    account. That input is an operator attestation, not an automated retrieval of
@@ -173,11 +177,36 @@ After TC-001 passes twice on the final committed source:
 5. Review the sanitized result printed by the final test step. Setup failures
    remain BLOCKED. A green build step alone is not a TC-002 pass.
 
-The job serializes cloud runs using one account concurrency group and times out
-after 60 minutes. Do not start local Android login while cloud iOS uses the same
+The updated workflow gives the **build/install step at most 60 minutes**. Its
+overall job limit is 100 minutes, allowing dependency setup, the two tests,
+report encryption and cleanup. The earlier run retains its original 60-minute
+overall limit; editing the workflow cannot change a running job.
+Do not start local Android login while cloud iOS uses the same
 account. Account secrets are available only to the test step, not dependency
-installation or compilation. Raw artifacts are not uploaded. Restrict who can
+installation or compilation. Only an encrypted visual report is uploaded. Restrict who can
 edit and dispatch workflows with this account's environment access.
+
+Safe progress messages identify Expo prebuild/CocoaPods, Simulator startup,
+Xcode compilation and app installation. On failure or interruption an always-run
+step reads the last recorded phase and emits fixed diagnostic categories, exit
+status and log timing/size. It never prints raw log lines. A timeout/cancellation
+that kills the shell before it records an exit code is reported as interrupted;
+GitHub's own annotation distinguishes timeout from manual cancellation.
+
+Project generation and CocoaPods installation are separate phases, with safe
+minute heartbeats. The build pins the installed Xcode 16.4/iOS 18.5 runtime and
+creates a dedicated iPhone 16 Simulator. It compiles before booting the Simulator
+to avoid consuming Simulator resources during compilation. Missing pinned tools
+block the job rather than downloading another Xcode/runtime.
+
+Download caching covers only npm's `_cacache` and CocoaPods' download cache.
+Keys include OS, CPU architecture, Xcode and dependency/configuration hashes;
+`npm ci` and native dependency installation still run. Cache save occurs before
+account access, even after a compilation failure if prebuild completed. Failed
+cache operations are bounded and do not fail the tests. App bundles, DerivedData,
+Simulator/Keychain data, logs, credentials and screenshots are excluded. Cache
+savings are unmeasured until a newly approved run. Compiling only the selected
+Simulator's active architecture also avoids unnecessary architecture builds.
 
 For an already prepared Mac/Simulator, use `npm run e2e:ios`, with the same secret
 environment and backend metadata plus `E2E_IOS_DEVICE`, optional separate
@@ -211,8 +240,50 @@ those folders and a stale `.run.lock` locally. Keep the results directory privat
 For failures, inspect the live emulator without exposing entered credentials.
 Do not relax assertions to obtain a pass. Missing tools, devices, binaries or
 credentials are environment blockers. A native assertion failure needs triage;
-it does not automatically establish an app bug. No screenshots of account data
-are required as evidence for this initial setup.
+it does not automatically establish an app bug. Use the private visual report
+below for screenshot review; keep account information out of shared bug reports.
+
+## Visual reports for PASS and FAIL
+
+New runs write `results/TC-001-latest.html` or `TC-002-latest.html`, with a native
+screenshot after each completed or failed attempt. Open the local HTML in a
+browser; it embeds the images and needs no web server. The JSON remains the
+machine-readable result. Screenshot capture does not change the assertion result:
+`evidenceStatus` separately says COMPLETE, INCOMPLETE or NOT_AVAILABLE.
+
+Credential fields are blacked out using UI bounds from before and after capture;
+when inputs are present the keyboard/autofill area is also hidden. Other pixels
+are preserved. If hierarchy, coordinates or capture cannot be verified, the raw
+image is discarded and the report explicitly says the image is unavailable.
+A setup/build failure may have no app to photograph. Screenshots from earlier
+runs cannot be reconstructed. A later supplemental screenshot is labelled with
+its actual capture time and does not become an assertion-time image.
+
+Images can still contain private league details, so all local HTML/PNG files stay
+ignored. Cloud uploads contain **only encrypted HTML**, never plaintext images,
+HTML, raw reports or logs. The report's RSA private key stays in the ignored
+`tests/e2e/.tools/report-keys/private.pem` on this laptop. GitHub receives only
+`public.pem` as environment variable `E2E_REPORT_PUBLIC_KEY`; this session's key
+is already configured. A new machine can generate its pair with:
+
+```powershell
+node tests/e2e/scripts/report.mjs keys
+```
+
+Keep a private backup of the key: losing it prevents opening earlier encrypted
+reports. Never upload the private key or put it in GitHub variables. The helper
+refuses to overwrite an existing pair. After an approved cloud run, download its
+`TC-002-report-...` artifact, unzip it, then open the private report locally:
+
+```powershell
+node tests/e2e/scripts/report.mjs decrypt "$env:USERPROFILE\Downloads\TC-002-report.encrypted.json"
+Invoke-Item tests/e2e/results/downloaded-ios-report.html
+```
+
+The encrypted artifact expires after seven days. No new iOS run is authorized by
+these reporting changes. Publishing to `main` also triggers the repository's
+existing Pages rebuild, so publication is held under the founder's latest
+no-new-cloud-run instruction until approval.
 
 ## Reuse the QA roles
 
@@ -236,4 +307,9 @@ Sources checked October 29, 2026:
 [launch/reset semantics](https://docs.maestro.dev/reference/commands-available/launchapp),
 [GitHub runner allowances](https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job),
 [Expo pricing](https://expo.dev/pricing),
-[EAS Maestro jobs](https://docs.expo.dev/eas/workflows/pre-packaged-jobs/).
+[EAS Maestro jobs](https://docs.expo.dev/eas/workflows/pre-packaged-jobs/),
+[GitHub step timeouts](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax),
+[dependency cache boundaries](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching),
+[CocoaPods cache location](https://guides.cocoapods.org/using/faq.html),
+[active architecture setting](https://developer.apple.com/documentation/xcode/build-settings-reference),
+[observed Mac runner image](https://github.com/actions/runner-images/blob/macos-15/20260824.0482/images/macos/macos-15-Readme.md).

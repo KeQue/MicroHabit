@@ -10,7 +10,8 @@ Use no emulator holding important local Commito data; launch clears app data.
 2. Enter the existing account email/password and tap Sign in through the real UI.
 3. Within 60 seconds require `e2e-leagues-loaded`, with no login or load errors.
 4. Stop and relaunch without clearing data. Require the same loaded state again.
-5. Repeat the entire case twice by default and record each result.
+5. Capture a native screenshot with credential fields redacted, on PASS or FAIL.
+6. Repeat the entire case twice by default and record each result in private HTML/JSON.
 
 Expected: real authentication plus authenticated server league loading succeeds
 (an empty list is valid), and the saved session survives a new app process.
@@ -21,5 +22,7 @@ without error. This is functional evidence, not an authentication security audit
 Command: `npm run e2e:android` after secure setup in the README.
 PASS requires both runs to execute and satisfy every assertion. Missing setup
 is BLOCKED; an executed assertion failure is FAIL. Reports contain device, OS,
-installed app version/build, declared backend, command and duration, with no
-account details. Do not create leagues, check in, delete accounts or change plans.
+installed app version/build, declared backend, command and duration. Keep HTML/PNG
+private and ignored; never include raw credentials. If capture/redaction is not
+safe, record missing visual evidence separately from the functional result.
+Do not create leagues, check in, delete accounts or change plans.

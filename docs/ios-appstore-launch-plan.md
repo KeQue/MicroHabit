@@ -37,8 +37,9 @@ Batch-2 record for exact source and deployment boundaries.
 
 On October 29 the founder chose to allow repeated display names, including
 within a league. Accounts and progress remain tied to UUIDs. The narrow index
-removal is locally tested and pending production migration approval; it needs
-no new app build. See the current name-check entry in `beta-smoke-test.md`.
+removal passed eight isolated SQL suites and was approved, deployed and verified
+on October 29 at 10:17:51 UTC. No new app build is needed. The iPhone rename
+check remains pending; see the current name-check entry in `beta-smoke-test.md`.
 
 ## Current Launch Gate
 

@@ -3,7 +3,7 @@
 Use this checklist to check the free beta with two disposable accounts, A and B.
 This is a testing guide, not a product roadmap. Payments must remain disabled.
 
-## Repeated display names — prepared October 29, 2026; not deployed
+## Repeated display names — deployed October 29, 2026
 
 The founder reported that changing Saddu to Sadu failed although nobody in
 that league had that name. Schema-only production inspection confirmed the
@@ -14,7 +14,7 @@ read to identify who held the name.
 
 The founder chose **allow repeated display names**, including within the same
 league. Names remain account-wide across leagues, not per-league aliases.
-Prepared migration `20261029100000_repeated_display_names.sql` removes only
+Approved migration `20261029100000_repeated_display_names.sql` removes only
 that unique display-name index. It preserves the profile ID primary key,
 three-to-twenty-character username check, policies, grants, monthly-name freeze
 trigger and existing UUID tie ordering. It changes no names or saved activity.
@@ -34,11 +34,16 @@ exist. Once duplicate names exist, the rollback refuses safely and preserves
 names/accounts; restoring the old rule then requires separate review. The
 rollback must never auto-rename or delete users to recreate the index.
 
-Production is **unchanged**: only schema metadata was inspected and compared
-with the verified Batch-2 baseline. Live migration approval and fresh committed
-schema verification remain pending. No iPhone rename pass is recorded yet.
+The founder approved production execution. The single migration committed on
+October 29 at **10:17:51 UTC**, after fresh schema metadata matched the tested
+baseline. Fresh post-commit requests verified that only the display-name index
+was removed and its migration record added. Public functions, policies, RLS,
+grants, constraints, profile columns/triggers, views and private functions were
+unchanged. The profile primary key and name-length check remain in place.
+No live user records were changed or exported. No iPhone rename pass after
+deployment is recorded yet; isolated SQL passes are not device results.
 
-- [ ] After approved deployment, retry Sadu and refresh/reopen the league.
+- [ ] Retry Sadu in the existing app and refresh/reopen the league.
 - [ ] With two disposable accounts, use the same name and verify progress stays
   separate. Equal names do not grant access to anyone else's profile/check-ins.
 

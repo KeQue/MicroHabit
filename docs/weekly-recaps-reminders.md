@@ -199,3 +199,9 @@ were created using the existing app/signing configuration. Fresh status at
 finished at **11:44:16 UTC** with an available binary. The automatic submission
 was **FINISHED** when checked. Apple processing and iPhone installation are
 not established by Expo's successful upload status. No public release occurred.
+
+Subsequent founder result, October 29: after the build-36 instructions, the
+founder reported that the refined recap works and looks good on their iPhone.
+This is a general native UI/function pass; the displayed build and each
+dismissal/accessibility case were not individually reconfirmed. It does not
+verify reminder delivery, timezone handling or the remaining launch gates.

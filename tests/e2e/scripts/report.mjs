@@ -36,6 +36,7 @@ export function writeReport(report, directory = results) {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const rows = [['Test', name], ['Case ID', report.caseId], ['Platform', report.platform], ['Result', report.status], ['Device', report.device], ['OS', report.osVersion], ['App version / build', `${report.appVersion ?? '?'} / ${report.appBuild ?? '?'}`], ['Backend', `${report.backendEnvironment ?? '?'} / ${report.backendHost ?? '?'}`], ['Source revision', report.sourceRevision], ['Started (UTC)', report.startedAt], ['Duration (seconds)', report.durationSeconds], ['Command', report.command], ['Screenshot evidence', report.evidenceStatus ?? 'Unavailable for this earlier run']];
   if (report.simulatorReadiness) rows.push(['Simulator checks', report.simulatorReadiness.map(check => `${check.diagnostic || 'ready'}; state ${check.state || 'unknown'}; ${check.durationSeconds}s`).join(' / ')]);
+  if (report.androidReadiness) rows.push(['Android system check', `${report.androidReadiness.diagnostic || 'ready'}; category ${report.androidReadiness.category || 'none'}`]);
   const pictureFor = screenshot => {
     let picture = '<p>Screenshot unavailable: this earlier run did not retain visual evidence.</p>';
     if (screenshot?.status === 'CAPTURED' && /^TC-00[12]-[0-9]+-attempt-[1-5]\.png$/.test(screenshot.file || '')) {

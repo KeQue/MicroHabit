@@ -8,6 +8,7 @@ import { authenticatedScreen, parseHierarchy, redactScreenshot, safeScreenState 
 import { recordRun, writeReport } from './report.mjs';
 import { failureDiagnostics } from './failure-diagnostics.mjs';
 import { inspectSimulator, mayRetrySimulatorProbe } from './ios-readiness.mjs';
+import { inspectAndroidWindows } from './android-readiness.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const resultsDir = join(root, 'tests/e2e/results');
@@ -214,7 +215,12 @@ async function prepare(platform) {
     const adb = args => call(tools.adb, ['-s', metadata.device, ...args]);
     if ((await adb(['get-state'])).stdout?.trim() !== 'device') block('The selected Android emulator is not ready/authorized.');
     else {
-      if ((await adb(['shell', 'getprop', 'ro.kernel.qemu'])).stdout?.trim() !== '1') block('TC-001 requires a dedicated Android emulator.');
+      const emulator = (await adb(['shell', 'getprop', 'ro.kernel.qemu'])).stdout?.trim() === '1';
+      if (!emulator) block('TC-001 requires a dedicated Android emulator.');
+      else {
+        metadata.androidReadiness = inspectAndroidWindows(await adb(['shell', 'dumpsys', 'window', 'windows']));
+        if (!metadata.androidReadiness.ready) block(`Android readiness blocked: ${metadata.androidReadiness.diagnostic}; category: ${metadata.androidReadiness.category || 'unknown'}. Resolve device setup before login.`);
+      }
       const os = (await adb(['shell', 'getprop', 'ro.build.version.release'])).stdout?.trim();
       if (valid(os, /^[0-9.]{1,30}$/)) metadata.osVersion = os;
       const installed = await adb(['shell', 'dumpsys', 'package', metadata.appId]);

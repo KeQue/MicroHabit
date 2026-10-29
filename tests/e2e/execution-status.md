@@ -86,6 +86,20 @@ than the matching `0731915` baseline, including 16.8s less capture time; timing
 alone does not establish a cause. The protected account was reused automatically.
 Afterward the dedicated Android emulator was closed to free laptop memory.
 
+The readiness revision `06798ca` had **129 passing Node checks**, but its
+Android cold-start run at **20:59:45 UTC** failed before credential entry:
+last completed checkpoint `app-launched`, failed assertion `e2e-login-email`.
+Attempt duration 217.2s; capture 123.3s was rejected for unverified coordinates.
+The failed/incomplete result remains in dated history. A private native probe
+afterward found a **System UI** ANR dialog with the actual Android Wait resource
+identifier. Its hierarchy contained only a partial viewport; no image has been
+substituted for that failed attempt. The emulator was awake/unlocked and the app
+process existed, so those setup flags did not establish UI readiness. Only after
+the case had ended, the verified system Wait button was selected and the dialog
+cleared. A new preflight check blocks current Android error windows before login,
+with fixed diagnostics; historical ANR mentions and arbitrary window titles are
+not retained or treated as a current dialog.
+
 ## Observed environment
 
 - Windows laptop, 8 GB RAM (founder supplied). Android Studio and its Java
@@ -370,7 +384,7 @@ of the proposed report history/timing improvements and iOS execution. Dated loca
 archives preserve self-contained images, with timing comparisons restricted to
 matching device/build/backend/tool settings and repetition count. Cloud report
 generation creates no plaintext history; local decryption archives downloaded
-iOS reports. Eighteen focused reporting/history/diagnostic checks pass (129 Node
+iOS reports. Twenty focused reporting/history/diagnostic checks pass (131 Node
 checks total),
 including two distinct per-attempt images, explicit browser selection, missing
 image exit status, and evidence-based post-run suggestions. No new app code,

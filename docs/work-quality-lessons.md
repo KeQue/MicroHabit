@@ -29,6 +29,15 @@ a roadmap, confidence score, or claim that the model has been retrained.
   read-only retry must still identify the exact available booted device/runtime;
   it must never become a login retry or convert unknown state to readiness.
 
+- Android transfer: a later cold-start attempt could not find the login field.
+  A private native probe afterward confirmed a System UI ANR/Wait dialog; the
+  partial hierarchy also lacked a verifiable screenshot viewport. ADB readiness,
+  an awake/unlocked screen and a live app process had all been true. Selecting
+  the verified system Wait button after the failed case cleared the dialog.
+  Check current WindowManager error windows before login; exclude historical
+  ANR mentions and retain fixed categories only. Never dismiss it during a case
+  or relax screenshot coordinate/redaction checks to manufacture evidence.
+
 ## Keep private build diagnostics observable
 
 - Observation: the first iOS E2E workflow combined project generation, CocoaPods,

@@ -293,6 +293,11 @@ TC-001/TC-002 identifiers and filenames remain stable for traceability.
 Each screenshot belongs to the attempt directly above it. Hierarchy inspection
 has a 90-second limit per inspection to accommodate native tool startup on this
 laptop; any capture failure records its phase and a fixed diagnostic category.
+Android preflight also checks current system error windows. A known crash/ANR
+dialog blocks setup before credentials are entered. Resolve it outside an active
+case; do not dismiss dialogs midway through a test or rewrite the earlier result.
+ADB reporting `device`, an awake screen and a running app do not by themselves
+prove that the app's UI is accessible.
 The second hierarchy read reuses the driver from the first read; test startup
 and the first inspection still use fresh setup. Failed attempts retain only
 allowlisted completed checkpoints, failed command/target names and fixed app

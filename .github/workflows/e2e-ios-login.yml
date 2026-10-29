@@ -59,7 +59,7 @@ jobs:
           if [[ "$E2E_BACKEND_ENV" == production ]]; then
             [[ "$E2E_ALLOW_PRODUCTION_LOGIN" == yes ]] || { echo 'BLOCKED: production login writes require explicit dispatch consent.'; exit 2; }
           fi
-          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs && -f tests/e2e/scripts/ios-readiness.mjs ]] || { echo 'BLOCKED: use an Android-tested source commit with Simulator readiness checks and private reports.'; exit 2; }
+          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs && -f tests/e2e/scripts/ios-readiness.mjs && -f tests/e2e/scripts/android-readiness.mjs ]] || { echo 'BLOCKED: use an Android-tested source commit with device readiness checks and private reports.'; exit 2; }
           [[ "$E2E_REPORT_PUBLIC_KEY" == '-----BEGIN PUBLIC KEY-----'* ]] || { echo 'BLOCKED: configure the report public key; its private key stays on the laptop.'; exit 2; }
           node --input-type=module -e 'import {createPublicKey} from "node:crypto";try{const key=createPublicKey(process.env.E2E_REPORT_PUBLIC_KEY);if(key.asymmetricKeyType!=="rsa"||key.asymmetricKeyDetails.modulusLength<2048)process.exit(2)}catch{process.exit(2)}' || { echo 'BLOCKED: the report key must be a valid RSA public key of at least 2048 bits.'; exit 2; }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

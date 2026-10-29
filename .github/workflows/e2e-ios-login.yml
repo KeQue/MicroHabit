@@ -21,9 +21,12 @@ concurrency:
 jobs:
   ios-login:
     runs-on: macos-15-intel
-    timeout-minutes: 60
+    # Build has its own 60-minute limit; leave room for setup, tests and cleanup.
+    timeout-minutes: 100
     environment: e2e-login
     env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      E2E_IOS_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-18-5
       E2E_ANDROID_PASS_SHA: ${{ inputs.android_pass_sha }}
       E2E_BACKEND_ENV: ${{ vars.E2E_BACKEND_ENV }}
       E2E_BACKEND_HOST: ${{ vars.E2E_BACKEND_HOST }}
@@ -42,6 +45,8 @@ jobs:
           persist-credentials: false
       - name: Verify Android prerequisite and backend consent
         shell: bash
+        env:
+          E2E_REPORT_PUBLIC_KEY: ${{ vars.E2E_REPORT_PUBLIC_KEY }}
         run: |
           set -euo pipefail
           [[ "$E2E_ANDROID_PASS_SHA" == "$(git rev-parse HEAD)" ]] || { echo 'BLOCKED: Android must pass twice on this exact checked-out revision, backend and account first.'; exit 2; }
@@ -53,14 +58,39 @@ jobs:
           if [[ "$E2E_BACKEND_ENV" == production ]]; then
             [[ "$E2E_ALLOW_PRODUCTION_LOGIN" == yes ]] || { echo 'BLOCKED: production login writes require explicit dispatch consent.'; exit 2; }
           fi
+          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs ]] || { echo 'BLOCKED: use an Android-tested source commit with private screenshot reporting.'; exit 2; }
+          [[ "$E2E_REPORT_PUBLIC_KEY" == '-----BEGIN PUBLIC KEY-----'* ]] || { echo 'BLOCKED: configure the report public key; its private key stays on the laptop.'; exit 2; }
+          node --input-type=module -e 'import {createPublicKey} from "node:crypto";try{const key=createPublicKey(process.env.E2E_REPORT_PUBLIC_KEY);if(key.asymmetricKeyType!=="rsa"||key.asymmetricKeyDetails.modulusLength<2048)process.exit(2)}catch{process.exit(2)}' || { echo 'BLOCKED: the report key must be a valid RSA public key of at least 2048 bits.'; exit 2; }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
+          package-manager-cache: false
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
           java-version: '21'
+      - name: Identify the dependency-cache toolchain
+        id: cache-key
+        shell: bash
+        run: |
+          [[ -d "$DEVELOPER_DIR" ]] || { echo 'BLOCKED: the pinned installed Xcode 16.4 is missing; no SDK download attempted.'; exit 2; }
+          echo "xcode=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - name: Restore public dependency downloads
+        id: download-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        timeout-minutes: 3
+        continue-on-error: true
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+        with:
+          path: |
+            ~/.npm/_cacache
+            ~/Library/Caches/CocoaPods
+          key: commito-ios-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+          restore-keys: |
+            commito-ios-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-
       - name: Install dependencies and pinned Maestro CLI
+        timeout-minutes: 10
         shell: bash
         run: |
           set -euo pipefail
@@ -76,6 +106,8 @@ jobs:
           unzip -q "$PRIVATE_DIR/maestro.zip" -d tests/e2e/.tools
           chmod +x tests/e2e/.tools/maestro/bin/maestro
       - name: Build unsigned Simulator Release locally and install
+        id: ios-build
+        timeout-minutes: 60
         shell: bash
         env:
           EXPO_PUBLIC_SUPABASE_URL: https://${{ vars.E2E_BACKEND_HOST }}
@@ -83,30 +115,151 @@ jobs:
           CI: '1'
         run: |
           set -euo pipefail
-          [[ -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]] || { echo 'BLOCKED: configure the public backend anon key as an environment secret or variable.'; exit 2; }
           PRIVATE_DIR=$(mktemp -d "$RUNNER_TEMP/commito-xcode.XXXXXX")
           chmod 700 "$PRIVATE_DIR"
-          trap 'rm -rf "$PRIVATE_DIR"' EXIT
-          echo 'Generating the iOS project and installing CocoaPods dependencies.'
-          npx --no-install expo prebuild --platform ios --clean >"$PRIVATE_DIR/prebuild.log" 2>&1 || { echo 'BLOCKED: Expo prebuild failed; raw logs discarded.'; exit 2; }
-          echo 'Selecting and booting a disposable iPhone Simulator.'
-          DEVICE=$(xcrun simctl list devices available --json | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;const d=Object.entries(JSON.parse(s).devices).filter(([r])=>r.includes("iOS")).flatMap(([,ds])=>ds).find(d=>d.name.startsWith("iPhone"));if(!d)process.exit(2);process.stdout.write(d.udid)')
-          xcrun simctl boot "$DEVICE" >"$PRIVATE_DIR/boot.log" 2>&1 || true
-          xcrun simctl bootstatus "$DEVICE" -b >"$PRIVATE_DIR/bootstatus.log" 2>&1 || { echo 'BLOCKED: Simulator did not boot.'; exit 2; }
-          echo 'Compiling the unsigned Simulator Release app.'
-          xcodebuild -workspace ios/Commito.xcworkspace -scheme Commito -configuration Release -sdk iphonesimulator -destination "id=$DEVICE" -derivedDataPath "$PRIVATE_DIR/build" CODE_SIGNING_ALLOWED=NO build >"$PRIVATE_DIR/xcode.log" 2>&1 || { echo 'BLOCKED: unsigned Release build failed; raw logs discarded.'; exit 2; }
+          printf '%s\n' "$PRIVATE_DIR" > "$RUNNER_TEMP/commito-ios-build-dir"
+          chmod 600 "$RUNNER_TEMP/commito-ios-build-dir"
+          umask 077
+          HEARTBEAT_PID=''
+          trap 'code=$?; if [[ -n "$HEARTBEAT_PID" ]]; then kill "$HEARTBEAT_PID" 2>/dev/null || true; fi; printf "%s\n" "$code" > "$PRIVATE_DIR/exit-code"' EXIT
+          trap 'printf interrupted > "$PRIVATE_DIR/interrupted"; exit 2' INT TERM
+          phase() {
+            printf '%s\n' "$1" > "$PRIVATE_DIR/phase"
+            date -u '+%Y-%m-%dT%H:%M:%SZ' > "$PRIVATE_DIR/phase-started"
+            echo "iOS build phase: $1"
+          }
+          phase configuration
+          [[ -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]] || { echo 'BLOCKED: configure the public backend anon key as an environment secret or variable.'; exit 2; }
+          xcrun simctl list runtimes --json 2>>"$PRIVATE_DIR/configuration.log" | node --input-type=module -e 'let s="";for await(const c of process.stdin)s+=c;if(!JSON.parse(s).runtimes.some(r=>r.identifier===process.env.E2E_IOS_RUNTIME&&r.isAvailable))process.exit(2)' 2>>"$PRIVATE_DIR/configuration.log" || { printf missing-pinned-runtime > "$PRIVATE_DIR/reason"; exit 2; }
+          DEVICE=$(xcrun simctl create Commito_E2E com.apple.CoreSimulator.SimDeviceType.iPhone-16 "$E2E_IOS_RUNTIME" 2>>"$PRIVATE_DIR/configuration.log")
+          (while sleep 60; do echo "iOS build still active: $(cat "$PRIVATE_DIR/phase")"; done) &
+          HEARTBEAT_PID=$!
+          phase expo-prebuild
+          npx --no-install expo prebuild --platform ios --clean --no-install >"$PRIVATE_DIR/expo-prebuild.log" 2>&1
+          phase cocoapods-install
+          command -v pod >"$PRIVATE_DIR/cocoapods-install.log" 2>&1 || { printf missing-cocoapods > "$PRIVATE_DIR/reason"; exit 2; }
+          pod install --project-directory=ios >>"$PRIVATE_DIR/cocoapods-install.log" 2>&1
+          phase xcode-compilation
+          xcodebuild -workspace ios/Commito.xcworkspace -scheme Commito -configuration Release -sdk iphonesimulator -destination "id=$DEVICE" -derivedDataPath "$PRIVATE_DIR/build" CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build >"$PRIVATE_DIR/xcode-compilation.log" 2>&1
+          phase simulator-startup
+          xcrun simctl boot "$DEVICE" >"$PRIVATE_DIR/simulator-startup.log" 2>&1
+          xcrun simctl bootstatus "$DEVICE" -b >>"$PRIVATE_DIR/simulator-startup.log" 2>&1
+          phase app-installation
           APP="$PRIVATE_DIR/build/Build/Products/Release-iphonesimulator/Commito.app"
-          [[ -f "$APP/main.jsbundle" ]] || { echo 'BLOCKED: Release app has no embedded JS bundle.'; exit 2; }
-          echo 'Installing the built app on the Simulator.'
-          xcrun simctl install "$DEVICE" "$APP" >"$PRIVATE_DIR/install.log" 2>&1 || { echo 'BLOCKED: Simulator install failed.'; exit 2; }
+          [[ -f "$APP/main.jsbundle" ]] || { printf missing-embedded-bundle > "$PRIVATE_DIR/reason"; exit 2; }
+          xcrun simctl install "$DEVICE" "$APP" >"$PRIVATE_DIR/app-installation.log" 2>&1
           echo "E2E_IOS_DEVICE=$DEVICE" >> "$GITHUB_ENV"
-      - name: Run TC-002 twice with scoped account secrets
+          phase complete
+      - name: Report sanitized build diagnostics and remove private build files
+        id: build-diagnostics
+        if: always()
+        timeout-minutes: 2
+        shell: bash
+        env:
+          IOS_BUILD_OUTCOME: ${{ steps.ios-build.outcome }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+          import { basename, dirname, join, resolve } from 'node:path';
+          const root = realpathSync(process.env.RUNNER_TEMP);
+          const pointer = join(root, 'commito-ios-build-dir');
+          const outcomes = ['success', 'failure', 'cancelled', 'skipped'];
+          const outcome = outcomes.includes(process.env.IOS_BUILD_OUTCOME) ? process.env.IOS_BUILD_OUTCOME : 'unknown';
+          const summarize = summary => {
+            console.log(JSON.stringify(summary, null, 2));
+            const results = resolve('tests/e2e/results');
+            mkdirSync(results, { recursive: true, mode: 0o700 });
+            writeFileSync(join(results, 'ios-build-summary.json'), JSON.stringify(summary), { mode: 0o600 });
+          };
+          if (!existsSync(pointer)) {
+            summarize({ kind: 'ios-build', outcome, phase: 'not-started', finding: 'No build phase record exists; inspect the preceding setup step.' });
+          } else {
+            const recordedTarget = resolve(readFileSync(pointer, 'utf8').trim());
+            // Never read or recursively remove an unchecked path, including symlinks.
+            if (realpathSync(dirname(recordedTarget)) !== root || !/^commito-xcode\.[A-Za-z0-9]+$/.test(basename(recordedTarget)) || lstatSync(recordedTarget).isSymbolicLink()) throw Error('Private build directory validation failed.');
+            const target = realpathSync(recordedTarget);
+            if (dirname(target) !== root) throw Error('Private build directory validation failed.');
+            try {
+              const read = name => existsSync(join(target, name)) ? readFileSync(join(target, name), 'utf8').trim() : '';
+              const phases = ['configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'xcode-compilation', 'app-installation', 'complete'];
+              const recorded = read('phase');
+              const phase = phases.includes(recorded) ? recorded : 'unknown';
+              const log = join(target, `${phase}.log`);
+              let tail = '', logBytes = 0, lastLogWriteAt = null;
+              if (existsSync(log)) {
+                const info = statSync(log);
+                logBytes = info.size;
+                lastLogWriteAt = info.mtime.toISOString();
+                const fd = openSync(log, 'r');
+                try { const buffer = Buffer.alloc(Math.min(logBytes, 65536)); readSync(fd, buffer, 0, buffer.length, Math.max(0, logBytes - buffer.length)); tail = buffer.toString('utf8'); }
+                finally { closeSync(fd); }
+              }
+              // Emit fixed categories only: filenames, log lines, keys and error messages stay private.
+              const patterns = [
+                ['network-or-download', /could not resolve host|connection (?:timed out|reset)|failed to download|HTTP[^\n]*(?:403|404|429|500|502|503)|SSL certificate/i],
+                ['dependency-resolution', /could not find compatible versions|unable to find a specification|pod install.*failed/i],
+                ['missing-module-or-header', /no such module|module[^\n]*not found|fatal error:[^\n]*file not found/i],
+                ['compiler-error', /(?:^|\n)[^\n]*:\d+:\d+: (?:fatal )?error:/i],
+                ['signing-configuration', /requires a provisioning profile|no signing certificate|code signing is required/i],
+                ['simulator-destination', /unable to find a destination|ineligible destinations|unable to boot|failed to boot|invalid device/i],
+                ['disk-space', /no space left on device|disk quota exceeded/i],
+                ['file-permission', /permission denied|operation not permitted/i],
+                ['workspace-or-scheme', /workspace[^\n]*does not exist|does not contain a scheme|scheme[^\n]*not currently configured/i],
+                ['javascript-bundle', /bundling failed|unable to resolve module|SyntaxError:/i],
+                ['process-termination', /killed: 9|signal (?:6|9|15)|out of memory/i],
+              ];
+              const diagnostics = patterns.filter(([, pattern]) => pattern.test(tail)).map(([category]) => category);
+              for (const reason of ['missing-embedded-bundle', 'missing-pinned-runtime', 'missing-cocoapods']) if (read('reason') === reason) diagnostics.push(reason);
+              const code = read('exit-code');
+              const exitCode = /^\d{1,3}$/.test(code) ? Number(code) : null;
+              const interrupted = existsSync(join(target, 'interrupted')) || (outcome !== 'success' && exitCode === null);
+              const started = read('phase-started');
+              const phaseStartedAt = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(started) ? started : null;
+              const finding = outcome === 'success' && phase === 'complete' ? 'Simulator Release app built and installed; native login is still a separate test.' : interrupted ? 'Build interrupted during this phase; check GitHub annotations for timeout or cancellation.' : 'Build failed during this phase.';
+              summarize({ kind: 'ios-build', outcome, phase, phaseStartedAt, exitCode, interrupted, logBytes, lastLogWriteAt, diagnostics, finding, diagnosticScope: 'Fixed categories from final 64 KiB only; absence of a category does not identify the cause.' });
+              if (process.env.GITHUB_OUTPUT && ['simulator-startup', 'xcode-compilation', 'app-installation', 'complete'].includes(phase)) appendFileSync(process.env.GITHUB_OUTPUT, 'cache-ready=true\n');
+            } finally { rmSync(target, { recursive: true, force: true }); rmSync(pointer, { force: true }); }
+          }
+          NODE
+      - name: Save public dependency downloads before account access
+        if: ${{ !cancelled() && steps.build-diagnostics.outputs.cache-ready == 'true' && steps.download-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        timeout-minutes: 3
+        continue-on-error: true
+        with:
+          path: |
+            ~/.npm/_cacache
+            ~/Library/Caches/CocoaPods
+          key: commito-ios-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+      - name: Login on iOS — two attempts with private screenshots
+        timeout-minutes: 24
         shell: bash
         env:
           MAESTRO_E2E_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
           MAESTRO_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
         run: npm run e2e:ios
-      # Deliberately no artifact upload, screenshots, raw reports, or build logs.
+      - name: Encrypt the private visual report
+        id: encrypt-report
+        if: always()
+        timeout-minutes: 2
+        shell: bash
+        env:
+          E2E_REPORT_PUBLIC_KEY: ${{ vars.E2E_REPORT_PUBLIC_KEY }}
+          E2E_CI_REMOVE_PLAINTEXT: 'yes'
+        run: |
+          [[ -f tests/e2e/scripts/report.mjs ]] || { echo 'BLOCKED: this source has no visual report helper.'; exit 2; }
+          node tests/e2e/scripts/report.mjs encrypt-ios
+      - name: Upload encrypted report only
+        if: ${{ always() && steps.encrypt-report.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 3
+        with:
+          name: TC-002-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/e2e/results/TC-002-report.encrypted.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      # No plaintext images, HTML, raw Maestro reports or build logs are uploaded.
       - name: Remove any interrupted-run raw files
         if: always()
         shell: bash

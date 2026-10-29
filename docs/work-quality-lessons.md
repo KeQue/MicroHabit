@@ -3,6 +3,22 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Retain useful failure evidence before deleting private tool output
+
+- Observation: the instrumented iOS build succeeded, but its native login failed.
+  The screenshot was safely redacted; the generic summary omitted the failed
+  command, while raw reports were deliberately deleted. The image alone could
+  not establish a keyboard or account error.
+- Correction: extract only completed, fixed checkpoints and allowlisted failed
+  command/target names from the private command report before cleanup. Classify
+  only the designated app error node into fixed categories; never retain its
+  text, credentials, evaluated commands or environment variables.
+- Transfer checks: a pending later checkpoint must not replace the last completed
+  checkpoint; a wrapper failure must not hide a deeper command failure; secret
+  values in command/environment/error fields must not enter the summary. A native
+  no-account fixture verified the actual pinned CLI schema, including its retained
+  JavaScript delimiters. These checks do not establish the iOS login root cause.
+
 ## Keep private build diagnostics observable
 
 - Observation: the first iOS E2E workflow combined project generation, CocoaPods,

@@ -293,6 +293,12 @@ TC-001/TC-002 identifiers and filenames remain stable for traceability.
 Each screenshot belongs to the attempt directly above it. Hierarchy inspection
 has a 90-second limit per inspection to accommodate native tool startup on this
 laptop; any capture failure records its phase and a fixed diagnostic category.
+The second hierarchy read reuses the driver from the first read; test startup
+and the first inspection still use fresh setup. Failed attempts retain only
+allowlisted completed checkpoints, failed command/target names and fixed app
+error categories. Raw command reports, input values and error text are discarded.
+On iOS, tapping the non-interactive COMMITO heading dismisses the keyboard before
+submission, following Maestro's documented workaround for unreliable swipes.
 
 Local runs also retain a dated, self-contained HTML report and result JSON under
 `results/history/`. Reports never overwrite one another. Open their private index:

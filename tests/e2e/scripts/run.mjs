@@ -4,8 +4,9 @@ import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, r
 import { delimiter, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { completedReport, resultExitCode } from './maestro-result.mjs';
-import { authenticatedScreen, parseHierarchy, redactScreenshot } from './screenshot.mjs';
+import { authenticatedScreen, parseHierarchy, redactScreenshot, safeScreenState } from './screenshot.mjs';
 import { recordRun, writeReport } from './report.mjs';
+import { failureDiagnostics } from './failure-diagnostics.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const resultsDir = join(root, 'tests/e2e/results');
@@ -264,8 +265,8 @@ async function captureScreenshot(metadata, attempt, output, requireLoaded = fals
     phase = next; phaseStarted = Date.now();
   };
   try {
-    const hierarchy = async () => {
-      const child = await call(tools.maestro, ['--device', metadata.device, '--platform', metadata.platform, 'hierarchy'],
+    const hierarchy = async (reuseDriver = false) => {
+      const child = await call(tools.maestro, ['--device', metadata.device, '--platform', metadata.platform, 'hierarchy', ...(reuseDriver ? ['--no-reinstall-driver'] : [])],
         { env: isolatedEnv(output), cwd: output, timeout: 90000 });
       if (child.error?.code === 'ETIMEDOUT') throw Error('Hierarchy timed out');
       if (child.status !== 0 || child.error) throw Error('Hierarchy command failed');
@@ -280,7 +281,7 @@ async function captureScreenshot(metadata, attempt, output, requireLoaded = fals
     if (image.status !== 0 || image.error) throw Error('Screenshot unavailable');
     const capturedAt = new Date().toISOString();
     nextPhase('hierarchy-after');
-    const after = await hierarchy();
+    const after = await hierarchy(true);
     nextPhase('validation-and-redaction');
     if (requireLoaded) {
       if (!authenticatedScreen(before, metadata.appId) || !authenticatedScreen(after, metadata.appId)) throw Error('Authenticated screenshot unavailable');
@@ -290,6 +291,7 @@ async function captureScreenshot(metadata, attempt, output, requireLoaded = fals
     writeFileSync(join(resultsDir, file), redacted.png, { mode: 0o600 });
     timings[phase] = Math.round((Date.now() - phaseStarted) / 100) / 10;
     return { status: 'CAPTURED', file, capturedAt, redactions: redacted.redactions, timings,
+      stateBefore: safeScreenState(before, metadata.appId), stateAfter: safeScreenState(after, metadata.appId),
       durationSeconds: Math.round((Date.now() - started) / 100) / 10 };
   } catch (error) {
     timings[phase] = Math.round((Date.now() - phaseStarted) / 100) / 10;
@@ -315,6 +317,7 @@ async function run(platform, prerequisite = null) {
       const childEnv = isolatedEnv(temporary, true);
       childEnv.MAESTRO_E2E_APP_ID = metadata.appId;
       for (let index = 1; index <= repetitions; index++) {
+        console.log(`${metadata.caseId}: attempt ${index} started; credentials remain private.`);
         const attemptStarted = Date.now();
         const output = join(temporary, `attempt-${index}`);
         mkdirSync(output, { mode: 0o700 });
@@ -331,7 +334,10 @@ async function run(platform, prerequisite = null) {
           finding: completed ? 'All real UI assertions completed, including authenticated load after process restart.' :
             child.error?.code === 'ETIMEDOUT' ? 'Maestro exceeded six minutes; no result is accepted.' :
               'Maestro failed or did not produce a completed report. Inspect the redacted screenshot or emulator; raw output is intentionally discarded.' };
+        if (!completed) attempt.diagnostics = failureDiagnostics(output);
+        console.log(`${metadata.caseId}: attempt ${index} assertions ${attempt.status}; capturing a private screenshot.`);
         attempt.screenshot = await captureScreenshot(metadata, index, output, completed);
+        console.log(`${metadata.caseId}: attempt ${index} screenshot ${attempt.screenshot.status}.`);
         report.attempts.push(attempt);
         if (!completed) break;
       }

@@ -32,6 +32,19 @@ export function authenticatedScreen(tree, appId) {
   return contains('e2e-leagues-loaded') && !contains('e2e-login-email') && !contains('e2e-login-password');
 }
 
+export function safeScreenState(tree, appId) {
+  const nodes = [];
+  const walk = node => { nodes.push(node); for (const child of node.children || []) walk(child); };
+  walk(tree);
+  const matches = (node, marker) => [marker, `${appId}:id/${marker}`].includes(node.attributes?.['resource-id']);
+  const has = marker => nodes.some(node => matches(node, marker));
+  const errors = nodes.filter(node => matches(node, 'e2e-auth-error'));
+  const errorText = errors.flatMap(node => ['text', 'value', 'label'].map(key => node.attributes?.[key])).filter(value => typeof value === 'string').join(' ');
+  const categories = [['invalid-credentials', /invalid login credentials/i], ['invalid-backend-key', /invalid api key|invalid jwt/i], ['email-unconfirmed', /email not confirmed/i], ['missing-email', /email is required/i], ['missing-password', /password is required/i], ['network', /network request failed|fetch failed|timed out|unable to connect/i]];
+  const authErrorCategory = !errors.length ? null : categories.find(([, pattern]) => pattern.test(errorText))?.[0] || 'other-auth-error';
+  return { loginEmailPresent: has('e2e-login-email'), loginPasswordPresent: has('e2e-login-password'), submitPresent: has('e2e-login-submit'), serverLoaded: authenticatedScreen(tree, appId), leagueLoadErrorPresent: has('e2e-leagues-error'), authErrorCategory };
+}
+
 export function redactScreenshot(raw, trees, secrets) {
   if (raw.length > 32 * 1024 * 1024 || raw.length < 24 || raw.readUInt32BE(16) * raw.readUInt32BE(20) > 20000000) throw Error('Unsupported screenshot');
   const image = PNG.sync.read(raw, { checkCRC: true });

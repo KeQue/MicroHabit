@@ -42,10 +42,12 @@ export function writeReport(report, directory = results) {
       picture = `<p>Native device screenshot captured ${escape(screenshot.capturedAt)}. Opaque credential/keyboard masks: ${escape(screenshot.redactions)}.</p><img alt="Native app state after this attempt" src="data:image/png;base64,${png.toString('base64')}">`;
     } else if (screenshot) picture = `<p>Screenshot unavailable: ${escape(screenshot.finding)}</p><p>Capture phase: ${escape(screenshot.phase)}. Diagnostic: ${escape(screenshot.diagnostic)}.</p>`;
     const timings = screenshot?.timings ? `<p>Capture phase times (seconds): ${Object.entries(screenshot.timings).map(([phase, seconds]) => `${escape(phase)}: ${escape(seconds)}`).join('; ')}.</p>` : '';
-    return picture + timings;
+    const state = screenshot?.stateAfter ? `<p>Safe screen checks: ${escape(JSON.stringify(screenshot.stateAfter))}. No field values or error text are retained.</p>` : '';
+    return picture + timings + state;
   };
   const attempts = (report.attempts || []).map(attempt => {
-    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(attempt.durationSeconds)} seconds)</p>${pictureFor(attempt.screenshot)}</section>`;
+    const diagnostic = attempt.diagnostics ? `<p>Last completed checkpoint: ${escape(attempt.diagnostics.lastCompletedCheckpoint)}. Failed command: ${escape(attempt.diagnostics.failedCommand)}. Target: ${escape(attempt.diagnostics.failedTarget)}.</p>` : '';
+    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(attempt.durationSeconds)} seconds)</p>${diagnostic}${pictureFor(attempt.screenshot)}</section>`;
   }).join('');
   const improvements = `<aside><h2>Suggested improvements after this run</h2><ul>${suggestedImprovements(report).map(item => `<li>${escape(item)}</li>`).join('')}</ul></aside>`;
   const totals = timingTotals(report);

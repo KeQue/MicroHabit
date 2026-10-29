@@ -5,7 +5,7 @@ October 29, 2026. Setup checks and actual native execution are distinguished bel
 | Case | Status | Device / OS | App version/build | Backend | Authentication evidence |
 | --- | --- | --- | --- | --- | --- |
 | Login on Android (TC-001) | PASS: two native attempts, each with its own screenshot | Dedicated Commito_E2E emulator, Android 14 / API 34, emulator-5554 | Installed 1.0.2 / versionCode 1 | Production; normal profile/auth effects approved | Both reached successful authenticated leagues loading, then repeated it after process restart; loaded state verified around each photo |
-| Login on iOS (TC-002) | BLOCKED: run cancelled at founder request after 55m 12s in combined build/install | Standard macos-15-intel runner; no Simulator app execution observed | Source configuration 1.0.2 / 36; installed version unknown | Production configured; account secrets never reached a test step | None: TC-002 never started |
+| Login on iOS (TC-002) | FAIL: first native attempt; its private screenshot retained | Standard macos-15-intel runner; dedicated iPhone 16 Simulator, iOS 18.5 | Installed 1.0.2 / 36 | Production; scoped environment secrets | Assertions did not complete; authenticated loading/session restoration is not proven |
 
 Initial Android run: October 29 at 14:04:04 UTC (15:04 Berlin), **310 seconds**
 including preflight; attempts **184.1s** and **121.3s**, both PASS. Command:
@@ -57,6 +57,18 @@ printing either value. The saved-account native run on `f18f68f` started at
 **18:57:11 UTC (19:57 Berlin)** and passed both attempts (**77.9s**, **85.1s**),
 with each photo retained (**34.9s**, **28.9s** capture time). Total **231.4s**.
 The wrapper reused the encrypted account automatically without another prompt.
+
+The dated-history/timing revision `07319159ded21af57b5a497ee29337e8411062b2`
+then passed both native Android attempts at **19:04:36 UTC (20:04 Berlin)**:
+**100.7s**, **89.1s**, with captures **32.3s**, **37.5s**, total **264.4s**.
+Both native photos were visually reviewed and embedded under their own attempt.
+The dated HTML exactly matches the latest HTML; the previous passing run remains
+unchanged in history. The comparable baseline is `f18f68f`; this run took 33.0s
+longer, which is an observation rather than evidence of a causal regression.
+Measured native PNG capture was 1.1s/1.4s; hierarchy-before/after inspection
+accounted for most of the remaining capture time. All **124 Node tests** passed
+(111 existing plus 13 report/history checks); the separate 13 synthetic Windows
+store checks also passed. Raw directories and the local run lock were removed.
 
 ## Observed environment
 
@@ -175,10 +187,52 @@ The wrapper reused the encrypted account automatically without another prompt.
 - Workflow-only commit `481eca9` adds safe setup/build stage messages for future
   runs. Fresh commit inspection confirms the workflow is its only changed file.
   It does not alter the active run or the Android-tested app/flow/runner source.
+- After the founder requested the prepared improvements and iOS execution,
+  workflow-only commit `5c30ab9` was published and freshly verified to contain
+  only the reviewed dispatcher. This also triggered the existing unchanged
+  Pages rebuild, which succeeded. The QA source branch was pushed at `0731915`;
+  credentials, keys, reports and unrelated Apple work were excluded.
+  Environment metadata was freshly verified: production backend, account secret
+  names present, report public key matches the local private-key pair, only main
+  is permitted. Standard public-repository macOS execution remains the route.
+  [Run 40937553476](https://github.com/KeQue/MicroHabit/actions/runs/40937553476)
+  was accepted at **19:09:49 UTC (20:09 Berlin)**. Dependencies installed
+  successfully; the bounded build step started at **19:12:00 UTC**.
+  This entry records an active run, not an iOS login PASS.
 
-## Prepared corrections and visual reports
+## Completed instrumented iOS run
 
-These later changes are local and have not been dispatched on GitHub:
+[Run 40937553476](https://github.com/KeQue/MicroHabit/actions/runs/40937553476)
+tested source `07319159ded21af57b5a497ee29337e8411062b2`. Its unsigned
+Simulator Release build/install succeeded in **25m 41s**, within the new
+60-minute limit. Recorded phases: Expo generation about 6s, CocoaPods 2m 32s,
+Xcode compilation 18m 49s, Simulator startup 2m 44s, installation 1m 12s.
+The npm/CocoaPods cache saved successfully before account access; a warm-cache
+speedup has not yet been measured. This success does not explain the original
+cancelled run's unknown stall.
+
+The first native iOS attempt started **19:39:28 UTC** and failed after
+**269.3s**; the runner correctly stopped rather than retrying a failed case.
+Its own redacted screenshot was captured at **19:45:43 UTC**, then encrypted
+for upload. Local decryption and visual inspection showed the sign-in screen;
+the credential fields and keyboard region remain masked. Capture took 150.8s,
+mostly two native hierarchy reads (69.1s/72.1s). The failure's exact command was
+not retained by the original sanitized summary, so neither an account error nor
+a keyboard failure is established. The failed report remains in private history.
+
+The local correction records only completed, fixed checkpoints and allowlisted
+failed command/target names from private command JSON before deleting it. It
+also retains fixed error categories from the designated app error element,
+never raw messages or input values. A no-account native fixture verified the
+pinned CLI's actual report schema; synthetic checks reject pending checkpoints,
+secret-bearing fields and unknown targets. The iOS flow uses the documented
+non-interactive-header keyboard-dismissal workaround; this remains a proposed
+fix until native iOS execution verifies it. Only the second screenshot hierarchy
+read skips redundant driver reinstall; first reads and tests retain fresh setup.
+
+## Earlier prepared corrections and visual reports
+
+The following records describe preparation before the completed run above:
 
 - Build/install has its own **60-minute** step limit; the overall job limit is
   100 minutes to allow setup, tests, encryption and cleanup. The old run's limit
@@ -243,7 +297,7 @@ Unrelated Apple account-deletion work appearing in
 the shared workspace is outside this review and must be preserved.
 
 Android passed on sources `abb5d0f` and `f18f68f`, with complete per-attempt visual
-evidence and real saved-account reuse. The founder then requested implementation
+evidence and real saved-account reuse, followed by `0731915`. The founder then requested implementation
 of the proposed report history/timing improvements and iOS execution. Dated local
 archives preserve self-contained images, with timing comparisons restricted to
 matching device/build/backend/tool settings and repetition count. Cloud report
@@ -251,6 +305,6 @@ generation creates no plaintext history; local decryption archives downloaded
 iOS reports. Thirteen focused reporting/history checks pass,
 including two distinct per-attempt images, explicit browser selection, missing
 image exit status, and evidence-based post-run suggestions. No new app code,
-test assertions or backend behavior changed. iOS remains BLOCKED, with zero
-native attempts. See
+test assertions or backend behavior changed. iOS now has one failed native
+attempt with its own screenshot; two successful attempts remain required. See
 [the beginner guide](README.md) for commands and secret-store steps.

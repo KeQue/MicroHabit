@@ -8,3 +8,10 @@ export function completedReport(child, xml) {
     && !/\b(?:failures|errors|skipped)=["'][1-9][0-9]*["']/.test(xml)
     && !/\btests=["']0["']/.test(xml);
 }
+
+// Keep the functional finding separate, while making missing required visual
+// evidence block a successful automation job.
+export function resultExitCode(report) {
+  if (report.status === 'FAIL') return 1;
+  return report.status === 'PASS' && report.evidenceStatus === 'COMPLETE' ? 0 : 2;
+}

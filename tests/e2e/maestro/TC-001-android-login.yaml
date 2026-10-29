@@ -1,5 +1,5 @@
 appId: ${MAESTRO_E2E_APP_ID}
-name: TC-001 Android successful login
+name: Login on Android
 ---
 - launchApp:
     clearState: true

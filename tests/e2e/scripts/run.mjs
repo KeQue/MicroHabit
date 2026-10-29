@@ -3,7 +3,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { completedReport } from './maestro-result.mjs';
+import { completedReport, resultExitCode } from './maestro-result.mjs';
 import { authenticatedScreen, parseHierarchy, redactScreenshot } from './screenshot.mjs';
 import { writeReport } from './report.mjs';
 
@@ -256,21 +256,26 @@ async function prepare(platform) {
 
 async function captureScreenshot(metadata, attempt, output, requireLoaded = false) {
   const started = Date.now();
+  let phase = 'hierarchy-before';
   try {
     const hierarchy = async () => {
       const child = await call(tools.maestro, ['--device', metadata.device, '--platform', metadata.platform, 'hierarchy'],
-        { env: isolatedEnv(output), cwd: output, timeout: 45000 });
-      if (child.status !== 0 || child.error) throw Error('Hierarchy unavailable');
+        { env: isolatedEnv(output), cwd: output, timeout: 90000 });
+      if (child.error?.code === 'ETIMEDOUT') throw Error('Hierarchy timed out');
+      if (child.status !== 0 || child.error) throw Error('Hierarchy command failed');
       return parseHierarchy(child.stdout);
     };
     const before = await hierarchy();
+    phase = 'native-capture';
     const raw = join(output, 'native-screen.png');
     const image = metadata.platform === 'android'
       ? await call(tools.adb, ['-s', metadata.device, 'exec-out', 'screencap', '-p'], { outputFile: raw, timeout: 20000 })
       : await call(tools.xcrun, ['simctl', 'io', metadata.device, 'screenshot', '--type=png', raw], { timeout: 20000 });
     if (image.status !== 0 || image.error) throw Error('Screenshot unavailable');
     const capturedAt = new Date().toISOString();
+    phase = 'hierarchy-after';
     const after = await hierarchy();
+    phase = 'validation-and-redaction';
     if (requireLoaded) {
       if (!authenticatedScreen(before, metadata.appId) || !authenticatedScreen(after, metadata.appId)) throw Error('Authenticated screenshot unavailable');
     }
@@ -280,8 +285,8 @@ async function captureScreenshot(metadata, attempt, output, requireLoaded = fals
     return { status: 'CAPTURED', file, capturedAt, redactions: redacted.redactions,
       durationSeconds: Math.round((Date.now() - started) / 100) / 10 };
   } catch (error) {
-    const categories = { 'Hierarchy unavailable': 'hierarchy-unavailable', 'Screenshot unavailable': 'native-capture-unavailable', 'Authenticated screenshot unavailable': 'authenticated-screen-not-visible', 'Cannot verify screenshot coordinates': 'unverified-coordinates', 'Cannot safely redact an element': 'unverified-redaction-bounds', 'Unsupported screenshot': 'unsupported-image' };
-    return { status: 'UNAVAILABLE', diagnostic: categories[error.message] || 'image-processing-or-output', finding: 'Native screenshot could not be captured and safely redacted; raw pixels were discarded.' };
+    const categories = { 'Hierarchy timed out': 'hierarchy-timeout', 'Hierarchy command failed': 'hierarchy-command-failed', 'Hierarchy unavailable': 'hierarchy-unavailable', 'Screenshot unavailable': 'native-capture-unavailable', 'Authenticated screenshot unavailable': 'authenticated-screen-not-visible', 'Cannot verify screenshot coordinates': 'unverified-coordinates', 'Cannot safely redact an element': 'unverified-redaction-bounds', 'Unsupported screenshot': 'unsupported-image' };
+    return { status: 'UNAVAILABLE', phase, diagnostic: categories[error.message] || 'image-processing-or-output', durationSeconds: Math.round((Date.now() - started) / 100) / 10, finding: 'Native screenshot could not be captured and safely redacted; raw pixels were discarded.' };
   }
 }
 
@@ -360,12 +365,12 @@ try {
       } finally { rmSync(temporary, { recursive: true, force: true }); }
     } else if (mode === 'all') {
       const android = await run('android');
-      if (android.status === 'PASS') env.E2E_ANDROID_PASS_SHA = android.sourceRevision;
-      const ios = await run('ios', android.status === 'PASS' ? null : 'Android must pass first; iOS was not executed.');
-      process.exitCode = android.status === 'PASS' && ios.status === 'PASS' ? 0 : android.status === 'FAIL' || ios.status === 'FAIL' ? 1 : 2;
+      if (resultExitCode(android) === 0) env.E2E_ANDROID_PASS_SHA = android.sourceRevision;
+      const ios = await run('ios', resultExitCode(android) === 0 ? null : 'Android must pass with a screenshot for each attempt first; iOS was not executed.');
+      process.exitCode = resultExitCode(android) === 0 ? resultExitCode(ios) : resultExitCode(android);
     } else {
       const result = await run(mode);
-      process.exitCode = result.status === 'PASS' ? 0 : result.status === 'FAIL' ? 1 : 2;
+      process.exitCode = resultExitCode(result);
     }
   } else { console.error('Usage: node tests/e2e/scripts/run.mjs doctor|android|ios|all'); process.exitCode = 2; }
 } catch (error) {

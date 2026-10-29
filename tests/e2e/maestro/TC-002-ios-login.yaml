@@ -1,5 +1,5 @@
 appId: ${MAESTRO_E2E_APP_ID}
-name: TC-002 iOS successful login
+name: Login on iOS
 ---
 # Dedicated disposable Simulator only: this clears its entire Keychain.
 - launchApp:

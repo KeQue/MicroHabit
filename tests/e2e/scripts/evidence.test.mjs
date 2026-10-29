@@ -2,12 +2,14 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { PNG } from 'pngjs';
-import { decryptReport, encryptReport, writeReport } from './report.mjs';
+import { decryptReport, encryptReport, suggestedImprovements, writeReport } from './report.mjs';
 import { authenticatedScreen, parseHierarchy, redactScreenshot } from './screenshot.mjs';
+import { browserCommand } from './view-report.mjs';
+import { resultExitCode } from './maestro-result.mjs';
 
 const secret = 'SYNTHETIC_PRIVATE_VALUE';
 const tree = children => ({ attributes: { bounds: '[0,0][100,200]' }, children });
@@ -83,4 +85,64 @@ test('private HTML escapes content and explicitly reports missing screenshot evi
     assert.equal(dirname(fixture), base);
     rmSync(fixture, { recursive: true, force: true });
   }
+});
+
+test('each attempt embeds its own native image directly below its result, with a readable test name', () => {
+  const base = resolve('tests/e2e/.tools/report-checks');
+  mkdirSync(base, { recursive: true });
+  const fixture = mkdtempSync(join(base, 'photos-'));
+  try {
+    const attempts = [1, 2].map(attempt => {
+      const pixels = new PNG({ width: 2, height: 2 });
+      pixels.data.fill(attempt * 50);
+      const png = PNG.sync.write(pixels);
+      const file = `TC-001-123-attempt-${attempt}.png`;
+      writeFileSync(join(fixture, file), png);
+      return { attempt, status: attempt === 1 ? 'PASS' : 'FAIL', finding: 'Synthetic fixture only', screenshot: { status: 'CAPTURED', file }, png };
+    });
+    const html = readFileSync(writeReport({ caseId: 'TC-001', status: 'FAIL', attempts }, fixture), 'utf8');
+    assert.ok(html.includes('<h1>Login on Android: FAIL</h1>'));
+    const sections = html.match(/<section>.*?<\/section>/g);
+    assert.equal(sections.length, 2);
+    for (let index = 0; index < 2; index++) {
+      assert.ok(sections[index].includes(`Attempt ${index + 1}:`));
+      assert.ok(sections[index].includes(attempts[index].png.toString('base64')));
+      assert.ok(!sections[index].includes(attempts[1 - index].png.toString('base64')));
+    }
+    const ios = readFileSync(writeReport({ caseId: 'TC-002', status: 'BLOCKED', attempts: [] }, fixture), 'utf8');
+    assert.ok(ios.includes('<h1>Login on iOS: BLOCKED</h1>'));
+    assert.ok(!ios.includes('<img'));
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
+test('Windows reports use an explicit browser, including paths with spaces and URL characters', () => {
+  const path = resolve('tests/e2e/results/private report #1.html');
+  const command = browserCommand('win32', path, { ProgramFiles: 'C:/Program Files' }, candidate => candidate.endsWith('msedge.exe'));
+  assert.ok(command.executable.endsWith('msedge.exe'));
+  assert.equal(command.args[0], '--new-window');
+  assert.ok(command.args[1].startsWith('file:'));
+  assert.ok(command.args[1].includes('%20'));
+  assert.ok(command.args[1].includes('%23'));
+  assert.throws(() => browserCommand('win32', path, {}, () => false));
+});
+
+test('a functional pass with a missing required screenshot blocks automation without rewriting the test result', () => {
+  const report = { status: 'PASS', evidenceStatus: 'INCOMPLETE' };
+  assert.equal(resultExitCode(report), 2);
+  assert.equal(report.status, 'PASS');
+  assert.equal(resultExitCode({ ...report, evidenceStatus: 'COMPLETE' }), 0);
+  assert.equal(resultExitCode({ status: 'FAIL', evidenceStatus: 'COMPLETE' }), 1);
+  assert.equal(resultExitCode({ status: 'BLOCKED', evidenceStatus: 'NOT_AVAILABLE' }), 2);
+});
+
+test('post-run suggestions follow observed evidence without inventing a root cause or launching work', () => {
+  const pass = suggestedImprovements({ status: 'PASS', evidenceStatus: 'COMPLETE', attempts: [{ screenshot: { status: 'CAPTURED', durationSeconds: 40 } }] });
+  assert.ok(pass.some(item => item.includes('baseline')));
+  assert.ok(pass.some(item => item.includes('startup')));
+  assert.ok(!pass.some(item => item.includes('resolve the recorded')));
+  const blocked = suggestedImprovements({ status: 'BLOCKED', attempts: [] });
+  assert.ok(blocked.some(item => item.includes('approval before another cloud run')));
+  const incomplete = suggestedImprovements({ status: 'PASS', evidenceStatus: 'INCOMPLETE', attempts: [{ screenshot: { status: 'UNAVAILABLE' } }] });
+  assert.ok(incomplete.some(item => item.includes('capture phase')));
+  assert.ok(!incomplete.some(item => item.includes('baseline')));
 });

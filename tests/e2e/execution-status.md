@@ -4,8 +4,8 @@ October 29, 2026. Setup checks and actual native execution are distinguished bel
 
 | Case | Status | Device / OS | App version/build | Backend | Authentication evidence |
 | --- | --- | --- | --- | --- | --- |
-| TC-001 Android login | PASS: two complete native attempts | Dedicated Commito_E2E emulator, Android 14 / API 34, emulator-5554 | Installed 1.0.2 / versionCode 1 | Production; normal profile/auth effects approved | Both reached successful authenticated leagues loading, then repeated it after process restart |
-| TC-002 iOS login | BLOCKED: run cancelled at founder request after 55m 12s in combined build/install | Standard macos-15-intel runner; no Simulator app execution observed | Source configuration 1.0.2 / 36; installed version unknown | Production configured; account secrets never reached a test step | None: TC-002 never started |
+| Login on Android (TC-001) | Functional PASS: two complete native attempts; image evidence incomplete | Dedicated Commito_E2E emulator, Android 14 / API 34, emulator-5554 | Installed 1.0.2 / versionCode 1 | Production; normal profile/auth effects approved | Both reached successful authenticated leagues loading, then repeated it after process restart; only attempt 1 retained its screenshot |
+| Login on iOS (TC-002) | BLOCKED: run cancelled at founder request after 55m 12s in combined build/install | Standard macos-15-intel runner; no Simulator app execution observed | Source configuration 1.0.2 / 36; installed version unknown | Production configured; account secrets never reached a test step | None: TC-002 never started |
 
 Initial Android run: October 29 at 14:04:04 UTC (15:04 Berlin), **310 seconds**
 including preflight; attempts **184.1s** and **121.3s**, both PASS. Command:
@@ -17,6 +17,22 @@ passed both attempts (**112.0s**, **100.8s**), **229.8s** including preflight.
 It used the same installed APK/backend/account. The account was entered only
 in the local hidden-input window; raw per-run artifacts were deleted afterward.
 Setup/build time is separate. Sanitized machine results are ignored in `results/`.
+
+The screenshot-enabled run on committed source
+`bda5812474768349ef67a7d66c3048d5d68688ad` started at **18:29:15 UTC
+(19:29 Berlin)**. Both attempts passed (**147.1s**, **117.6s**); total runtime
+including preflight/capture was **445.2s**. Attempt 1 retained its own native
+photo; attempt 2 reported `hierarchy-unavailable` and discarded raw pixels.
+The old diagnostic does not distinguish timeout, command failure or parsing
+failure, so its precise capture failure remains unknown. No later photo has
+been substituted for attempt 2.
+
+Two subsequent capture-only probes succeeded (**33.4s**, **24.2s**) on the
+already authenticated emulator, with the loaded marker checked before/after
+capture. These are not login attempts and do not repair the earlier evidence.
+The next local correction gives hierarchy startup more time, records the capture
+phase/category/timing, and makes missing required photos return blocked exit 2
+without rewriting a functional PASS. Its fresh two-attempt login check is pending.
 
 ## Observed environment
 
@@ -89,7 +105,8 @@ Setup/build time is separate. Sanitized machine results are ignored in `results/
   exception content from reaching those logs. OS/version metadata can still be
   written. Raw test screenshots/command reports were private and deleted. The
   subsequent requested visual-report feature retains only safely redacted native
-  PNGs locally, with encrypted-only cloud upload; it has not had a fresh login run.
+  PNGs locally, with encrypted-only cloud upload; the later login run and its
+  incomplete evidence are recorded above.
 - Nine synthetic result-parser checks passed, including skipped/empty/error and
   timeout counterexamples. These validate reporting behavior, not authentication.
 - Two additional synthetic startup checks verify that an executable which fails
@@ -201,6 +218,11 @@ existing GitHub Pages rebuild/deployment; the site content was unchanged.
 Unrelated Apple account-deletion work appearing in
 the shared workspace is outside this review and must be preserved.
 
-Android passed on source `350486a`; the current reporting changes are a later
-local revision. iOS remains BLOCKED, with zero native attempts. See
+Android passed on sources `350486a` and `bda5812`; the latter retained one of two
+required images. The latest capture/report corrections are a later local
+revision awaiting their complete native run. Ten focused reporting checks pass,
+including two distinct per-attempt images, explicit browser selection, missing
+image exit status, and evidence-based post-run suggestions. No new app code,
+test assertions or backend behavior changed. iOS remains BLOCKED, with zero
+native attempts. See
 [the beginner guide](README.md) for commands and secret-store steps.

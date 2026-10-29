@@ -1,4 +1,4 @@
-# TC-001: Successful login on Android
+# Login on Android (TC-001)
 
 Preconditions: a dedicated Android emulator has a Release APK built from this
 source, with its backend recorded. An existing confirmed email/password account

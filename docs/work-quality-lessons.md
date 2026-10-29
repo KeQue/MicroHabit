@@ -19,6 +19,24 @@ a roadmap, confidence score, or claim that the model has been retrained.
   paths are rejected and preserved. The revised Mac build still requires a newly
   approved run; these checks do not establish the old stall's cause or its fix.
 
+## Verify visual evidence for every attempt
+
+- Observation: both Android login attempts passed, but the second attempt's
+  hierarchy inspection failed, leaving its screenshot unavailable. A successful
+  login exit code alone did not satisfy the requested visual report. Windows also
+  opened the HTML source in VS Code through its file association.
+- Correction: require complete per-attempt image evidence for a successful
+  automation exit, while preserving the independent functional finding. Allow
+  more time for native hierarchy startup and record capture phase, timing and
+  fixed diagnostic categories. Open an installed browser explicitly.
+- Executed transfer checks: synthetic PASS-without-image returns BLOCKED exit 2;
+  FAIL-with-image remains failure. Two differently coloured fixture images stay
+  under their own attempt. A build-blocked iOS report has no invented image.
+  Two successive real native capture probes succeeded without another login.
+  The complete fresh login run remains a separate device verification.
+- Every run should propose improvements supported by its evidence. A proposal
+  does not authorize cloud execution or establish an unobserved root cause.
+
 ## Check every mobile automation artifact destination
 
 - Observation: the first QA runner design assumed private Java home and explicit

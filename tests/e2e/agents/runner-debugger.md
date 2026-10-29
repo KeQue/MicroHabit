@@ -11,3 +11,13 @@ success (PASS). Report device/OS, installed version/build, source/backend, comma
 duration and safe assertion evidence. Never publish raw Maestro output or personal
 screenshots. Classify app versus automation/environment findings from evidence;
 do not weaken assertions or change business logic. No TC-003 implementation.
+
+After every run, inspect the private report in a browser and verify a separate
+native screenshot below each executed attempt, whether PASS or FAIL. Incomplete
+visual evidence blocks a successful automation job without rewriting the
+functional finding. A build/setup blocker may have no app image; say so.
+Propose a few evidence-based improvements to the system, workflow, agent
+instructions or skills, with the expected benefit and remaining uncertainty.
+Do not invent a root cause, create unnecessary skills, or start another cloud
+run while making recommendations. Record durable lessons only after an observed
+issue and a discriminating verification of its correction.

@@ -1,4 +1,4 @@
-# TC-002: Successful login on iOS
+# Login on iOS (TC-002)
 
 Preconditions: TC-001 has passed for the same source revision/backend/account;
 macOS with Xcode, Maestro and a dedicated booted iOS Simulator are available.

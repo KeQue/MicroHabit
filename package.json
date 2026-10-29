@@ -12,7 +12,8 @@
     "e2e:doctor": "node tests/e2e/scripts/run.mjs doctor",
     "e2e:android": "node tests/e2e/scripts/run.mjs android",
     "e2e:ios": "node tests/e2e/scripts/run.mjs ios",
-    "e2e:all": "node tests/e2e/scripts/run.mjs all"
+    "e2e:all": "node tests/e2e/scripts/run.mjs all",
+    "e2e:report": "node tests/e2e/scripts/view-report.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

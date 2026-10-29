@@ -231,8 +231,8 @@ jobs:
             ~/.npm/_cacache
             ~/Library/Caches/CocoaPods
           key: commito-ios-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}
-      - name: Run TC-002 twice with scoped account secrets
-        timeout-minutes: 18
+      - name: Login on iOS — two attempts with private screenshots
+        timeout-minutes: 24
         shell: bash
         env:
           MAESTRO_E2E_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}

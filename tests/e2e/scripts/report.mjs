@@ -9,25 +9,47 @@ const results = join(root, 'tests/e2e/results');
 const keys = join(root, 'tests/e2e/.tools/report-keys');
 const escape = value => String(value ?? 'Not available').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
+export function suggestedImprovements(report) {
+  const suggestions = [];
+  const attempts = report.attempts || [];
+  if (attempts.some(attempt => attempt.screenshot?.status !== 'CAPTURED')) {
+    suggestions.push('Workflow: isolate the recorded capture phase and diagnostic. Verify repeated capture on the existing device before requesting another login run.');
+  }
+  if (report.status === 'FAIL') {
+    suggestions.push('Debugging: compare the failed attempt with its screenshot and sanitized finding before changing the app. Preserve the failed result and existing assertions.');
+  } else if (report.status === 'BLOCKED') {
+    suggestions.push('Workflow: resolve the recorded setup/build blocker before another login attempt. For iOS, inspect the phase diagnostics; obtain approval before another cloud run.');
+  } else if (report.status === 'PASS' && report.evidenceStatus === 'COMPLETE') {
+    suggestions.push('System: keep this run as a baseline. Compare later durations and screenshots before expanding test coverage or changing time limits.');
+  }
+  if (attempts.some(attempt => attempt.screenshot?.durationSeconds > 30)) {
+    suggestions.push('Performance: screenshot inspection exceeded 30 seconds. Measure native tool startup and laptop resource use before adding more parallel work.');
+  }
+  suggestions.push('Agents: the Runner/Debugger should review an image for every attempt and report missing evidence separately from the functional result. Change reusable skills only when an observed issue supports it.');
+  return suggestions;
+}
+
 export function writeReport(report, directory = results) {
   if (!/^TC-00[12]$/.test(report.caseId)) throw Error('Invalid report case');
+  const name = report.caseId === 'TC-001' ? 'Login on Android' : 'Login on iOS';
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const rows = [['Platform', report.platform], ['Result', report.status], ['Device', report.device], ['OS', report.osVersion], ['App version / build', `${report.appVersion ?? '?'} / ${report.appBuild ?? '?'}`], ['Backend', `${report.backendEnvironment ?? '?'} / ${report.backendHost ?? '?'}`], ['Source revision', report.sourceRevision], ['Started (UTC)', report.startedAt], ['Duration (seconds)', report.durationSeconds], ['Command', report.command], ['Screenshot evidence', report.evidenceStatus ?? 'Unavailable for this earlier run']];
+  const rows = [['Test', name], ['Case ID', report.caseId], ['Platform', report.platform], ['Result', report.status], ['Device', report.device], ['OS', report.osVersion], ['App version / build', `${report.appVersion ?? '?'} / ${report.appBuild ?? '?'}`], ['Backend', `${report.backendEnvironment ?? '?'} / ${report.backendHost ?? '?'}`], ['Source revision', report.sourceRevision], ['Started (UTC)', report.startedAt], ['Duration (seconds)', report.durationSeconds], ['Command', report.command], ['Screenshot evidence', report.evidenceStatus ?? 'Unavailable for this earlier run']];
   const pictureFor = screenshot => {
     let picture = '<p>Screenshot unavailable: this earlier run did not retain visual evidence.</p>';
     if (screenshot?.status === 'CAPTURED' && /^TC-00[12]-[0-9]+-attempt-[1-5]\.png$/.test(screenshot.file || '')) {
       const png = readFileSync(join(directory, screenshot.file));
       picture = `<p>Native device screenshot captured ${escape(screenshot.capturedAt)}. Opaque credential/keyboard masks: ${escape(screenshot.redactions)}.</p><img alt="Native app state after this attempt" src="data:image/png;base64,${png.toString('base64')}">`;
-    } else if (screenshot) picture = `<p>Screenshot unavailable: ${escape(screenshot.finding)}</p>`;
+    } else if (screenshot) picture = `<p>Screenshot unavailable: ${escape(screenshot.finding)}</p><p>Capture phase: ${escape(screenshot.phase)}. Diagnostic: ${escape(screenshot.diagnostic)}.</p>`;
     return picture;
   };
   const attempts = (report.attempts || []).map(attempt => {
     return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(attempt.durationSeconds)} seconds)</p>${pictureFor(attempt.screenshot)}</section>`;
   }).join('');
+  const improvements = `<aside><h2>Suggested improvements after this run</h2><ul>${suggestedImprovements(report).map(item => `<li>${escape(item)}</li>`).join('')}</ul></aside>`;
   const supplemental = report.supplementalScreenshot ? `<section><h2>Supplemental screenshot</h2><p>${escape(report.supplementalScreenshot.context)}</p>${pictureFor(report.supplementalScreenshot)}</section>` : '';
-  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${escape(report.caseId)} Commito report</title><style>body{font:16px system-ui;margin:32px auto;padding:0 20px;max-width:900px;color:#222}table{border-collapse:collapse;width:100%}td,th{padding:9px;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}img{display:block;max-width:390px;width:100%;height:auto;border:1px solid #ddd}section{margin-top:32px}h1{font-size:25px}</style><h1>${escape(report.caseId)}: ${escape(report.status)}</h1><p>Real UI and backend test. A screenshot supports visual review; the executed assertions determine the functional result.</p><table>${rows.map(([label, value]) => `<tr><th>${escape(label)}</th><td>${escape(value)}</td></tr>`).join('')}</table><p>${escape(report.authenticationEvidence)}</p>${(report.blockers || []).map(blocker => `<p>BLOCKED: ${escape(blocker)}</p>`).join('')}${attempts || '<p>No native attempt or app screenshot was available.</p>'}<p>Keep this report private. Redaction preserves the remaining native screenshot pixels; it does not recreate the app.</p></html>`;
+  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${escape(name)} | Commito report</title><style>body{font:16px system-ui;margin:32px auto;padding:0 20px;max-width:900px;color:#222}table{border-collapse:collapse;width:100%}td,th{padding:9px;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}img{display:block;max-width:390px;width:100%;height:auto;border:1px solid #ddd}section{margin-top:32px}h1{font-size:25px}</style><h1>${escape(name)}: ${escape(report.status)}</h1><p>Real UI and backend test. A screenshot supports visual review; the executed assertions determine the functional result.</p><table>${rows.map(([label, value]) => `<tr><th>${escape(label)}</th><td>${escape(value)}</td></tr>`).join('')}</table><p>${escape(report.authenticationEvidence)}</p>${(report.blockers || []).map(blocker => `<p>BLOCKED: ${escape(blocker)}</p>`).join('')}${attempts || '<p>No native attempt or app screenshot was available.</p>'}<p>Keep this report private. Redaction preserves the remaining native screenshot pixels; it does not recreate the app.</p></html>`;
   const path = join(directory, `${report.caseId}-latest.html`);
-  writeFileSync(path, html.replace('</html>', `${supplemental}</html>`), { mode: 0o600 });
+  writeFileSync(path, html.replace('</html>', `${supplemental}${improvements}</html>`), { mode: 0o600 });
   return path;
 }
 

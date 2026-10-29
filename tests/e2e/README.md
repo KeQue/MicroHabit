@@ -1,7 +1,7 @@
 # Commito mobile login regression
 
-Only two mobile cases exist: [TC-001 Android](cases/TC-001-android-login.md)
-and [TC-002 iOS](cases/TC-002-ios-login.md). Both use the same existing
+Only two mobile cases exist: [Login on Android](cases/TC-001-android-login.md)
+and [Login on iOS](cases/TC-002-ios-login.md). Both use the same existing
 email/password account, sequentially, through the real UI and Supabase backend.
 No accounts or leagues are created, no check-ins change, and nothing is deleted.
 Normal login **does** update authentication metadata and upsert the profile's
@@ -229,7 +229,10 @@ command, durations and assertion evidence. The backend is operator-confirmed,
 not extracted from the installed binary. A checkout SHA alone does not identify
 uncommitted edits; use a clean committed source for reproducible comparisons.
 
-Exit codes are 0 PASS, 1 executed failure, 2 BLOCKED/setup problem. Raw Maestro
+Exit codes are 0 PASS with complete screenshot evidence, 1 executed failure,
+2 BLOCKED/setup problem or missing required visual evidence. A missing image
+does not rewrite the functional finding, but it prevents a green automation job.
+Raw Maestro
 console output, JUnit, screenshots and command dumps may contain secrets, even
 with friendly step labels. The runner captures them privately, emits only a
 whitelisted summary, and removes temporary raw files after the run. Do not run
@@ -250,6 +253,25 @@ screenshot after each completed or failed attempt. Open the local HTML in a
 browser; it embeds the images and needs no web server. The JSON remains the
 machine-readable result. Screenshot capture does not change the assertion result:
 `evidenceStatus` separately says COMPLETE, INCOMPLETE or NOT_AVAILABLE.
+
+Open the report with an explicit browser command, even if Windows normally opens
+HTML files in VS Code:
+
+```powershell
+npm.cmd run e2e:report -- android
+npm.cmd run e2e:report -- ios
+```
+
+The report headings use **Login on Android** and **Login on iOS**. Internal
+TC-001/TC-002 identifiers and filenames remain stable for traceability.
+Each screenshot belongs to the attempt directly above it. Hierarchy inspection
+has a 90-second limit per inspection to accommodate native tool startup on this
+laptop; any capture failure records its phase and a fixed diagnostic category.
+
+Every HTML report includes suggested improvements based on its observed result,
+capture completeness and timings. The run review should also consider workflow,
+agent instructions and skills, state what is untested, and preserve the original
+findings. Suggestions do not authorize new cloud runs or other external changes.
 
 Credential fields are blacked out using UI bounds from before and after capture;
 when inputs are present the keyboard/autofill area is also hidden. Other pixels
@@ -277,7 +299,7 @@ refuses to overwrite an existing pair. After an approved cloud run, download its
 
 ```powershell
 node tests/e2e/scripts/report.mjs decrypt "$env:USERPROFILE\Downloads\TC-002-report.encrypted.json"
-Invoke-Item tests/e2e/results/downloaded-ios-report.html
+npm.cmd run e2e:report -- downloaded-ios
 ```
 
 The encrypted artifact expires after seven days. No new iOS run is authorized by

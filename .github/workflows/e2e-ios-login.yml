@@ -6,6 +6,10 @@ on:
         description: Full source SHA already passed twice on Android using this backend/account
         required: true
         type: string
+      ios_source_sha:
+        description: Optional source SHA for a verified iOS-only infrastructure change
+        required: false
+        type: string
       allow_production_login:
         description: Approve production auth metadata/profile writes if production is configured
         required: true
@@ -29,6 +33,7 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       E2E_IOS_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-18-5
       E2E_ANDROID_PASS_SHA: ${{ inputs.android_pass_sha }}
+      E2E_IOS_SOURCE_SHA: ${{ inputs.ios_source_sha || inputs.android_pass_sha }}
       E2E_BACKEND_ENV: ${{ vars.E2E_BACKEND_ENV }}
       E2E_BACKEND_HOST: ${{ vars.E2E_BACKEND_HOST }}
       E2E_IOS_APP_ID: com.sadik.microhabit
@@ -39,10 +44,11 @@ jobs:
       - name: Validate the tested source commit
         shell: bash
         run: |
-          [[ "$E2E_ANDROID_PASS_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo 'BLOCKED: supply a full tested source commit SHA.'; exit 2; }
+          [[ "$E2E_ANDROID_PASS_SHA" =~ ^[a-f0-9]{40}$ && "$E2E_IOS_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo 'BLOCKED: supply full source commit SHAs.'; exit 2; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.android_pass_sha }}
+          ref: ${{ inputs.ios_source_sha || inputs.android_pass_sha }}
+          fetch-depth: 4
           persist-credentials: false
       - name: Verify Android prerequisite and backend consent
         shell: bash
@@ -50,7 +56,13 @@ jobs:
           E2E_REPORT_PUBLIC_KEY: ${{ vars.E2E_REPORT_PUBLIC_KEY }}
         run: |
           set -euo pipefail
-          [[ "$E2E_ANDROID_PASS_SHA" == "$(git rev-parse HEAD)" ]] || { echo 'BLOCKED: Android must pass twice on this exact checked-out revision, backend and account first.'; exit 2; }
+          if [[ "$E2E_ANDROID_PASS_SHA" != "$E2E_IOS_SOURCE_SHA" ]]; then
+            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == 97be51c1b42e86318ac0161955db7e84ac2bb295 ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
+            node tests/e2e/scripts/ios-source-gate.mjs "$E2E_ANDROID_PASS_SHA" "$E2E_IOS_SOURCE_SHA"
+            echo "E2E_IOS_VERIFIED_BASELINE=$E2E_ANDROID_PASS_SHA:$E2E_IOS_SOURCE_SHA" >> "$GITHUB_ENV"
+          else
+            [[ "$E2E_ANDROID_PASS_SHA" == "$(git rev-parse HEAD)" ]] || { echo 'BLOCKED: checked-out revision differs from Android baseline.'; exit 2; }
+          fi
           [[ "$E2E_BACKEND_ENV" == staging || "$E2E_BACKEND_ENV" == production ]] || { echo 'BLOCKED: configure the e2e-login environment variables.'; exit 2; }
           [[ "$E2E_BACKEND_HOST" =~ ^[a-z0-9][a-z0-9.-]+\.[a-z]{2,20}$ ]] || { echo 'BLOCKED: configure the backend hostname.'; exit 2; }
           if [[ "$E2E_BACKEND_HOST" == nzpnfrutomyuvrprkrwi.supabase.co ]]; then

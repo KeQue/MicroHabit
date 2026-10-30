@@ -2,8 +2,9 @@
 
 From VS Code, choose **Terminal → Run Task → Commito: Run login regression**. Or open
 this folder in Windows File Explorer and double-click **Run Android login.cmd**.
-The changes must first be committed to Git. The existing saved Windows-protected account is reused. Start the dedicated
-Android emulator first and install the current Release APK. The task runs one
+The changes must first be committed to Git. The existing saved Windows-protected account is reused. Install the current Release APK on the dedicated emulator once.
+The task starts that emulator in the background if needed, waits for it to boot,
+and closes it after the test, including on failure. It runs one
 attempt and retries only if it fails; it opens the private report in a browser.
 After an Android pass it also opens the iOS workflow page and prints the source
 revision. To start iOS without copying the revision, choose **Terminal → Run

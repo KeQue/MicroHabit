@@ -28,6 +28,20 @@ test('safe screen diagnostics classify only designated app errors and never reta
   assert.equal(safeScreenState(tree('Check your inbox and confirm your email before signing in.'), appId).authErrorCategory, 'email-unconfirmed');
   assert.equal(safeScreenState(tree('Supabase rejected that signup email. Use a real inbox address, and if this is a production signup, make sure custom SMTP is configured in Supabase Auth.'), appId).authErrorCategory, 'invalid-signup-email');
   assert.equal(safeScreenState(tree('Supabase is not allowed to send signup emails to that address yet. Add custom SMTP or authorize the address in your Supabase project.'), appId).authErrorCategory, 'signup-email-unauthorized');
+  for (const [message, category] of [
+    ['Invalid key provided to SecureStore. Keys must not be empty.', 'secure-store-key'],
+    ['No keychain is available. You may need to restart your computer.', 'keychain-error'],
+    ['The specified item already exists in the keychain.', 'keychain-error'],
+    ['Unable to construct SecAccessControl: unknown error', 'keychain-error'],
+    ['Stored sign-in data is invalid. Please sign in again.', 'session-data-invalid'],
+    ['Stored sign-in data is incomplete. Please sign in again.', 'session-data-incomplete'],
+    ['Sign-in data is too large to store safely.', 'session-data-too-large'],
+  ]) {
+    const state = safeScreenState(tree(`${message} ${secret}`), appId);
+    assert.equal(state.authErrorCategory, category);
+    assert.ok(!JSON.stringify(state).includes(secret));
+  }
+  assert.equal(safeScreenState(tree('User interaction is not allowed.'), appId).authErrorCategory, 'other-auth-error');
   const unknown = safeScreenState(tree(secret), appId);
   assert.equal(unknown.authErrorCategory, 'other-auth-error');
   assert.ok(!JSON.stringify(unknown).includes(secret));

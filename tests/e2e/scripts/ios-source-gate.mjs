@@ -21,8 +21,8 @@ const allowed = new Set([
 ]);
 // These shared files are permitted only at the exact reviewed diagnostic blobs.
 const reviewedBlobs = new Map([
-  ['tests/e2e/scripts/screenshot.mjs', '0ab9797dd2d8e80da48bfda5897d2472435ccf29'],
-  ['tests/e2e/scripts/failure-diagnostics.test.mjs', '815b5358ecd0e06351d2ef321875a006195ec273'],
+  ['tests/e2e/scripts/screenshot.mjs', '2d99f4b0300fe8aa7e0a0c7cbc1382902d6221e1'],
+  ['tests/e2e/scripts/failure-diagnostics.test.mjs', '09786254957b3e88e384e13812ecfbcbd8c22578'],
 ]);
 const oldGuard = "  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');";
 const newGuard = "  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision && !(env.GITHUB_ACTIONS === 'true' && env.E2E_IOS_VERIFIED_BASELINE === `${env.E2E_ANDROID_PASS_SHA}:${metadata.sourceRevision}`)) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');";

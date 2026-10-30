@@ -31,6 +31,40 @@ and diff whitespace checks passed. These checks do not prove Mac execution,
 actual AutoFill file availability, cache savings or iOS authentication. Existing
 unrelated Deno import errors from the full TypeScript check remain outside scope.
 
+Local native verification of committed source
+`a9ac59a4dc76d9e0781d265f334d9161aa6b3755` on October 30:
+
+- **10:25:11 UTC (11:25 Berlin), BLOCKED**, zero attempts. The current system
+  error-window guard caught a cold-boot System UI error. A verified native system
+  Wait control was selected outside the case, then the current window guard
+  confirmed healthy state. The blocked report remains in dated history.
+- **10:29:36 UTC, FAIL**, first attempt PASS (**104.2s**), second FAIL (**93.1s**)
+  after `process-restarted`, on `e2e-leagues-error`. Both own images were captured
+  and reviewed. The second showed **Network request failed**, not a login form;
+  the prior authenticated-load checkpoint had completed. Total **263.8s**.
+  History: `TC-001-2026-10-30T10-29-36-492Z-8c75c625`.
+- A verified Refresh was selected after the failed case, outside its assertions.
+  A separate native inspection subsequently confirmed server-loaded state and
+  no league-loading error. Host reachability/Android capability mentions alone
+  did not establish recovery or explain the earlier network interruption.
+- **10:39:30 UTC (11:39 Berlin), PASS**, a new complete two-attempt run after
+  observed recovery: **92.2s**, **74.1s** UI; captures **23.0s**, **24.3s**; total
+  **218.8s (3m 39s)**. Both own native images were reviewed and showed authenticated
+  Leagues loading after restart, with no credential fields/errors. The saved
+  account was reused without a prompt. History:
+  `TC-001-2026-10-30T10-39-30-355Z-56b62334`. The browser report opened; raw capture
+  directories and run lock were absent afterward, and the dedicated emulator
+  was closed. This fresh PASS does not erase or explain the earlier failure.
+
+The same-device passing baseline took 319.3s; this run was 100.5s shorter, with
+49.4s less capture time. This does not isolate the effect of driver reuse or
+establish an iOS saving. Next measurements should compare cold/warm Mac compiler
+cache times separately from UI and image time. A useful follow-up diagnostic
+improvement is fixed league-loading error categories, preserving real network
+failures rather than refreshing/retrying inside an assertion. No cloud run,
+workflow publication, app release or backend policy/schema change followed this
+local verification; iOS still requires explicit run approval.
+
 | Case | Status | Device / OS | App version/build | Backend | Authentication evidence |
 | --- | --- | --- | --- | --- | --- |
 | Login on Android (TC-001) | PASS: two native attempts, each with its own screenshot | Dedicated Commito_E2E emulator, Android 14 / API 34, emulator-5554 | Installed 1.0.2 / versionCode 1 | Production; normal profile/auth effects approved | Both reached successful authenticated leagues loading, then repeated it after process restart; loaded state verified around each photo |

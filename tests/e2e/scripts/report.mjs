@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { archiveReport, comparePreviousRun, timingTotals } from './history.mjs';
+import { formatDuration } from './duration.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const results = join(root, 'tests/e2e/results');
@@ -34,8 +35,9 @@ export function writeReport(report, directory = results) {
   if (!/^TC-00[12]$/.test(report.caseId)) throw Error('Invalid report case');
   const name = report.caseId === 'TC-001' ? 'Login on Android' : 'Login on iOS';
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const rows = [['Test', name], ['Case ID', report.caseId], ['Platform', report.platform], ['Result', report.status], ['Device', report.device], ['OS', report.osVersion], ['App version / build', `${report.appVersion ?? '?'} / ${report.appBuild ?? '?'}`], ['Backend', `${report.backendEnvironment ?? '?'} / ${report.backendHost ?? '?'}`], ['Source revision', report.sourceRevision], ['Started (UTC)', report.startedAt], ['Duration (seconds)', report.durationSeconds], ['Command', report.command], ['Screenshot evidence', report.evidenceStatus ?? 'Unavailable for this earlier run']];
-  if (report.simulatorReadiness) rows.push(['Simulator checks', report.simulatorReadiness.map(check => `${check.diagnostic || 'ready'}; state ${check.state || 'unknown'}; ${check.durationSeconds}s`).join(' / ')]);
+  const result = report.flaky ? 'PASS (after retry; flaky)' : report.status;
+  const rows = [['Test', name], ['Case ID', report.caseId], ['Platform', report.platform], ['Result', result], ['Device', report.device], ['OS', report.osVersion], ['App version / build', `${report.appVersion ?? '?'} / ${report.appBuild ?? '?'}`], ['Backend', `${report.backendEnvironment ?? '?'} / ${report.backendHost ?? '?'}`], ['Source revision', report.sourceRevision], ['Started (UTC)', report.startedAt], ['Duration', formatDuration(report.durationSeconds)], ['Command', report.command], ['Screenshot evidence', report.evidenceStatus ?? 'Unavailable for this earlier run']];
+  if (report.simulatorReadiness) rows.push(['Simulator checks', report.simulatorReadiness.map(check => `${check.diagnostic || 'ready'}; state ${check.state || 'unknown'}; ${formatDuration(check.durationSeconds)}`).join(' / ')]);
   if (report.androidReadiness) rows.push(['Android system check', `${report.androidReadiness.diagnostic || 'ready'}; category ${report.androidReadiness.category || 'none'}`]);
   const pictureFor = screenshot => {
     let picture = '<p>Screenshot unavailable: this earlier run did not retain visual evidence.</p>';
@@ -44,7 +46,7 @@ export function writeReport(report, directory = results) {
       picture = `<p>Native device screenshot captured ${escape(screenshot.capturedAt)}. Opaque credential/keyboard masks: ${escape(screenshot.redactions)}.</p><img alt="Native app state after this attempt" src="data:image/png;base64,${png.toString('base64')}">`;
       if (screenshot.privacyPolicy === 'visible-email-native-password-mask-v1') picture += '<p>The login email may be visible. Native password dots remain visible only when both screen inspections confirm masking; otherwise the field is covered. No password text or replacement dots are added to the image.</p>';
     } else if (screenshot) picture = `<p>Screenshot unavailable: ${escape(screenshot.finding)}</p><p>Capture phase: ${escape(screenshot.phase)}. Diagnostic: ${escape(screenshot.diagnostic)}.</p>`;
-    const timings = screenshot?.timings ? `<p>Capture phase times (seconds): ${Object.entries(screenshot.timings).map(([phase, seconds]) => `${escape(phase)}: ${escape(seconds)}`).join('; ')}.</p>` : '';
+    const timings = screenshot?.timings ? `<p>Capture phase times: ${Object.entries(screenshot.timings).map(([phase, seconds]) => `${escape(phase)}: ${escape(formatDuration(seconds))}`).join('; ')}.</p>` : '';
     const state = screenshot?.stateAfter ? `<p>Safe screen checks: ${escape(JSON.stringify(screenshot.stateAfter))}. These checks retain no field values or error text.</p>` : '';
     const inputs = screenshot?.inputChecks ? `<p>Private input verification: ${escape(JSON.stringify(screenshot.inputChecks))}. A nonempty native password mask verifies populated input, not the hidden password's exact value.</p>` : '';
     return picture + timings + state + inputs;
@@ -52,15 +54,15 @@ export function writeReport(report, directory = results) {
   const attempts = (report.attempts || []).map(attempt => {
     const diagnostic = attempt.diagnostics ? `<p>Last completed checkpoint: ${escape(attempt.diagnostics.lastCompletedCheckpoint)}. Failed command: ${escape(attempt.diagnostics.failedCommand)}. Target: ${escape(attempt.diagnostics.failedTarget)}.</p>` : '';
     const before = attempt.inputScreenshot && !attempt.finalScreenshotIsInput && attempt.inputScreenshot !== attempt.screenshot && (!attempt.inputScreenshot.file || attempt.inputScreenshot.file !== attempt.screenshot?.file) ? `<h3>Before Sign in</h3>${pictureFor(attempt.inputScreenshot)}<h3>After attempt</h3>` : '';
-    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(attempt.durationSeconds)} seconds)</p>${diagnostic}${before}${pictureFor(attempt.screenshot)}</section>`;
+    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(formatDuration(attempt.durationSeconds))})</p>${diagnostic}${before}${pictureFor(attempt.screenshot)}</section>`;
   }).join('');
   const improvements = `<aside><h2>Suggested improvements after this run</h2><ul>${suggestedImprovements(report).map(item => `<li>${escape(item)}</li>`).join('')}</ul></aside>`;
   const totals = timingTotals(report);
-  const timing = `<aside><h2>Timing</h2><p>UI assertions: ${escape(totals.uiSeconds)} seconds. Screenshot capture and inspection: ${escape(totals.captureSeconds)} seconds. Total including setup: ${escape(totals.runSeconds)} seconds.</p>${report.timingComparison ? `<p>Compared with the passing run started ${escape(report.timingComparison.startedAt)}: total change ${escape(report.timingComparison.deltaSeconds.runSeconds)} seconds; screenshot-time change ${escape(report.timingComparison.deltaSeconds.captureSeconds)} seconds. Negative values mean less time.</p><p>${escape(report.timingComparison.finding)}</p>` : '<p>No earlier comparable complete passing run is available.</p>'}</aside>`;
+  const timing = `<aside><h2>Timing</h2><p>UI assertions: ${escape(formatDuration(totals.uiSeconds))}. Screenshot capture and inspection: ${escape(formatDuration(totals.captureSeconds))}. Total including setup: ${escape(formatDuration(totals.runSeconds))}.</p>${report.timingComparison ? `<p>Compared with the passing run started ${escape(report.timingComparison.startedAt)}: total change ${escape(formatDuration(report.timingComparison.deltaSeconds.runSeconds))}; screenshot-time change ${escape(formatDuration(report.timingComparison.deltaSeconds.captureSeconds))}. Negative values mean less time.</p><p>${escape(report.timingComparison.finding)}</p>` : '<p>No earlier comparable complete passing run is available.</p>'}</aside>`;
   const supplemental = report.supplementalScreenshot ? `<section><h2>Supplemental screenshot</h2><p>${escape(report.supplementalScreenshot.context)}</p>${pictureFor(report.supplementalScreenshot)}</section>` : '';
   const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><title>${escape(name)} | Commito report</title><style>body{font:16px system-ui;margin:32px auto;padding:0 20px;max-width:900px;color:#222}table{border-collapse:collapse;width:100%}td,th{padding:9px;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}img{display:block;max-width:390px;width:100%;height:auto;border:1px solid #ddd}section{margin-top:32px}h1{font-size:25px}</style><h1>${escape(name)}: ${escape(report.status)}</h1><p>Real UI and backend test. A screenshot supports visual review; the executed assertions determine the functional result.</p><table>${rows.map(([label, value]) => `<tr><th>${escape(label)}</th><td>${escape(value)}</td></tr>`).join('')}</table><p>${escape(report.authenticationEvidence)}</p>${(report.blockers || []).map(blocker => `<p>BLOCKED: ${escape(blocker)}</p>`).join('')}${attempts || '<p>No native attempt or app screenshot was available.</p>'}<p>Keep this report private. Redaction preserves the remaining native screenshot pixels; it does not recreate the app.</p></html>`;
   const path = join(directory, `${report.caseId}-latest.html`);
-  writeFileSync(path, html.replace('</html>', `${supplemental}${timing}${improvements}</html>`), { mode: 0o600 });
+  writeFileSync(path, html.replace(`<h1>${escape(name)}: ${escape(report.status)}</h1>`, `<h1>${escape(name)}: ${escape(result)}</h1>`).replace('</html>', `${supplemental}${timing}${improvements}</html>`), { mode: 0o600 });
   return path;
 }
 

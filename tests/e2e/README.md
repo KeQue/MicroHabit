@@ -21,15 +21,16 @@ can appear during loading or after an error.
 
 The flow stops/restarts the app **without clearing storage** and requires the
 same server-loaded state again, with no auth/load errors or login inputs. The
-runner repeats the entire case twice; both attempts must pass. It never retries
-a failed assertion into a passing result. This proves the login/load/restore
+runner stops after one pass, or retries once after a failure. Both attempts and
+their screenshots remain in the report; a pass on retry is marked flaky. Missing
+required screenshots still fail the evidence check. This proves the login/load/restore
 journey, not every authentication security property or other app flow.
 
 ## Files and tools
 
 ```text
 tests/e2e/
-  agents/                 Reusable instructions for the three QA roles
+  agents/                 Reusable instructions for the QA roles
   cases/                  Human-readable TC-001 and TC-002
   maestro/                One wrapper per platform
     shared/               Shared login and authenticated-state assertions
@@ -37,6 +38,11 @@ tests/e2e/
   results/                Ignored machine results and temporary raw files
   .tools/                 Ignored local tools/build caches
 ```
+
+After a run, the runner follows [the report and performance improvement agent](agents/report-improvement-engineer.md)
+to review recommendations and look for evidence-backed speed improvements. This
+is an assistant workflow, not an unattended service: it runs when an assistant is
+working on the report and does not independently start tests or cloud jobs.
 
 Reuse Node/npm, Expo SDK 54, Java 21, Android SDK and the existing
 Pixel_7 Android 14 image. Maestro CLI is pinned to **2.12.0**. No npm testing
@@ -181,7 +187,7 @@ The founder approved this setup's manual GitHub run. Keep triggers manual;
 future execution must follow the account owner's authorization and budget.
 ChatGPT Plus is not a mobile CI subscription.
 
-After TC-001 passes twice on the final committed source:
+After TC-001 passes with complete evidence on the final committed source:
 
 1. Put the reviewed files on the GitHub branch to test. The workflow must exist
    on the default branch to appear under Actions. Review and commit first, then

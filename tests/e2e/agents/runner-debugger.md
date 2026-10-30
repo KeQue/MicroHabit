@@ -47,6 +47,10 @@ Do not invent a root cause, create unnecessary skills, or start another cloud
 run while making recommendations. Record durable lessons only after an observed
 issue and a discriminating verification of its correction.
 
+After each run, apply `tests/e2e/agents/report-improvement-engineer.md` to assess
+the report recommendations and investigate speed. Use that workflow yourself if
+no separate agent is available; it does not grant permission for another run.
+
 Keep the dated local report and screenshots for each run. Use the private history
 index and compare timings only across matching device/build/backend/tool settings.
 Distinguish UI assertion time from capture/hierarchy overhead; do not attribute

@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { verifySource } from './ios-source-gate.mjs';
 
 const base = 'a9ac59a4dc76d9e0781d265f334d9161aa6b3755';
+const reviewed = '99afb3c6e2bfd6bb2782acce7fdd6207c66a533b';
 const source = '1'.repeat(40);
 function fixture({ changed = ['M', 'tests/e2e/scripts/run.mjs'], runnerEdit = '', testEdit = '', diagnosticEdit = '', ancestor = true } = {}) {
   return (command, args) => {
@@ -15,7 +15,7 @@ function fixture({ changed = ['M', 'tests/e2e/scripts/run.mjs'], runnerEdit = ''
     if (args[0] === 'ls-tree') return { status: 0, stdout: '100644 blob 012345\tpath\n' };
     if (args[0] === 'show') {
       const [rev, path] = args[1].split(':');
-      const text = rev === base ? execFileSync('git', ['show', `${base}:${path}`], { encoding: 'utf8' }) : readFileSync(path, 'utf8');
+      const text = execFileSync('git', ['show', `${rev === base ? base : reviewed}:${path}`], { encoding: 'utf8' });
       return { status: 0, stdout: text + (path.endsWith('/run.mjs') && rev === source ? runnerEdit : '') + (path.endsWith('/login-attempt.test.mjs') && rev === source ? testEdit : '') + (path.endsWith('/screenshot.mjs') && rev === source ? diagnosticEdit : '') };
     }
     throw new Error('unexpected command');

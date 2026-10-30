@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { formatDuration } from './duration.mjs';
 
 const escape = value => String(value ?? 'Unavailable').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const validFolder = value => /^TC-00[12]-[0-9TZ-]+-[a-f0-9]{8}$/.test(value);
@@ -60,8 +61,8 @@ export function writeHistoryIndex(directory) {
   mkdirSync(history, { recursive: true, mode: 0o700 });
   const rows = entries(directory).map(({ folder, report }) => {
     const name = report.caseId === 'TC-001' ? 'Login on Android' : 'Login on iOS';
-    return `<tr><td><a href="${folder}/report.html">${name}</a></td><td>${escape(report.startedAt)}</td><td>${escape(report.status)}</td><td>${escape(report.evidenceStatus)}</td><td>${escape(report.durationSeconds)}</td></tr>`;
+    return `<tr><td><a href="${folder}/report.html">${name}</a></td><td>${escape(report.startedAt)}</td><td>${escape(report.flaky ? 'PASS (after retry)' : report.status)}</td><td>${escape(report.evidenceStatus)}</td><td>${escape(formatDuration(report.durationSeconds))}</td></tr>`;
   }).join('');
   const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>Commito private test history</title><style>body{font:16px system-ui;margin:32px auto;padding:0 20px;max-width:1000px}table{border-collapse:collapse;width:100%}td,th{padding:10px;border:1px solid #ddd;text-align:left;overflow-wrap:anywhere}</style><h1>Private test history</h1><p>Each report retains its own screenshots. Times below are UTC. Downloaded iOS reports show their actual result inside the report.</p><table><tr><th>Test</th><th>Started / downloaded</th><th>Result</th><th>Images</th><th>Seconds</th></tr>${rows}</table></html>`;
-  writeFileSync(join(history, 'index.html'), html, { mode: 0o600 });
+  writeFileSync(join(history, 'index.html'), html.replace('<th>Seconds</th>', '<th>Duration</th>'), { mode: 0o600 });
 }

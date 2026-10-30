@@ -10,6 +10,7 @@ import { failureDiagnostics } from './failure-diagnostics.mjs';
 import { inspectSimulator, mayRetrySimulatorProbe } from './ios-readiness.mjs';
 import { inspectAndroidWindows } from './android-readiness.mjs';
 import { executeLoginAttempt } from './login-attempt.mjs';
+import { runAttempts } from './retry-policy.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const resultsDir = join(root, 'tests/e2e/results');
@@ -325,8 +326,6 @@ async function run(platform, prerequisite = null) {
   const started = Date.now();
   const { metadata, blockers } = await prepare(platform);
   if (prerequisite) blockers.push(prerequisite);
-  const repetitions = Number(env.E2E_REPEAT || 2);
-  if (!Number.isInteger(repetitions) || repetitions < 2 || repetitions > 5) blockers.push('E2E_REPEAT must be an integer from 2 to 5.');
   const report = {
     ...metadata, startedAt: new Date(started).toISOString(), status: 'BLOCKED',
     blockers, attempts: [], requiresInputScreenshot: platform === 'ios', durationSeconds: 0, authenticationEvidence: 'Not executed',
@@ -337,7 +336,7 @@ async function run(platform, prerequisite = null) {
     try {
       const childEnv = isolatedEnv(temporary, true);
       childEnv.MAESTRO_E2E_APP_ID = metadata.appId;
-      for (let index = 1; index <= repetitions; index++) {
+      const outcome = await runAttempts(async index => {
         console.log(`${metadata.caseId}: attempt ${index} started; credentials remain private.`);
         const output = join(temporary, `attempt-${index}`);
         mkdirSync(output, { mode: 0o700 });
@@ -358,12 +357,11 @@ async function run(platform, prerequisite = null) {
         });
         console.log(`${metadata.caseId}: attempt ${index} assertions ${attempt.status}.`);
         console.log(`${metadata.caseId}: attempt ${index} screenshot ${attempt.screenshot.status}.`);
-        report.attempts.push(attempt);
-        if (attempt.status !== 'PASS') break;
-      }
-      report.status = report.attempts.length === repetitions && report.attempts.every(attempt => attempt.status === 'PASS') ? 'PASS' : 'FAIL';
+        return attempt;
+      });
+      Object.assign(report, outcome);
       report.authenticationEvidence = report.status === 'PASS' ?
-        'Each run reached the conditional server-loaded leagues marker with no auth/load errors, then repeated it after restart without clearing storage.' : 'Assertions did not complete successfully; authentication is not proven.';
+        'The passing attempt reached the conditional server-loaded leagues marker with no auth/load errors, then repeated it after restart without clearing storage.' : 'Assertions did not complete successfully; authentication is not proven.';
     } finally { rmSync(temporary, { recursive: true, force: true }); }
   }
   report.durationSeconds = Math.round((Date.now() - started) / 100) / 10;

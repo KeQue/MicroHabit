@@ -58,3 +58,7 @@ git diff --check
 Database fixtures under `supabase/tests` belong in an isolated test database.
 Use `docs/beta-smoke-test.md` for device checks and recorded results.
 See `docs/codex-plus-tutorial.md` for assistant assessment and lesson checks.
+
+After each mobile E2E run, apply `tests/e2e/agents/report-improvement-engineer.md`
+to the report recommendations and performance evidence. This does not authorize
+additional device logins, cloud runs, publishing, downloads, or production writes.

@@ -216,7 +216,7 @@ test('cloud reporting writes no plaintext archive, while a local blocked run ret
     assert.ok(existsSync(join(fixture, local.historyFile)));
     const html = readFileSync(join(fixture, local.historyFile), 'utf8');
     assert.ok(html.includes('Login on iOS: BLOCKED'));
-    assert.ok(html.includes('simulator-list-timeout; state unknown; 90s'));
+    assert.ok(html.includes('simulator-list-timeout; state unknown; 1 min 30 sec'));
     assert.ok(!html.includes('<img'));
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });

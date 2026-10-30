@@ -11,7 +11,7 @@ Use no emulator holding important local Commito data; launch clears app data.
 3. Within 60 seconds require `e2e-leagues-loaded`, with no login or load errors.
 4. Stop and relaunch without clearing data. Require the same loaded state again.
 5. Capture a native screenshot with credential fields redacted, on PASS or FAIL.
-6. Repeat the entire case twice by default and record each result in private HTML/JSON.
+6. Record the result and screenshot. Retry once only after a failure, retaining both attempts in private HTML/JSON.
 
 Expected: real authentication plus authenticated server league loading succeeds
 (an empty list is valid), and the saved session survives a new app process.

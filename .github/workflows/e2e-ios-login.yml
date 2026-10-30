@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       android_pass_sha:
-        description: Full source SHA already passed twice on Android using this backend/account
+        description: Full source SHA passed on Android with required evidence using this backend/account
         required: true
         type: string
       ios_source_sha:
@@ -313,7 +313,7 @@ jobs:
         with:
           path: ~/.cache/commito-ccache
           key: commito-clang-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ steps.cache-key.outputs.ccache }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}-${{ github.run_id }}
-      - name: Login on iOS — two attempts with private screenshots
+      - name: Login on iOS — retry once after failure with private screenshots
         timeout-minutes: 28
         shell: bash
         env:

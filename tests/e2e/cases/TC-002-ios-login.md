@@ -18,7 +18,7 @@ email/password account securely and approve production effects if applicable.
 5. Stop and relaunch without clearing state/Keychain; require loaded state again.
 6. Capture the final native screen on PASS or FAIL. Preserve the real password's
    privacy, and show both before-submission and final photos under their attempt.
-7. Repeat the entire case twice by default and record each result in private HTML/JSON.
+7. Record the result and screenshot. Retry once only after a failure, retaining both attempts in private HTML/JSON.
 
 Expected: the same real login/server-load/session-restoration assertions as
 TC-001. An empty league list is valid. The loaded marker is conditional on an

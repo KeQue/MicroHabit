@@ -14,6 +14,8 @@ const allowed = new Set([
   'tests/e2e/scripts/ios-autofill.mjs',
   'tests/e2e/scripts/ios-source-gate.mjs',
   'tests/e2e/scripts/ios-source-gate.test.mjs',
+  'tests/e2e/scripts/ios-auth-diagnostic.mjs',
+  'tests/e2e/scripts/ios-auth-diagnostic.test.mjs',
   'tests/e2e/scripts/screenshot.mjs',
   'tests/e2e/scripts/failure-diagnostics.test.mjs',
   'tests/e2e/scripts/login-attempt.test.mjs',
@@ -21,8 +23,10 @@ const allowed = new Set([
 ]);
 // These shared files are permitted only at the exact reviewed diagnostic blobs.
 const reviewedBlobs = new Map([
-  ['tests/e2e/scripts/screenshot.mjs', '2d99f4b0300fe8aa7e0a0c7cbc1382902d6221e1'],
-  ['tests/e2e/scripts/failure-diagnostics.test.mjs', '09786254957b3e88e384e13812ecfbcbd8c22578'],
+  ['tests/e2e/scripts/screenshot.mjs', '97de1b2bdc113c60802078f66bee5b3741aee56d'],
+  ['tests/e2e/scripts/failure-diagnostics.test.mjs', '013fe74f6f1ba1ba6fbb0c0fb635fc31495f1942'],
+  ['tests/e2e/scripts/ios-auth-diagnostic.mjs', '067b3360de5bd210436ad6efe3788426334aebf8'],
+  ['tests/e2e/scripts/ios-auth-diagnostic.test.mjs', '11330d534ee7b76b496fed8462bfa0c46f6c012c'],
 ]);
 const oldGuard = "  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');";
 const newGuard = "  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision && !(env.GITHUB_ACTIONS === 'true' && env.E2E_IOS_VERIFIED_BASELINE === `${env.E2E_ANDROID_PASS_SHA}:${metadata.sourceRevision}`)) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');";
@@ -49,7 +53,7 @@ export function verifySource(base, source, run = spawnSync) {
       const [status, path] = fields.slice(i, i + 2);
       if (!allowed.has(path) || !['M', 'A'].includes(status)) throw new Error('disallowed-change');
       if (git(['ls-tree', source, '--', path]).split(' ')[0] !== '100644') throw new Error('invalid-file-mode');
-      if (status === 'A' && !['tests/e2e/scripts/ios-source-gate.mjs', 'tests/e2e/scripts/ios-source-gate.test.mjs'].includes(path)) throw new Error('unexpected-addition');
+      if (status === 'A' && !['tests/e2e/scripts/ios-source-gate.mjs', 'tests/e2e/scripts/ios-source-gate.test.mjs', 'tests/e2e/scripts/ios-auth-diagnostic.mjs', 'tests/e2e/scripts/ios-auth-diagnostic.test.mjs'].includes(path)) throw new Error('unexpected-addition');
       if (reviewedBlobs.has(path)) {
         const bytes = Buffer.from(git(['show', `${source}:${path}`]), 'utf8');
         const hash = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');

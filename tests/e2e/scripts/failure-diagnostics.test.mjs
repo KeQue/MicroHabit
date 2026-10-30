@@ -42,6 +42,10 @@ test('safe screen diagnostics classify only designated app errors and never reta
     assert.ok(!JSON.stringify(state).includes(secret));
   }
   assert.equal(safeScreenState(tree('User interaction is not allowed.'), appId).authErrorCategory, 'other-auth-error');
+  const phase = safeScreenState(tree('commito-diagnostic:storage-set ' + secret), appId);
+  assert.equal(phase.authFailurePhase, 'storage-set');
+  assert.ok(!JSON.stringify(phase).includes(secret));
+  assert.equal(safeScreenState(tree('commito-diagnostic:storage-set-untrusted'), appId).authFailurePhase, null);
   const unknown = safeScreenState(tree(secret), appId);
   assert.equal(unknown.authErrorCategory, 'other-auth-error');
   assert.ok(!JSON.stringify(unknown).includes(secret));

@@ -1,0 +1,34 @@
+name: Manual production Auth preflight
+on:
+  workflow_dispatch:
+    inputs:
+      allow_production_auth:
+        description: Approve one production password authentication and its normal Auth session effects
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: commito-existing-login-account
+  cancel-in-progress: false
+jobs:
+  auth-preflight:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.allow_production_auth }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    environment: e2e-login
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check existing account without a simulator
+        timeout-minutes: 1
+        env:
+          E2E_BACKEND_ENV: ${{ vars.E2E_BACKEND_ENV }}
+          E2E_BACKEND_HOST: ${{ vars.E2E_BACKEND_HOST }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY || vars.E2E_SUPABASE_ANON_KEY }}
+          E2E_LOGIN_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
+          E2E_LOGIN_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+          E2E_ALLOW_PRODUCTION_AUTH: 'yes'
+        run: node tests/e2e/scripts/auth-preflight.mjs

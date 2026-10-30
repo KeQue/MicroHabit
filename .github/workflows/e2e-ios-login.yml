@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ios_source_sha || inputs.android_pass_sha }}
-          fetch-depth: 5
+          fetch-depth: 6
           persist-credentials: false
       - name: Verify Android prerequisite and backend consent
         shell: bash
@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$E2E_ANDROID_PASS_SHA" != "$E2E_IOS_SOURCE_SHA" ]]; then
-            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == 3b7d566601ce2c6e3c9f6ef486af8774fe31ada3 ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
+            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == d2923af851e8cdafa2abb768f16d6ee8f54cf3f6 ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
             node tests/e2e/scripts/ios-source-gate.mjs "$E2E_ANDROID_PASS_SHA" "$E2E_IOS_SOURCE_SHA"
             echo "E2E_IOS_VERIFIED_BASELINE=$E2E_ANDROID_PASS_SHA:$E2E_IOS_SOURCE_SHA" >> "$GITHUB_ENV"
           else
@@ -187,6 +187,7 @@ jobs:
           (while sleep 60; do echo "iOS build still active: $(cat "$PRIVATE_DIR/phase")"; done) &
           HEARTBEAT_PID=$!
           phase expo-prebuild
+          node tests/e2e/scripts/ios-auth-diagnostic.mjs
           npx --no-install expo prebuild --platform ios --clean --no-install >"$PRIVATE_DIR/expo-prebuild.log" 2>&1
           phase cocoapods-install
           if command -v ccache >/dev/null 2>&1; then

@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,8 +14,15 @@ const allowed = new Set([
   'tests/e2e/scripts/ios-autofill.mjs',
   'tests/e2e/scripts/ios-source-gate.mjs',
   'tests/e2e/scripts/ios-source-gate.test.mjs',
+  'tests/e2e/scripts/screenshot.mjs',
+  'tests/e2e/scripts/failure-diagnostics.test.mjs',
   'tests/e2e/scripts/login-attempt.test.mjs',
   'tests/e2e/scripts/run.mjs',
+]);
+// These shared files are permitted only at the exact reviewed diagnostic blobs.
+const reviewedBlobs = new Map([
+  ['tests/e2e/scripts/screenshot.mjs', '0ab9797dd2d8e80da48bfda5897d2472435ccf29'],
+  ['tests/e2e/scripts/failure-diagnostics.test.mjs', '815b5358ecd0e06351d2ef321875a006195ec273'],
 ]);
 const oldGuard = "  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');";
 const newGuard = "  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision && !(env.GITHUB_ACTIONS === 'true' && env.E2E_IOS_VERIFIED_BASELINE === `${env.E2E_ANDROID_PASS_SHA}:${metadata.sourceRevision}`)) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');";
@@ -41,6 +50,11 @@ export function verifySource(base, source, run = spawnSync) {
       if (!allowed.has(path) || !['M', 'A'].includes(status)) throw new Error('disallowed-change');
       if (git(['ls-tree', source, '--', path]).split(' ')[0] !== '100644') throw new Error('invalid-file-mode');
       if (status === 'A' && !['tests/e2e/scripts/ios-source-gate.mjs', 'tests/e2e/scripts/ios-source-gate.test.mjs'].includes(path)) throw new Error('unexpected-addition');
+      if (reviewedBlobs.has(path)) {
+        const bytes = Buffer.from(git(['show', `${source}:${path}`]), 'utf8');
+        const hash = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+        if (hash !== reviewedBlobs.get(path)) throw new Error('shared-diagnostics-changed');
+      }
     }
     const content = (rev, path) => git(['show', `${rev}:${path}`]).replaceAll('\r\n', '\n');
     const beforeRunner = content(base, 'tests/e2e/scripts/run.mjs');

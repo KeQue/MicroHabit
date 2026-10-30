@@ -24,6 +24,10 @@ test('safe screen diagnostics classify only designated app errors and never reta
   const appId = 'com.example.app';
   const tree = text => ({ attributes: {}, children: [{ attributes: { 'resource-id': 'e2e-login-email', text: secret }, children: [] }, { attributes: { 'resource-id': 'e2e-auth-error', text }, children: [] }] });
   assert.equal(safeScreenState(tree('Invalid login credentials'), appId).authErrorCategory, 'invalid-credentials');
+  assert.equal(safeScreenState(tree('Invalid email or password.'), appId).authErrorCategory, 'invalid-credentials');
+  assert.equal(safeScreenState(tree('Check your inbox and confirm your email before signing in.'), appId).authErrorCategory, 'email-unconfirmed');
+  assert.equal(safeScreenState(tree('Supabase rejected that signup email. Use a real inbox address, and if this is a production signup, make sure custom SMTP is configured in Supabase Auth.'), appId).authErrorCategory, 'invalid-signup-email');
+  assert.equal(safeScreenState(tree('Supabase is not allowed to send signup emails to that address yet. Add custom SMTP or authorize the address in your Supabase project.'), appId).authErrorCategory, 'signup-email-unauthorized');
   const unknown = safeScreenState(tree(secret), appId);
   assert.equal(unknown.authErrorCategory, 'other-auth-error');
   assert.ok(!JSON.stringify(unknown).includes(secret));

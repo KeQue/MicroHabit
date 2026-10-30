@@ -43,7 +43,7 @@ export function safeScreenState(tree, appId) {
   // only this designated error subtree, never neighboring credential inputs.
   const errorValues = node => [...['text', 'value', 'label', 'accessibilityText'].map(key => node.attributes?.[key]), ...(node.children || []).flatMap(errorValues)];
   const errorText = errors.flatMap(errorValues).filter(value => typeof value === 'string').join(' ');
-  const categories = [['invalid-credentials', /invalid login credentials/i], ['invalid-backend-key', /invalid api key|invalid jwt/i], ['email-unconfirmed', /email not confirmed/i], ['missing-email', /email is required/i], ['missing-password', /password is required/i], ['network', /network request failed|fetch failed|timed out|unable to connect/i]];
+  const categories = [['invalid-credentials', /invalid login credentials|invalid email or password\./i], ['invalid-backend-key', /invalid api key|invalid jwt/i], ['email-unconfirmed', /email not confirmed|check your inbox and confirm your email before signing in\./i], ['invalid-signup-email', /supabase rejected that signup email\./i], ['signup-email-unauthorized', /supabase is not allowed to send signup emails to that address yet\./i], ['missing-email', /email is required/i], ['missing-password', /password is required/i], ['network', /network request failed|fetch failed|timed out|unable to connect/i]];
   const authErrorCategory = !errors.length ? null : categories.find(([, pattern]) => pattern.test(errorText))?.[0] || 'other-auth-error';
   return { loginEmailPresent: has('e2e-login-email'), loginPasswordPresent: has('e2e-login-password'), submitPresent: has('e2e-login-submit'), serverLoaded: authenticatedScreen(tree, appId), leagueLoadErrorPresent: has('e2e-leagues-error'), authErrorCategory };
 }

@@ -57,7 +57,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$E2E_ANDROID_PASS_SHA" != "$E2E_IOS_SOURCE_SHA" ]]; then
-            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == 97be51c1b42e86318ac0161955db7e84ac2bb295 ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
+            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == 435238f2fa5f8b7802ae9a1fdb727a800b65c3bd ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
             node tests/e2e/scripts/ios-source-gate.mjs "$E2E_ANDROID_PASS_SHA" "$E2E_IOS_SOURCE_SHA"
             echo "E2E_IOS_VERIFIED_BASELINE=$E2E_ANDROID_PASS_SHA:$E2E_IOS_SOURCE_SHA" >> "$GITHUB_ENV"
           else

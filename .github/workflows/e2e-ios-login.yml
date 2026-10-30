@@ -23,7 +23,7 @@ jobs:
     # Standard Apple Silicon runner; free for this public repository.
     runs-on: macos-15
     # Build has its own 60-minute limit; leave room for setup, tests and cleanup.
-    timeout-minutes: 100
+    timeout-minutes: 110
     environment: e2e-login
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
@@ -59,7 +59,7 @@ jobs:
           if [[ "$E2E_BACKEND_ENV" == production ]]; then
             [[ "$E2E_ALLOW_PRODUCTION_LOGIN" == yes ]] || { echo 'BLOCKED: production login writes require explicit dispatch consent.'; exit 2; }
           fi
-          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs && -f tests/e2e/scripts/ios-readiness.mjs && -f tests/e2e/scripts/android-readiness.mjs ]] || { echo 'BLOCKED: use an Android-tested source commit with device readiness checks and private reports.'; exit 2; }
+          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs && -f tests/e2e/scripts/ios-readiness.mjs && -f tests/e2e/scripts/android-readiness.mjs && -f tests/e2e/scripts/ios-autofill.mjs && -f tests/e2e/scripts/login-attempt.mjs ]] || { echo 'BLOCKED: use an Android-tested source commit with input verification, Simulator settings and private reports.'; exit 2; }
           [[ "$E2E_REPORT_PUBLIC_KEY" == '-----BEGIN PUBLIC KEY-----'* ]] || { echo 'BLOCKED: configure the report public key; its private key stays on the laptop.'; exit 2; }
           node --input-type=module -e 'import {createPublicKey} from "node:crypto";try{const key=createPublicKey(process.env.E2E_REPORT_PUBLIC_KEY);if(key.asymmetricKeyType!=="rsa"||key.asymmetricKeyDetails.modulusLength<2048)process.exit(2)}catch{process.exit(2)}' || { echo 'BLOCKED: the report key must be a valid RSA public key of at least 2048 bits.'; exit 2; }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -70,12 +70,29 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Prepare optional native compiler cache
+        timeout-minutes: 3
+        continue-on-error: true
+        shell: bash
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          set -euo pipefail
+          if ! command -v ccache >/dev/null 2>&1; then
+            PRIVATE_DIR=$(mktemp -d "$RUNNER_TEMP/commito-ccache-install.XXXXXX")
+            trap 'rm -rf "$PRIVATE_DIR"' EXIT
+            brew install ccache >"$PRIVATE_DIR/install.log" 2>&1 || { echo 'Compiler cache unavailable; the normal build will continue.'; exit 0; }
+          fi
+          echo 'Native compiler cache available; no app or account data will be cached.'
       - name: Identify the dependency-cache toolchain
         id: cache-key
         shell: bash
         run: |
           [[ -d "$DEVELOPER_DIR" ]] || { echo 'BLOCKED: the pinned installed Xcode 16.4 is missing; no SDK download attempted.'; exit 2; }
           echo "xcode=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          if command -v ccache >/dev/null 2>&1; then
+            echo "ccache=$(ccache --version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          fi
       - name: Restore public dependency downloads
         id: download-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -87,9 +104,23 @@ jobs:
           path: |
             ~/.npm/_cacache
             ~/Library/Caches/CocoaPods
-          key: commito-ios-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+            tests/e2e/.tools/downloads
+          key: commito-ios-downloads-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}
           restore-keys: |
-            commito-ios-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-
+            commito-ios-downloads-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-
+      - name: Restore native compiler results
+        id: compiler-cache
+        if: steps.cache-key.outputs.ccache != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        timeout-minutes: 3
+        continue-on-error: true
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+        with:
+          path: ~/.cache/commito-ccache
+          key: commito-clang-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ steps.cache-key.outputs.ccache }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}-${{ github.run_id }}
+          restore-keys: |
+            commito-clang-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ steps.cache-key.outputs.ccache }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}-
       - name: Install dependencies and pinned Maestro CLI
         timeout-minutes: 10
         shell: bash
@@ -100,11 +131,14 @@ jobs:
           trap 'rm -rf "$PRIVATE_DIR"' EXIT
           echo 'Installing JavaScript dependencies.'
           npm ci --no-audit --no-fund >"$PRIVATE_DIR/npm.log" 2>&1 || { echo 'BLOCKED: dependency installation failed; raw logs discarded.'; exit 2; }
-          mkdir -p tests/e2e/.tools
-          echo 'Downloading and verifying Maestro 2.12.0.'
-          curl --fail --silent --show-error --location https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.0/maestro.zip --output "$PRIVATE_DIR/maestro.zip"
-          printf '%s  %s\n' 'a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e' "$PRIVATE_DIR/maestro.zip" | shasum -a 256 -c -
-          unzip -q "$PRIVATE_DIR/maestro.zip" -d tests/e2e/.tools
+          mkdir -p tests/e2e/.tools/downloads
+          ARCHIVE=tests/e2e/.tools/downloads/maestro-2.12.0.zip
+          if [[ ! -f "$ARCHIVE" ]] || ! printf '%s  %s\n' 'a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e' "$ARCHIVE" | shasum -a 256 -c - >/dev/null 2>&1; then
+            echo 'Downloading pinned Maestro 2.12.0.'
+            curl --fail --silent --show-error --location https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.12.0/maestro.zip --output "$ARCHIVE"
+          fi
+          printf '%s  %s\n' 'a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e' "$ARCHIVE" | shasum -a 256 -c -
+          unzip -q "$ARCHIVE" -d tests/e2e/.tools
           chmod +x tests/e2e/.tools/maestro/bin/maestro
       - name: Build unsigned Simulator Release locally and install
         id: ios-build
@@ -114,10 +148,15 @@ jobs:
           EXPO_PUBLIC_SUPABASE_URL: https://${{ vars.E2E_BACKEND_HOST }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY || vars.E2E_SUPABASE_ANON_KEY }}
           CI: '1'
+          CCACHE_MAXSIZE: '1G'
+          CCACHE_DEBUG: '0'
+          CCACHE_LOGFILE: /dev/null
         run: |
           set -euo pipefail
-          PRIVATE_DIR=$(mktemp -d "$RUNNER_TEMP/commito-xcode.XXXXXX")
-          chmod 700 "$PRIVATE_DIR"
+          # A stable private build path permits compiler-cache reuse. A prior
+          # directory is never reused or removed here; mkdir must create it.
+          PRIVATE_DIR="$RUNNER_TEMP/commito-xcode.build"
+          mkdir -m 700 "$PRIVATE_DIR"
           printf '%s\n' "$PRIVATE_DIR" > "$RUNNER_TEMP/commito-ios-build-dir"
           chmod 600 "$RUNNER_TEMP/commito-ios-build-dir"
           umask 077
@@ -138,13 +177,21 @@ jobs:
           phase expo-prebuild
           npx --no-install expo prebuild --platform ios --clean --no-install >"$PRIVATE_DIR/expo-prebuild.log" 2>&1
           phase cocoapods-install
+          if command -v ccache >/dev/null 2>&1; then
+            export CCACHE_DIR="$HOME/.cache/commito-ccache"
+            export CCACHE_BASEDIR="$GITHUB_WORKSPACE"
+            export USE_CCACHE=1
+            node --input-type=module -e 'import{readFileSync,writeFileSync}from"node:fs";const p="ios/Podfile.properties.json";const v=JSON.parse(readFileSync(p,"utf8"));v["apple.ccacheEnabled"]="true";writeFileSync(p,JSON.stringify(v))'
+          fi
           command -v pod >"$PRIVATE_DIR/cocoapods-install.log" 2>&1 || { printf missing-cocoapods > "$PRIVATE_DIR/reason"; exit 2; }
           pod install --project-directory=ios >>"$PRIVATE_DIR/cocoapods-install.log" 2>&1
           phase xcode-compilation
-          xcodebuild -workspace ios/Commito.xcworkspace -scheme Commito -configuration Release -sdk iphonesimulator -destination "id=$DEVICE" -derivedDataPath "$PRIVATE_DIR/build" CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES build >"$PRIVATE_DIR/xcode-compilation.log" 2>&1
+          xcodebuild -workspace ios/Commito.xcworkspace -scheme Commito -configuration Release -sdk iphonesimulator -destination "id=$DEVICE" -derivedDataPath "$PRIVATE_DIR/build" CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES COMPILER_INDEX_STORE_ENABLE=NO build >"$PRIVATE_DIR/xcode-compilation.log" 2>&1
           phase simulator-startup
           xcrun simctl boot "$DEVICE" >"$PRIVATE_DIR/simulator-startup.log" 2>&1
           xcrun simctl bootstatus "$DEVICE" -b >>"$PRIVATE_DIR/simulator-startup.log" 2>&1
+          phase simulator-configuration
+          node tests/e2e/scripts/ios-autofill.mjs "$DEVICE" >"$PRIVATE_DIR/simulator-configuration.log" 2>&1 || { printf autofill-configuration-unconfirmed > "$PRIVATE_DIR/reason"; exit 2; }
           phase app-installation
           APP="$PRIVATE_DIR/build/Build/Products/Release-iphonesimulator/Commito.app"
           [[ -f "$APP/main.jsbundle" ]] || { printf missing-embedded-bundle > "$PRIVATE_DIR/reason"; exit 2; }
@@ -185,7 +232,7 @@ jobs:
             if (dirname(target) !== root) throw Error('Private build directory validation failed.');
             try {
               const read = name => existsSync(join(target, name)) ? readFileSync(join(target, name), 'utf8').trim() : '';
-              const phases = ['configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete'];
+              const phases = ['configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'simulator-configuration', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete'];
               const recorded = read('phase');
               const phase = phases.includes(recorded) ? recorded : 'unknown';
               const log = join(target, `${phase}.log`);
@@ -211,9 +258,12 @@ jobs:
                 ['workspace-or-scheme', /workspace[^\n]*does not exist|does not contain a scheme|scheme[^\n]*not currently configured/i],
                 ['javascript-bundle', /bundling failed|unable to resolve module|SyntaxError:/i],
                 ['process-termination', /killed: 9|signal (?:6|9|15)|out of memory/i],
+                ['autofill-settings-unavailable', /"diagnostic":"autofill-settings-unavailable"/],
+                ['autofill-setting-failed', /"diagnostic":"autofill-setting-failed"/],
+                ['autofill-readback-failed', /"diagnostic":"autofill-readback-failed"/],
               ];
               const diagnostics = patterns.filter(([, pattern]) => pattern.test(tail)).map(([category]) => category);
-              for (const reason of ['missing-embedded-bundle', 'missing-pinned-runtime', 'missing-cocoapods', 'simulator-readiness-unconfirmed']) if (read('reason') === reason) diagnostics.push(reason);
+              for (const reason of ['missing-embedded-bundle', 'missing-pinned-runtime', 'missing-cocoapods', 'simulator-readiness-unconfirmed', 'autofill-configuration-unconfirmed']) if (read('reason') === reason) diagnostics.push(reason);
               const code = read('exit-code');
               const exitCode = /^\d{1,3}$/.test(code) ? Number(code) : null;
               const interrupted = existsSync(join(target, 'interrupted')) || (outcome !== 'success' && exitCode === null);
@@ -221,7 +271,7 @@ jobs:
               const phaseStartedAt = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(started) ? started : null;
               const finding = outcome === 'success' && phase === 'complete' ? 'Simulator Release app built and installed; native login is still a separate test.' : interrupted ? 'Build interrupted during this phase; check GitHub annotations for timeout or cancellation.' : 'Build failed during this phase.';
               summarize({ kind: 'ios-build', outcome, phase, phaseStartedAt, exitCode, interrupted, logBytes, lastLogWriteAt, diagnostics, finding, diagnosticScope: 'Fixed categories from final 64 KiB only; absence of a category does not identify the cause.' });
-              if (process.env.GITHUB_OUTPUT && ['simulator-startup', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete'].includes(phase)) appendFileSync(process.env.GITHUB_OUTPUT, 'cache-ready=true\n');
+              if (process.env.GITHUB_OUTPUT && ['simulator-startup', 'simulator-configuration', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete'].includes(phase)) appendFileSync(process.env.GITHUB_OUTPUT, 'cache-ready=true\n');
             } finally { rmSync(target, { recursive: true, force: true }); rmSync(pointer, { force: true }); }
           }
           NODE
@@ -234,9 +284,18 @@ jobs:
           path: |
             ~/.npm/_cacache
             ~/Library/Caches/CocoaPods
-          key: commito-ios-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+            tests/e2e/.tools/downloads
+          key: commito-ios-downloads-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}
+      - name: Save native compiler results before account access
+        if: ${{ !cancelled() && steps.cache-key.outputs.ccache != '' && steps.build-diagnostics.outputs.cache-ready == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        timeout-minutes: 3
+        continue-on-error: true
+        with:
+          path: ~/.cache/commito-ccache
+          key: commito-clang-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-key.outputs.xcode }}-${{ steps.cache-key.outputs.ccache }}-${{ hashFiles('package-lock.json', 'app.config.ts') }}-${{ github.run_id }}
       - name: Login on iOS — two attempts with private screenshots
-        timeout-minutes: 24
+        timeout-minutes: 28
         shell: bash
         env:
           MAESTRO_E2E_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}

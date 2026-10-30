@@ -3,6 +3,15 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Check Simulator Keychain entitlements after a successful Auth response
+
+- Observation: a diagnostic iOS login received an Auth success response but
+  failed when SecureStore read the Simulator Keychain; the private screenshot
+  showed a missing entitlement. The test build had signing disabled.
+- Correction: investigate the installed Simulator build's Keychain access and
+  signing configuration before attributing this pattern to passwords, RLS or
+  app storage logic. An ad-hoc signing change still requires native validation.
+
 ## Retain useful failure evidence before deleting private tool output
 
 - Observation: the instrumented iOS build succeeded, but its native login failed.

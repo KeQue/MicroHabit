@@ -10,6 +10,7 @@ const allowed = new Set([
   '.github/workflows/e2e-ios-login.yml',
   'docs/work-quality-lessons.md',
   'tests/e2e/agents/runner-debugger.md',
+  'tests/e2e/README.md',
   'tests/e2e/execution-status.md',
   'tests/e2e/scripts/ios-autofill.mjs',
   'tests/e2e/scripts/ios-source-gate.mjs',

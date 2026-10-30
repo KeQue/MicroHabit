@@ -28,6 +28,7 @@ test('source gate accepts the reviewed iOS-only change and rejects shared change
   assert.equal(verifySource(base, source, fixture({ testEdit: '\n// unexpected' })).reason, 'shared-tests-changed');
   assert.equal(verifySource(base, source, fixture({ changed: ['M', 'tests/e2e/scripts/screenshot.mjs'] })).ok, true);
   assert.equal(verifySource(base, source, fixture({ changed: ['M', 'tests/e2e/scripts/failure-diagnostics.test.mjs'] })).ok, true);
+  assert.equal(verifySource(base, source, fixture({ changed: ['M', 'tests/e2e/README.md'] })).ok, true);
   assert.equal(verifySource(base, source, fixture({ changed: ['A', 'tests/e2e/scripts/ios-auth-diagnostic.mjs'] })).ok, true);
   assert.equal(verifySource(base, source, fixture({ changed: ['M', 'tests/e2e/scripts/screenshot.mjs'], diagnosticEdit: '\n// unexpected' })).reason, 'shared-diagnostics-changed');
   assert.equal(verifySource(base, source, fixture({ ancestor: false })).ok, false);

@@ -170,7 +170,7 @@ Do not change the existing account password solely to accommodate the test.
 Windows cannot host an iOS Simulator. A cabled iPhone does not provide native iOS
 automation here. Use the prepared manual workflow
 [e2e-ios-login.yml](../../.github/workflows/e2e-ios-login.yml) on GitHub's standard
-`macos-15` Apple Silicon runner, which builds an unsigned Simulator Release `.app` and
+`macos-15` Apple Silicon runner, which builds an ad-hoc-signed Simulator Release `.app` and
 runs Maestro against the installed app. No Apple signing key, App Store release,
 EAS build or paid Maestro Cloud account is required for this route.
 

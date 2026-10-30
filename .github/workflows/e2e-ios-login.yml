@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ios_source_sha || inputs.android_pass_sha }}
-          fetch-depth: 7
+          fetch-depth: 8
           persist-credentials: false
       - name: Verify Android prerequisite and backend consent
         shell: bash
@@ -63,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$E2E_ANDROID_PASS_SHA" != "$E2E_IOS_SOURCE_SHA" ]]; then
-            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == 8842be83fba005cd7dfcd5b3d1c9db73aeb56e7a ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
+            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == f9d3ae2047d7b1637352cdec0f608300953b601b ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
             node tests/e2e/scripts/ios-source-gate.mjs "$E2E_ANDROID_PASS_SHA" "$E2E_IOS_SOURCE_SHA"
             echo "E2E_IOS_VERIFIED_BASELINE=$E2E_ANDROID_PASS_SHA:$E2E_IOS_SOURCE_SHA" >> "$GITHUB_ENV"
           else
@@ -158,7 +158,7 @@ jobs:
           printf '%s  %s\n' 'a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e' "$ARCHIVE" | shasum -a 256 -c -
           unzip -q "$ARCHIVE" -d tests/e2e/.tools
           chmod +x tests/e2e/.tools/maestro/bin/maestro
-      - name: Build unsigned Simulator Release locally and install
+      - name: Build Simulator Release locally and install
         id: ios-build
         timeout-minutes: 60
         shell: bash
@@ -205,7 +205,7 @@ jobs:
           command -v pod >"$PRIVATE_DIR/cocoapods-install.log" 2>&1 || { printf missing-cocoapods > "$PRIVATE_DIR/reason"; exit 2; }
           pod install --project-directory=ios >>"$PRIVATE_DIR/cocoapods-install.log" 2>&1
           phase xcode-compilation
-          xcodebuild -workspace ios/Commito.xcworkspace -scheme Commito -configuration Release -sdk iphonesimulator -destination "id=$DEVICE" -derivedDataPath "$PRIVATE_DIR/build" CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES COMPILER_INDEX_STORE_ENABLE=NO build >"$PRIVATE_DIR/xcode-compilation.log" 2>&1
+          xcodebuild -workspace ios/Commito.xcworkspace -scheme Commito -configuration Release -sdk iphonesimulator -destination "id=$DEVICE" -derivedDataPath "$PRIVATE_DIR/build" CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=YES CODE_SIGNING_ALLOWED=YES ONLY_ACTIVE_ARCH=YES COMPILER_INDEX_STORE_ENABLE=NO build >"$PRIVATE_DIR/xcode-compilation.log" 2>&1
           phase simulator-startup
           xcrun simctl boot "$DEVICE" >"$PRIVATE_DIR/simulator-startup.log" 2>&1
           xcrun simctl bootstatus "$DEVICE" -b >>"$PRIVATE_DIR/simulator-startup.log" 2>&1

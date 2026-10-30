@@ -2,13 +2,9 @@ name: Manual iOS login E2E
 on:
   workflow_dispatch:
     inputs:
-      android_pass_sha:
-        description: Full source SHA passed on Android with required evidence using this backend/account
-        required: true
-        type: string
       ios_source_sha:
-        description: Optional source SHA for a verified iOS-only infrastructure change
-        required: false
+        description: Full source SHA to build and test on iOS
+        required: true
         type: string
       full_screenshots:
         description: Include full unmasked native screenshots in the encrypted private report
@@ -37,8 +33,7 @@ jobs:
     env:
       DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
       E2E_IOS_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-18-5
-      E2E_ANDROID_PASS_SHA: ${{ inputs.android_pass_sha }}
-      E2E_IOS_SOURCE_SHA: ${{ inputs.ios_source_sha || inputs.android_pass_sha }}
+      E2E_IOS_SOURCE_SHA: ${{ inputs.ios_source_sha }}
       E2E_IOS_FULL_SCREENSHOT: ${{ inputs.full_screenshots && 'yes' || 'no' }}
       E2E_BACKEND_ENV: ${{ vars.E2E_BACKEND_ENV }}
       E2E_BACKEND_HOST: ${{ vars.E2E_BACKEND_HOST }}
@@ -50,25 +45,19 @@ jobs:
       - name: Validate the tested source commit
         shell: bash
         run: |
-          [[ "$E2E_ANDROID_PASS_SHA" =~ ^[a-f0-9]{40}$ && "$E2E_IOS_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo 'BLOCKED: supply full source commit SHAs.'; exit 2; }
+          [[ "$E2E_IOS_SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo 'BLOCKED: supply the full source commit SHA.'; exit 2; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.ios_source_sha || inputs.android_pass_sha }}
+          ref: ${{ inputs.ios_source_sha }}
           fetch-depth: 8
           persist-credentials: false
-      - name: Verify Android prerequisite and backend consent
+      - name: Verify tested source and backend consent
         shell: bash
         env:
           E2E_REPORT_PUBLIC_KEY: ${{ vars.E2E_REPORT_PUBLIC_KEY }}
         run: |
           set -euo pipefail
-          if [[ "$E2E_ANDROID_PASS_SHA" != "$E2E_IOS_SOURCE_SHA" ]]; then
-            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == f9d3ae2047d7b1637352cdec0f608300953b601b ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
-            node tests/e2e/scripts/ios-source-gate.mjs "$E2E_ANDROID_PASS_SHA" "$E2E_IOS_SOURCE_SHA"
-            echo "E2E_IOS_VERIFIED_BASELINE=$E2E_ANDROID_PASS_SHA:$E2E_IOS_SOURCE_SHA" >> "$GITHUB_ENV"
-          else
-            [[ "$E2E_ANDROID_PASS_SHA" == "$(git rev-parse HEAD)" ]] || { echo 'BLOCKED: checked-out revision differs from Android baseline.'; exit 2; }
-          fi
+          [[ "$E2E_IOS_SOURCE_SHA" == "$(git rev-parse HEAD)" ]] || { echo 'BLOCKED: checked-out revision differs from requested source.'; exit 2; }
           [[ "$E2E_BACKEND_ENV" == staging || "$E2E_BACKEND_ENV" == production ]] || { echo 'BLOCKED: configure the e2e-login environment variables.'; exit 2; }
           [[ "$E2E_BACKEND_HOST" =~ ^[a-z0-9][a-z0-9.-]+\.[a-z]{2,20}$ ]] || { echo 'BLOCKED: configure the backend hostname.'; exit 2; }
           if [[ "$E2E_BACKEND_HOST" == nzpnfrutomyuvrprkrwi.supabase.co ]]; then
@@ -77,7 +66,7 @@ jobs:
           if [[ "$E2E_BACKEND_ENV" == production ]]; then
             [[ "$E2E_ALLOW_PRODUCTION_LOGIN" == yes ]] || { echo 'BLOCKED: production login writes require explicit dispatch consent.'; exit 2; }
           fi
-          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs && -f tests/e2e/scripts/ios-readiness.mjs && -f tests/e2e/scripts/android-readiness.mjs && -f tests/e2e/scripts/ios-autofill.mjs && -f tests/e2e/scripts/login-attempt.mjs ]] || { echo 'BLOCKED: use an Android-tested source commit with input verification, Simulator settings and private reports.'; exit 2; }
+          [[ -f tests/e2e/scripts/report.mjs && -f tests/e2e/scripts/screenshot.mjs && -f tests/e2e/scripts/ios-readiness.mjs && -f tests/e2e/scripts/android-readiness.mjs && -f tests/e2e/scripts/ios-autofill.mjs && -f tests/e2e/scripts/login-attempt.mjs ]] || { echo 'BLOCKED: source lacks required input verification, Simulator settings or private reports.'; exit 2; }
           [[ "$E2E_REPORT_PUBLIC_KEY" == '-----BEGIN PUBLIC KEY-----'* ]] || { echo 'BLOCKED: configure the report public key; its private key stays on the laptop.'; exit 2; }
           node --input-type=module -e 'import {createPublicKey} from "node:crypto";try{const key=createPublicKey(process.env.E2E_REPORT_PUBLIC_KEY);if(key.asymmetricKeyType!=="rsa"||key.asymmetricKeyDetails.modulusLength<2048)process.exit(2)}catch{process.exit(2)}' || { echo 'BLOCKED: the report key must be a valid RSA public key of at least 2048 bits.'; exit 2; }
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
-Set-Location (Join-Path $PSScriptRoot '..')
+Set-Location (Join-Path $PSScriptRoot '../..')
 if (@(git status --porcelain --untracked-files=no).Count -ne 0) { Write-Host 'Commit or restore tracked changes before recording the source revision.'; exit 2 }
-& git ls-files --error-unmatch tests/e2e/scripts/retry-policy.mjs tests/e2e/scripts/duration.mjs regression/run-android.ps1 *> $null
+& git ls-files --error-unmatch tests/e2e/scripts/retry-policy.mjs tests/e2e/scripts/duration.mjs regression/android/run.ps1 *> $null
 if ($LASTEXITCODE -ne 0) { Write-Host 'Commit the new regression tools before recording the source revision.'; exit 2 }
 $revision = (git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { Write-Host 'Could not identify the source revision.'; exit 2 }
@@ -42,11 +42,7 @@ $result = $LASTEXITCODE
 if ((Test-Path -LiteralPath $reportPath) -and (Get-Item -LiteralPath $reportPath).LastWriteTimeUtc -gt $previousWrite) {
     & node tests/e2e/scripts/view-report.mjs android
 }
-if ($result -eq 0) {
-    Write-Host "Android passed with evidence. For iOS use this source revision: $revision"
-    Write-Host 'To start iOS without copying the revision, run the VS Code task Commito: Run iOS login.'
-    Start-Process 'https://github.com/KeQue/MicroHabit/actions/workflows/e2e-ios-login.yml'
-}
+if ($result -eq 0) { Write-Host "Android passed with evidence for source revision: $revision" }
 } finally {
     if ($testDevice) {
         $currentName = (& $adb -s $testDevice shell getprop ro.boot.qemu.avd_name 2>$null | Out-String).Trim()

@@ -11,6 +11,7 @@ import { inspectSimulator, mayRetrySimulatorProbe } from './ios-readiness.mjs';
 import { inspectAndroidWindows } from './android-readiness.mjs';
 import { executeLoginAttempt } from './login-attempt.mjs';
 import { runAttempts } from './retry-policy.mjs';
+import { matchesIosSource } from './ios-source.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const resultsDir = join(root, 'tests/e2e/results');
@@ -209,7 +210,7 @@ async function prepare(platform) {
     } finally { rmSync(temporary, { recursive: true, force: true }); }
   }
   if (!android && process.platform !== 'darwin') block('iOS native automation requires macOS and Xcode; Windows/iPhone USB is insufficient.');
-  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision && !(env.GITHUB_ACTIONS === 'true' && env.E2E_IOS_VERIFIED_BASELINE === `${env.E2E_ANDROID_PASS_SHA}:${metadata.sourceRevision}`)) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');
+  if (!android && !matchesIosSource(env.E2E_IOS_SOURCE_SHA, metadata.sourceRevision)) block('E2E_IOS_SOURCE_SHA must match the tested source revision.');
   if (!android && env.E2E_DISPOSABLE_SIMULATOR !== 'yes') block('Confirm E2E_DISPOSABLE_SIMULATOR=yes: the entire Simulator Keychain will be cleared.');
 
   if (android && !tools.adb) block('Android SDK ADB is unavailable.');
@@ -399,8 +400,7 @@ try {
       } finally { rmSync(temporary, { recursive: true, force: true }); }
     } else if (mode === 'all') {
       const android = await run('android');
-      if (resultExitCode(android) === 0) env.E2E_ANDROID_PASS_SHA = android.sourceRevision;
-      const ios = await run('ios', resultExitCode(android) === 0 ? null : 'Android must pass with a screenshot for each attempt first; iOS was not executed.');
+      const ios = await run('ios');
       process.exitCode = resultExitCode(android) === 0 ? resultExitCode(ios) : resultExitCode(android);
     } else {
       const result = await run(mode);

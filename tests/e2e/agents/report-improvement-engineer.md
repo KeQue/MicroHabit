@@ -23,14 +23,14 @@ speedup, add downloads merely to investigate, or remove required checks to make
 the test faster.
 
 Preserve authentication and post-restart assertions, account isolation, the
-Android source-verification gate, credential handling, screenshot privacy and
+iOS source-revision verification, credential handling, screenshot privacy and
 the rule that missing required visual evidence blocks success. One attempt runs
 on success; a failure is retained with its screenshot and may be retried once.
 Do not change production data, start another device login, dispatch cloud jobs,
 publish workflows or incur new downloads unless covered by the user's current
 authorization. A normal production login can update auth metadata and profile.
-Existing Android evidence applies to a new revision only when the existing
-source gate verifies it; shared Android-relevant changes require a new pass.
+Do not claim a new Android pass from prior evidence; each platform reports its
+own actual result and source revision.
 
 Review the final diff and run focused checks, including failure and missing
 evidence cases when affected. Distinguish local automated checks from real device

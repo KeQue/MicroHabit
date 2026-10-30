@@ -187,15 +187,15 @@ The founder approved this setup's manual GitHub run. Keep triggers manual;
 future execution must follow the account owner's authorization and budget.
 ChatGPT Plus is not a mobile CI subscription.
 
-After TC-001 passes with complete evidence on the final committed source:
+For a manual iOS run:
 
 1. Put the reviewed files on the GitHub branch to test. The workflow must exist
    on the default branch to appear under Actions. Review and commit first, then
-   rerun Android if the tested source changed. Never include `.tools`, results,
+   test the intended source. Never include `.tools`, results,
    `.env` or credentials in the commit.
 2. In GitHub repository **Settings > Environments**, create `e2e-login` and
    restrict deployment branches to `main`, the trusted dispatcher branch. The
-   dispatcher checks out the separately supplied Android-tested source commit.
+   dispatcher checks out the separately supplied source commit.
    Add required reviewers if available. This environment gates account secrets.
 3. Add environment **variables** `E2E_BACKEND_ENV` (`production` or `staging`) and
    `E2E_BACKEND_HOST` (hostname only). Add environment **secrets**
@@ -204,9 +204,8 @@ After TC-001 passes with complete evidence on the final committed source:
    secret or variable: it is the app's public Supabase key, never a service-role
    or management key. A secret takes precedence if both are present.
 4. After approval, choose **Actions > Manual iOS login E2E > Run workflow**.
-   Supply the full commit SHA whose Android case passed on the same backend and
-   account. That input is an operator attestation, not an automated retrieval of
-   Android evidence. Approve normal production login effects if applicable.
+   Supply the full source commit SHA. The workflow verifies that it checks out
+   that revision. Approve normal production login effects if applicable.
 5. Review the sanitized result printed by the final test step. Setup failures
    remain BLOCKED. A green build step alone is not a TC-002 pass.
 
@@ -252,7 +251,7 @@ or hosted build service is enabled.
 
 For an already prepared Mac/Simulator, use `npm run e2e:ios`, with the same secret
 environment and backend metadata plus `E2E_IOS_DEVICE`, optional separate
-`E2E_IOS_APP_ID`, `E2E_ANDROID_PASS_SHA`, and `E2E_DISPOSABLE_SIMULATOR=yes`.
+`E2E_IOS_APP_ID`, `E2E_IOS_SOURCE_SHA`, and `E2E_DISPOSABLE_SIMULATOR=yes`.
 **TC-002 clears the entire Simulator Keychain.** Use a disposable Simulator only.
 The second launch within each attempt preserves storage and Keychain.
 The runner now divides each iOS attempt into input and submission phases, without

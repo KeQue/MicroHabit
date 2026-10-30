@@ -143,7 +143,9 @@ test('each attempt embeds its own native image directly below its result, with a
       return { attempt, status: attempt === 1 ? 'PASS' : 'FAIL', finding: 'Synthetic fixture only', screenshot: { status: 'CAPTURED', file }, png };
     });
     const html = readFileSync(writeReport({ caseId: 'TC-001', status: 'FAIL', attempts }, fixture), 'utf8');
-    assert.ok(html.includes('<h1>Login on Android: FAIL</h1>'));
+    assert.ok(html.includes('<h1>Login on Android</h1>'));
+    const summaryOrder = ['<h1>Login on Android</h1>', 'Checks that an existing account', '<th>Result</th><td>FAIL</td>', '<th>Duration</th>', '<th>App version / build</th>'].map(part => html.indexOf(part));
+    assert.ok(summaryOrder.every((position, index) => position >= 0 && (index === 0 || position > summaryOrder[index - 1])));
     const sections = html.match(/<section>.*?<\/section>/g);
     assert.equal(sections.length, 2);
     for (let index = 0; index < 2; index++) {
@@ -152,7 +154,8 @@ test('each attempt embeds its own native image directly below its result, with a
       assert.ok(!sections[index].includes(attempts[1 - index].png.toString('base64')));
     }
     const ios = readFileSync(writeReport({ caseId: 'TC-002', status: 'BLOCKED', attempts: [] }, fixture), 'utf8');
-    assert.ok(ios.includes('<h1>Login on iOS: BLOCKED</h1>'));
+    assert.ok(ios.includes('<h1>Login on iOS</h1>'));
+    assert.ok(ios.includes('<th>Result</th><td>BLOCKED</td>'));
     assert.ok(!ios.includes('<img'));
     const input = { ...attempts[0].screenshot, privacyPolicy: 'visible-email-native-password-mask-v1', inputChecks: { before: { passed: true }, after: { passed: true } } };
     const review = readFileSync(writeReport({ caseId: 'TC-002', status: 'FAIL', attempts: [{ ...attempts[1], inputScreenshot: input }] }, fixture), 'utf8');
@@ -215,7 +218,8 @@ test('cloud reporting writes no plaintext archive, while a local blocked run ret
     recordRun(local, fixture, { cloud: false });
     assert.ok(existsSync(join(fixture, local.historyFile)));
     const html = readFileSync(join(fixture, local.historyFile), 'utf8');
-    assert.ok(html.includes('Login on iOS: BLOCKED'));
+    assert.ok(html.includes('<h1>Login on iOS</h1>'));
+    assert.ok(html.includes('<th>Result</th><td>BLOCKED</td>'));
     assert.ok(html.includes('simulator-list-timeout; state unknown; 1 min 30 sec'));
     assert.ok(!html.includes('<img'));
   } finally { rmSync(fixture, { recursive: true, force: true }); }

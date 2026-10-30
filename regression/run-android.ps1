@@ -27,7 +27,7 @@ if ((Test-Path -LiteralPath $reportPath) -and (Get-Item -LiteralPath $reportPath
 }
 if ($result -eq 0) {
     Write-Host "Android passed with evidence. For iOS use this source revision: $revision"
-    Write-Host 'Opening the iOS workflow. Start it yourself only when ready; the workflow and revision must already be published.'
+    Write-Host 'To start iOS without copying the revision, run the VS Code task Commito: Run iOS login.'
     Start-Process 'https://github.com/KeQue/MicroHabit/actions/workflows/e2e-ios-login.yml'
 }
 exit $result

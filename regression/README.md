@@ -6,11 +6,21 @@ The changes must first be committed to Git. The existing saved Windows-protected
 Android emulator first and install the current Release APK. The task runs one
 attempt and retries only if it fails; it opens the private report in a browser.
 After an Android pass it also opens the iOS workflow page and prints the source
-revision. Starting iOS there is a separate, deliberate action.
+revision. To start iOS without copying the revision, choose **Terminal → Run
+Task → Commito: Run iOS login**, then type `YES` to confirm. Or double-click
+**Start iOS login.cmd** in File Explorer. The iOS task uses the existing Android
+report, publishes the current QA branch if needed, and starts one GitHub run.
+It stops if another iOS run is active or the Android report does not match the
+current committed revision. Its encrypted report uses the default protected
+screenshot policy. Do not run this task while another person is starting the
+same workflow: GitHub's check and dispatch are separate operations.
 Running it signs in to production and can update the test account's profile and
 authentication metadata. It clears the test app's local data on the emulator.
 
-For iOS, Windows cannot run Apple's simulator. Open
+For iOS, Windows cannot run Apple's simulator. The iOS task uses GitHub's Mac
+runner and the existing GitHub sign-in and environment secrets. If its dispatch
+outcome is unknown, check the Actions page before resolving the pending marker;
+never start a second run until you know what happened. Alternatively, open
 [the iOS workflow](https://github.com/KeQue/MicroHabit/actions/workflows/e2e-ios-login.yml),
 select **Run workflow**, provide the full source revision that passed Android
 with complete screenshots, and confirm the production-login option. The GitHub

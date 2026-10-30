@@ -1,0 +1,70 @@
+import { spawnSync } from 'node:child_process';
+import { Buffer } from 'node:buffer';
+import { createHash, createPublicKey } from 'node:crypto';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { validateAndroidReport } from './ios-preflight.mjs';
+
+const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/SECRET|TOKEN|PASSWORD|ANON_KEY|MAESTRO_E2E_EMAIL/i.test(key)));
+const run = (command, args, options = {}) => spawnSync(command, args, { encoding: 'utf8', env: cleanEnv, windowsHide: true, timeout: 30000, ...options });
+const git = args => { const result = run('git', args); if (result.error || result.status !== 0) throw Error('Git operation failed. Check your GitHub sign-in and QA branch.'); return result.stdout.trim(); };
+const intent = 'tests/e2e/results/ios-regression-dispatch.pending';
+let dispatchRequested = false;
+try {
+  if (git(['status', '--porcelain', '--untracked-files=no'])) throw Error('Commit tracked changes before running the suite.');
+  if (git(['branch', '--show-current']) !== 'qa/mobile-login-e2e') throw Error('Switch to the QA branch before running iOS.');
+  const remote = git(['remote', 'get-url', 'origin']);
+  if (!['https://github.com/KeQue/MicroHabit.git', 'https://github.com/KeQue/MicroHabit', 'git@github.com:KeQue/MicroHabit.git'].includes(remote)) throw Error('The GitHub repository does not match the configured QA project.');
+  const source = git(['rev-parse', 'HEAD']);
+  const report = JSON.parse(readFileSync('tests/e2e/results/TC-001-latest.json', 'utf8'));
+  const problem = validateAndroidReport(report, source);
+  if (problem) throw Error(problem);
+  if (existsSync(intent)) throw Error('A previous dispatch outcome is unknown. Check GitHub Actions before resolving the pending dispatch.');
+  const credential = run('git', ['credential', 'fill'], { input: 'protocol=https\nhost=github.com\npath=KeQue/MicroHabit.git\n\n' });
+  if (credential.error || credential.status !== 0) throw Error('GitHub sign-in is unavailable.');
+  const fields = Object.fromEntries(credential.stdout.split(/\r?\n/).filter(line => line.includes('=')).map(line => { const i = line.indexOf('='); return [line.slice(0, i), line.slice(i + 1)]; }));
+  if (!fields.password) throw Error('GitHub sign-in is unavailable.');
+  const headers = { Authorization: `Bearer ${fields.password}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' };
+  const base = 'https://api.github.com/repos/KeQue/MicroHabit';
+  const request = async (path, options = {}) => {
+    const response = await fetch(base + path, { headers, redirect: 'error', signal: AbortSignal.timeout(30000), ...options });
+    if (!response.ok) throw Error('GitHub rejected a preflight or dispatch request.');
+    return response.status === 204 ? null : response.json();
+  };
+  const repo = await request('');
+  if (repo.private || repo.default_branch !== 'main') throw Error('GitHub repository context changed.');
+  const ensureIdle = async () => {
+    const runs = await request('/actions/workflows/e2e-ios-login.yml/runs?per_page=100');
+    if (runs.workflow_runs.some(item => item.status !== 'completed')) throw Error('An iOS workflow is already active. Wait for it to finish.');
+  };
+  await ensureIdle();
+  const workflow = await request('/contents/.github/workflows/e2e-ios-login.yml?ref=main');
+  const deployed = Buffer.from(workflow.content, 'base64').toString('utf8').replaceAll('\r\n', '\n');
+  const local = readFileSync('.github/workflows/e2e-ios-login.yml', 'utf8').replaceAll('\r\n', '\n');
+  const priorLabels = local.replace('Full source SHA passed on Android with required evidence using this backend/account', 'Full source SHA already passed twice on Android using this backend/account').replace('Login on iOS — retry once after failure with private screenshots', 'Login on iOS — two attempts with private screenshots');
+  if (deployed !== local && deployed !== priorLabels) throw Error('The GitHub workflow differs from the reviewed local workflow.');
+  const vars = await request('/environments/e2e-login/variables');
+  const values = Object.fromEntries(vars.variables.map(v => [v.name, v.value]));
+  if (values.E2E_BACKEND_ENV !== 'production' || values.E2E_BACKEND_HOST !== report.backendHost) throw Error('GitHub backend does not match the Android report.');
+  const publicHash = key => createHash('sha256').update(createPublicKey(key).export({ type: 'spki', format: 'der' })).digest('hex');
+  if (publicHash(values.E2E_REPORT_PUBLIC_KEY) !== publicHash(readFileSync('tests/e2e/.tools/report-keys/public.pem'))) throw Error('The report encryption key does not match this laptop.');
+  const secrets = await request('/environments/e2e-login/secrets');
+  if (!['E2E_LOGIN_EMAIL', 'E2E_LOGIN_PASSWORD', 'E2E_SUPABASE_ANON_KEY'].every(name => secrets.secrets.some(s => s.name === name))) throw Error('GitHub environment secrets are incomplete.');
+  const policy = await request('/environments/e2e-login/deployment-branch-policies');
+  if (policy.branch_policies.length !== 1 || policy.branch_policies[0].name !== 'main') throw Error('The GitHub environment branch restriction changed.');
+  console.log('Publishing the tested QA revision if needed.');
+  const push = run('git', ['push', 'origin', 'HEAD:refs/heads/qa/mobile-login-e2e'], { timeout: 120000 });
+  if (push.error || push.status !== 0) throw Error('Git push failed. Check your GitHub sign-in and branch; no iOS run was started.');
+  const commit = await request(`/commits/${source}`);
+  if (commit.sha !== source) throw Error('GitHub does not have the tested revision.');
+  await ensureIdle();
+  writeFileSync(intent, `${source}\n`, { flag: 'wx', mode: 0o600 });
+  dispatchRequested = true;
+  await request('/actions/workflows/e2e-ios-login.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { android_pass_sha: source, allow_production_login: true, full_screenshots: false } }) });
+  rmSync(intent);
+  dispatchRequested = false;
+  console.log('iOS workflow started. Open https://github.com/KeQue/MicroHabit/actions/workflows/e2e-ios-login.yml to follow it.');
+} catch (error) {
+  console.error(error.message);
+  if (dispatchRequested) console.error('Dispatch outcome may be unknown. Check GitHub Actions before trying again; the pending marker prevents duplicate runs.');
+  process.exitCode = 2;
+}

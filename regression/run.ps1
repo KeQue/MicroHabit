@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 Write-Host 'Regression runs Android locally and iOS on GitHub using the production test account.'
 Write-Host 'Normal login updates auth metadata and the profile. The QA branch may be published.'
+Write-Host 'Before continuing, make sure no other login test is running with this account.'
 if ((Read-Host 'Type YES to run regression') -cne 'YES') { Write-Host 'Cancelled.'; exit 2 }
 Write-Host 'Starting Android regression.'
 . (Join-Path $PSScriptRoot 'orchestrate.ps1')

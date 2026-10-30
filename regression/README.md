@@ -4,6 +4,8 @@ In VS Code choose **Terminal → Run Task → Regression**, then type `YES` to
 approve the production login effects and one GitHub iOS run. The suite runs
 Android locally, then starts iOS on GitHub even if Android fails. They run
 sequentially because they share one account. Each platform keeps its own result.
+Before starting, check that no other login run is using the account; the suite
+does not automatically detect a run started separately before its Android step.
 
 The dedicated Android emulator starts in the background and is closed when its
 test ends. It must already contain the current Release APK; the runner cannot

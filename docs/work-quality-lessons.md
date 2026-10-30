@@ -62,6 +62,14 @@ a roadmap, confidence score, or claim that the model has been retrained.
   paths are rejected and preserved. The revised Mac build still requires a newly
   approved run; these checks do not establish the old stall's cause or its fix.
 
+- Follow-up observation: an additional Simulator AutoFill readback blocked the
+  approved iOS run before authentication. Earlier tests used stubbed `plutil`
+  responses and did not establish native command behavior. The local candidate
+  reads a typed Boolean in raw format and still fails closed on command errors or
+  a value other than false. A focused negative case checks that an unsuccessful
+  read cannot pass even if its output says false. The specific cause of the Mac
+  readback failure remains unknown until a native check; preserve that distinction.
+
 ## Verify visual evidence for every attempt
 
 - Observation: both Android login attempts passed, but the second attempt's

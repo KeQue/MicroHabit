@@ -15,7 +15,7 @@ export function configurePasswordAutofill(device, home, { run = spawnSync, exist
     for (const path of paths) {
       const changed = run('/usr/bin/plutil', ['-replace', 'restrictedBool.allowPasswordAutoFill.value', '-bool', 'NO', path], { encoding: 'utf8', timeout: 20000 });
       if (changed.error || changed.status !== 0) return { configured: false, diagnostic: 'autofill-setting-failed' };
-      const readback = run('/usr/bin/plutil', ['-extract', 'restrictedBool.allowPasswordAutoFill.value', 'json', '-o', '-', path], { encoding: 'utf8', timeout: 20000 });
+      const readback = run('/usr/bin/plutil', ['-extract', 'restrictedBool.allowPasswordAutoFill.value', 'raw', '-expect', 'bool', path], { encoding: 'utf8', timeout: 20000 });
       if (readback.error || readback.status !== 0 || readback.stdout?.trim() !== 'false') return { configured: false, diagnostic: 'autofill-readback-failed' };
     }
     return { configured: true, diagnostic: null };

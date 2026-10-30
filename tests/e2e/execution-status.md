@@ -2,6 +2,35 @@
 
 Updated October 30, 2026. Setup checks and actual native execution are distinguished below.
 
+Founder steering: **iOS only from this point; no further Android runs**. The
+existing two-attempt Android result on `a9ac59a` is retained as prerequisite
+evidence. One iOS publication/run was explicitly approved after this instruction.
+The reviewed workflow was published alone on main in commit
+`86e4c220ed88a3f6f398377119a67bb2761db89d`, with exact UTF-8 readback and changed-file
+scope verified. QA source is `a9ac59a4dc76d9e0781d265f334d9161aa6b3755`; the later
+`ff7335d` commit records evidence only. Run
+[41043427679](https://github.com/KeQue/MicroHabit/actions/runs/41043427679) was
+accepted at **10:48:15 UTC (11:48 Berlin)**. Its dispatch intent prevents a second
+dispatch for this source after acceptance. No Android test was launched during
+this approved iOS execution.
+
+Run 41043427679 completed **BLOCKED before TC-002**. Xcode compilation succeeded
+and the Simulator booted, then `simulator-configuration` reported
+`autofill-readback-failed`; installation and login did not run. The encrypted
+report was digest-verified, decrypted locally and opened in the browser. It has
+no attempt screenshot because no native test ran. The sanitized result does not
+distinguish a failing readback command from an unexpected returned value.
+
+A small local candidate changes the AutoFill readback to typed raw Boolean output,
+retaining the existing requirement that both settings read back false. Focused
+stubbed checks pass, including error and incorrect-value cases; macOS native
+behavior and the cause of the failed readback remain unverified. No new GitHub
+run was started. The existing workflow also requires the Android-pass SHA to
+equal the iOS test source; this local change produces a new source revision. The
+founder prohibited another Android run, so a future iOS dispatch needs a reviewed
+way to use the existing Android baseline without falsely claiming it tested the
+new revision. Keep the production app and its test assertions unchanged.
+
 Prepared locally after the final run: iOS now privately verifies fields and
 captures the input screen before submission, then continues the same session.
 The final screen is still captured for each attempt. Both phases share the

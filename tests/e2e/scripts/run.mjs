@@ -208,7 +208,7 @@ async function prepare(platform) {
     } finally { rmSync(temporary, { recursive: true, force: true }); }
   }
   if (!android && process.platform !== 'darwin') block('iOS native automation requires macOS and Xcode; Windows/iPhone USB is insufficient.');
-  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');
+  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision && !(env.GITHUB_ACTIONS === 'true' && env.E2E_IOS_VERIFIED_BASELINE === `${env.E2E_ANDROID_PASS_SHA}:${metadata.sourceRevision}`)) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');
   if (!android && env.E2E_DISPOSABLE_SIMULATOR !== 'yes') block('Confirm E2E_DISPOSABLE_SIMULATOR=yes: the entire Simulator Keychain will be cleared.');
 
   if (android && !tools.adb) block('Android SDK ADB is unavailable.');

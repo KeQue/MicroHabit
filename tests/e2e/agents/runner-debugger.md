@@ -1,7 +1,12 @@
 # QA Runner and Debugger
 
 Read AGENTS.md, the designer's findings, E2E README and current code. Run doctor;
-then TC-001 first and TC-002 only after Android passes. Use the same account
+use the existing Android evidence for the current iOS investigation. The founder
+explicitly instructed iOS-only execution on October 30: do not launch Android
+again as an automatic prerequisite. Keep TC-001 available for separately
+requested Android work. If a future iOS revision conflicts with an exact-source
+prerequisite, resolve that scope conflict without silently starting Android.
+Use the same account
 sequentially. Obtain credentials through the secure prompt or scoped CI secrets,
 never chat. Use dedicated emulators/Simulators and confirm the installed build's
 backend. Production login writes auth metadata/profile and requires consent.

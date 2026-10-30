@@ -89,10 +89,13 @@ test('Simulator-only AutoFill configuration requires both files and confirmed fa
   const options = { exists: () => true, isLink: () => false, run: (tool, args) => { calls.push({ tool, args }); return { status: 0, stdout: 'false\n' }; } };
   assert.equal(configurePasswordAutofill(device, '/synthetic-home', options).configured, true);
   assert.equal(calls.length, 4);
+  for (const call of [calls[1], calls[3]]) assert.deepEqual(call.args.slice(0, 5), ['-extract', 'restrictedBool.allowPasswordAutoFill.value', 'raw', '-expect', 'bool']);
   assert.ok(calls.every(call => call.tool === '/usr/bin/plutil' && call.args.at(-1).replaceAll('\\', '/').includes(`/Devices/${device}/data/`)));
   assert.equal(configurePasswordAutofill('../other-device', '/synthetic-home', options).configured, false);
   assert.equal(calls.length, 4);
   assert.equal(configurePasswordAutofill(device, '/synthetic-home', { ...options, exists: () => false }).diagnostic, 'autofill-settings-unavailable');
   assert.equal(configurePasswordAutofill(device, '/synthetic-home', { ...options, run: () => ({ status: 0, stdout: 'true' }) }).diagnostic, 'autofill-readback-failed');
+  let readCalls = 0;
+  assert.equal(configurePasswordAutofill(device, '/synthetic-home', { ...options, run: () => ({ status: ++readCalls === 2 ? 1 : 0, stdout: 'false' }) }).diagnostic, 'autofill-readback-failed');
   assert.equal(configurePasswordAutofill(device, '/synthetic-home', { ...options, run: () => ({ status: 1, stderr: 'SYNTHETIC_SECRET' }) }).diagnostic, 'autofill-setting-failed');
 });

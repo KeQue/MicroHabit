@@ -25,8 +25,8 @@ const allowed = new Set([
 const reviewedBlobs = new Map([
   ['tests/e2e/scripts/screenshot.mjs', '97de1b2bdc113c60802078f66bee5b3741aee56d'],
   ['tests/e2e/scripts/failure-diagnostics.test.mjs', '013fe74f6f1ba1ba6fbb0c0fb635fc31495f1942'],
-  ['tests/e2e/scripts/ios-auth-diagnostic.mjs', '067b3360de5bd210436ad6efe3788426334aebf8'],
-  ['tests/e2e/scripts/ios-auth-diagnostic.test.mjs', '11330d534ee7b76b496fed8462bfa0c46f6c012c'],
+  ['tests/e2e/scripts/ios-auth-diagnostic.mjs', '80d96a127ed287f56a92f986763bd7eddc4faf4f'],
+  ['tests/e2e/scripts/ios-auth-diagnostic.test.mjs', 'a81cd3af1150a4e08ac8d6fb960e1b697184ebd2'],
 ]);
 const oldGuard = "  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');";
 const newGuard = "  if (!android && env.E2E_ANDROID_PASS_SHA !== metadata.sourceRevision && !(env.GITHUB_ACTIONS === 'true' && env.E2E_IOS_VERIFIED_BASELINE === `${env.E2E_ANDROID_PASS_SHA}:${metadata.sourceRevision}`)) block('Run Android first; E2E_ANDROID_PASS_SHA must attest its PASS for this revision, backend and same account.');";

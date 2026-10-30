@@ -25,8 +25,8 @@ function replaceOnce(source, before, after) {
   if (source.split(before).length !== 2) throw Error('Diagnostic source does not match reviewed code');
   return source.replace(before, after);
 }
-export function patchIosDiagnostic(root) {
-  const files = ['lib/supabase.ts', 'features/auth/useAuth.tsx', 'app/(auth)/sign-in.tsx'];
+export function patchIosDiagnostic(root, { fullScreenshot = false } = {}) {
+  const files = ['lib/supabase.ts', 'features/auth/useAuth.tsx', 'app/(auth)/sign-in.tsx', ...(fullScreenshot ? ['tests/e2e/scripts/run.mjs', 'tests/e2e/scripts/report.mjs'] : [])];
   const output = new Map(files.map(path => [path, readFileSync(join(root, path), 'utf8').replaceAll('\r\n', '\n')]));
   if (existsSync(join(root, 'lib/ios-diagnostic.ts'))) throw Error('Diagnostic module already exists');
   const change = (path, before, after) => output.set(path, replaceOnce(output.get(path), before, after));
@@ -55,10 +55,16 @@ export function patchIosDiagnostic(root) {
   change(files[2], '  const [error, setError] = useState<string | null>(null);', '  const [error, setError] = useState<string | null>(null);\n  const [diagnostic, setDiagnostic] = useState("unknown");');
   change(files[2], '{error ? <Text testID="e2e-auth-error" style={styles.error}>{error}</Text> : null}', '{error ? <Text testID="e2e-auth-error" accessibilityLabel={`commito-diagnostic:${diagnostic}`} style={styles.error}>{error}</Text> : null}');
   change(files[2], '                  setError(e?.message ?? "Sign-in failed");', '                  setDiagnostic(authDiagnostic());\n                  setError(e?.message ?? "Sign-in failed");');
+  if (fullScreenshot) {
+    change(files[3], '    const redacted = redactScreenshot(readFileSync(raw), [before, after], [env.MAESTRO_E2E_PASSWORD], { showLoginInputs: true, appId: metadata.appId });', '    const redacted = { png: readFileSync(raw), redactions: 0 };');
+    change(files[3], "privacyPolicy: 'visible-email-native-password-mask-v1'", "privacyPolicy: 'private-full-screen-v1'");
+    change(files[4], "      if (screenshot.privacyPolicy === 'visible-email-native-password-mask-v1')", "      if (screenshot.privacyPolicy === 'private-full-screen-v1') picture += '<p>This is the full native screenshot without masks. Keep it private; any keyboard or account details visible on the device are included.</p>';\n      if (screenshot.privacyPolicy === 'visible-email-native-password-mask-v1')");
+    change(files[4], 'Keep this report private. Redaction preserves the remaining native screenshot pixels; it does not recreate the app.', 'Keep this report private. Native screenshots are not redacted in this explicitly approved run.');
+  }
   for (const [path, source] of output) writeFileSync(join(root, path), source);
   writeFileSync(join(root, 'lib/ios-diagnostic.ts'), moduleText, { flag: 'wx' });
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { patchIosDiagnostic(process.cwd()); console.log('iOS-only fixed-category login diagnostics enabled.'); }
+  try { patchIosDiagnostic(process.cwd(), { fullScreenshot: process.env.E2E_IOS_FULL_SCREENSHOT === 'yes' }); console.log('iOS-only fixed-category login diagnostics enabled.'); }
   catch { console.error('BLOCKED: reviewed iOS diagnostic patch did not apply.'); process.exitCode = 2; }
 }

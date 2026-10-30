@@ -8,15 +8,17 @@ import ts from 'typescript';
 import { patchIosDiagnostic } from './ios-auth-diagnostic.mjs';
 
 const files = ['lib/supabase.ts', 'features/auth/useAuth.tsx', 'app/(auth)/sign-in.tsx'];
+const reportFiles = ['tests/e2e/scripts/run.mjs', 'tests/e2e/scripts/report.mjs'];
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'commito-ios-diag-'));
-  for (const path of files) { const target = join(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, readFileSync(path)); }
+  for (const path of [...files, ...reportFiles]) { const target = join(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, readFileSync(path)); }
   return root;
 }
 test('iOS-only diagnostic build patch applies fixed stages, preserves login assertions and refuses mismatched source', async () => {
   const root = fixture();
   try {
     patchIosDiagnostic(root);
+    assert.match(readFileSync(join(root, reportFiles[0]), 'utf8'), /redactScreenshot\(readFileSync\(raw\)/);
     const auth = readFileSync(join(root, files[1]), 'utf8');
     const screen = readFileSync(join(root, files[2]), 'utf8');
     assert.match(auth, /traceAuth\("auth-call"/);
@@ -51,4 +53,14 @@ test('iOS-only diagnostic build patch applies fixed stages, preserves login asse
     assert.throws(() => patchIosDiagnostic(changed));
     assert.equal(readFileSync(join(changed, files[0]), 'utf8'), before);
   } finally { rmSync(changed, { recursive: true, force: true }); }
+  const full = fixture();
+  try {
+    patchIosDiagnostic(full, { fullScreenshot: true });
+    const runner = readFileSync(join(full, reportFiles[0]), 'utf8');
+    const report = readFileSync(join(full, reportFiles[1]), 'utf8');
+    assert.match(runner, /png: readFileSync\(raw\), redactions: 0/);
+    assert.match(runner, /private-full-screen-v1/);
+    assert.match(report, /full native screenshot without masks/);
+    assert.doesNotMatch(report, /Redaction preserves the remaining native screenshot pixels/);
+  } finally { rmSync(full, { recursive: true, force: true }); }
 });

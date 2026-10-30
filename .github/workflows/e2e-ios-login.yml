@@ -10,6 +10,11 @@ on:
         description: Optional source SHA for a verified iOS-only infrastructure change
         required: false
         type: string
+      full_screenshots:
+        description: Include full unmasked native screenshots in the encrypted private report
+        required: true
+        default: false
+        type: boolean
       allow_production_login:
         description: Approve production auth metadata/profile writes if production is configured
         required: true
@@ -34,6 +39,7 @@ jobs:
       E2E_IOS_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-18-5
       E2E_ANDROID_PASS_SHA: ${{ inputs.android_pass_sha }}
       E2E_IOS_SOURCE_SHA: ${{ inputs.ios_source_sha || inputs.android_pass_sha }}
+      E2E_IOS_FULL_SCREENSHOT: ${{ inputs.full_screenshots && 'yes' || 'no' }}
       E2E_BACKEND_ENV: ${{ vars.E2E_BACKEND_ENV }}
       E2E_BACKEND_HOST: ${{ vars.E2E_BACKEND_HOST }}
       E2E_IOS_APP_ID: com.sadik.microhabit
@@ -48,7 +54,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ios_source_sha || inputs.android_pass_sha }}
-          fetch-depth: 6
+          fetch-depth: 7
           persist-credentials: false
       - name: Verify Android prerequisite and backend consent
         shell: bash
@@ -57,7 +63,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$E2E_ANDROID_PASS_SHA" != "$E2E_IOS_SOURCE_SHA" ]]; then
-            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == d2923af851e8cdafa2abb768f16d6ee8f54cf3f6 ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
+            [[ "$(git hash-object tests/e2e/scripts/ios-source-gate.mjs)" == 8842be83fba005cd7dfcd5b3d1c9db73aeb56e7a ]] || { echo 'BLOCKED: source verifier differs from the reviewed version.'; exit 2; }
             node tests/e2e/scripts/ios-source-gate.mjs "$E2E_ANDROID_PASS_SHA" "$E2E_IOS_SOURCE_SHA"
             echo "E2E_IOS_VERIFIED_BASELINE=$E2E_ANDROID_PASS_SHA:$E2E_IOS_SOURCE_SHA" >> "$GITHUB_ENV"
           else

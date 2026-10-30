@@ -1,0 +1,42 @@
+import { completedReport } from './maestro-result.mjs';
+
+// Two phases belong to the same iOS attempt. No login retries, state reset,
+// or app relaunch occur between input review and submission.
+export async function executeLoginAttempt({ platform, attempt, runFlow, capture, diagnostics, now = Date.now }) {
+  let uiMilliseconds = 0;
+  const execute = async (phase, reuseDriver) => {
+    if (uiMilliseconds >= 360000) return { child: { error: { code: 'ETIMEDOUT' } }, xml: '', completed: false, started: false };
+    const started = now();
+    const result = await runFlow(phase, { reuseDriver, timeout: Math.max(1, 360000 - uiMilliseconds) });
+    uiMilliseconds += now() - started;
+    return { ...result, completed: completedReport(result.child, result.xml), started: true };
+  };
+  let result = await execute(platform === 'ios' ? 'prepare' : 'full', false);
+  let inputScreenshot;
+  let submitted = platform !== 'ios';
+  let inputBlocked = false;
+  if (platform === 'ios' && result.completed) {
+    inputScreenshot = await capture({ verifyInputs: true, reuseDriver: true });
+    inputBlocked = inputScreenshot.status !== 'CAPTURED' || inputScreenshot.inputChecks?.before?.passed !== true || inputScreenshot.inputChecks?.after?.passed !== true;
+    if (!inputBlocked) {
+      result = await execute('submit', true);
+      submitted = result.started;
+    }
+  }
+  const completed = result.completed && !inputBlocked;
+  const finding = inputBlocked ? 'Stopped before Sign in: the entered fields or required pre-submission photo could not be verified. No login was submitted.'
+    : completed ? 'All real UI assertions completed, including authenticated load after process restart.'
+      : result.child.error?.code === 'ETIMEDOUT' ? 'Maestro exceeded the shared six-minute UI budget; no result is accepted.'
+        : 'Native UI assertions did not complete. Inspect the fixed diagnostics and private screenshot; raw output is discarded.';
+  const outcome = { attempt, status: completed ? 'PASS' : 'FAIL', durationSeconds: Math.round(uiMilliseconds / 100) / 10, finding };
+  if (platform === 'ios') outcome.submissionStarted = submitted;
+  if (inputScreenshot) outcome.inputScreenshot = inputScreenshot;
+  if (!completed) outcome.diagnostics = inputBlocked ? { lastCompletedCheckpoint: 'keyboard-dismissed', failedCommand: 'input-verification', failedTarget: null } : diagnostics();
+  // If verification stopped the attempt, its final photo is the same native
+  // capture: there has been no further UI action. Do not manufacture another.
+  if (inputScreenshot && !submitted) {
+    outcome.finalScreenshotIsInput = true;
+    outcome.screenshot = inputScreenshot;
+  } else outcome.screenshot = await capture({ requireLoaded: completed, reuseDriver: true });
+  return outcome;
+}

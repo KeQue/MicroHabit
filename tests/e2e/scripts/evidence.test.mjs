@@ -9,7 +9,7 @@ import { PNG } from 'pngjs';
 import { decryptReport, encryptReport, recordRun, suggestedImprovements, writeReport } from './report.mjs';
 import { authenticatedScreen, parseHierarchy, redactScreenshot } from './screenshot.mjs';
 import { browserCommand } from './view-report.mjs';
-import { resultExitCode } from './maestro-result.mjs';
+import { resultExitCode, screenshotEvidenceStatus } from './maestro-result.mjs';
 
 const secret = 'SYNTHETIC_PRIVATE_VALUE';
 const tree = children => ({ attributes: { bounds: '[0,0][100,200]' }, children });
@@ -40,6 +40,48 @@ test('redacts credential fields in both positions and the keyboard, preserving o
   const untouched = redactScreenshot(raw, [tree([]), tree([])], [secret]);
   assert.deepEqual(PNG.sync.read(untouched.png).data, image.data);
   assert.equal(untouched.redactions, 0);
+});
+
+test('private input review preserves the email and native password masks, including below the keyboard fallback', () => {
+  const appId = 'com.sadik.microhabit';
+  const email = { attributes: { 'resource-id': `${appId}:id/e2e-login-email`, bounds: '[10,120][90,140]', text: 'synthetic@example.test' }, children: [] };
+  const password = { attributes: { 'resource-id': 'e2e-login-password', bounds: '[10,150][90,170]', value: '\u2022\u2022\u2022\u2022' }, children: [] };
+  const options = { showLoginInputs: true, appId };
+  const pixel = (png, x, y) => Array.from(PNG.sync.read(png).data.subarray((y * 200 + x) * 4, (y * 200 + x) * 4 + 4));
+  for (const mask of ['\u2022\u2022\u2022\u2022', '****', '\u25cf\u25cf\u25cf']) {
+    const field = { ...password, attributes: { ...password.attributes, value: mask } };
+    const output = redactScreenshot(raw, [tree([email, field]), tree([email, field])], [secret], options);
+    assert.deepEqual(pixel(output.png, 40, 250), [255, 255, 255, 255]);
+    assert.deepEqual(pixel(output.png, 40, 310), [255, 255, 255, 255]);
+    assert.deepEqual(pixel(output.png, 40, 380), [0, 0, 0, 255]);
+  }
+  // Unknown, partially revealed or changed fields must not inherit permission
+  // from the other inspection. A secure flag alone is insufficient.
+  for (const value of [secret, '\u2022\u2022x', '', 'Password']) {
+    const changed = { ...password, attributes: { ...password.attributes, value, password: 'true' } };
+    const output = redactScreenshot(raw, [tree([email, password]), tree([email, changed])], [secret], options);
+    assert.deepEqual(pixel(output.png, 40, 250), [255, 255, 255, 255]);
+    assert.deepEqual(pixel(output.png, 40, 310), [0, 0, 0, 255]);
+  }
+  const moved = { ...password, attributes: { ...password.attributes, bounds: '[20,150][95,170]' } };
+  const output = redactScreenshot(raw, [tree([email, password]), tree([email, moved])], [secret], options);
+  assert.deepEqual(pixel(output.png, 60, 310), [0, 0, 0, 255]);
+});
+
+test('input visibility never overrides explicit keyboard overlays, leaked password text or unrelated inputs', () => {
+  const options = { showLoginInputs: true, appId: 'com.sadik.microhabit' };
+  const email = { attributes: { 'resource-id': 'e2e-login-email', bounds: '[10,20][90,40]', text: 'synthetic@example.test' }, children: [] };
+  const password = { attributes: { 'resource-id': 'e2e-login-password', bounds: '[10,60][90,80]', text: '****' }, children: [] };
+  const scenarios = [
+    { attributes: { class: 'XCUIElementTypeKeyboard', bounds: '[0,10][100,90]' }, children: [] },
+    { attributes: { text: secret, bounds: '[0,10][100,90]' }, children: [] },
+    { attributes: { class: 'android.widget.EditText', bounds: '[0,10][100,90]' }, children: [] },
+  ];
+  for (const sensitive of scenarios) {
+    const output = redactScreenshot(raw, [tree([email, password, sensitive]), tree([email, password, sensitive])], [secret], options);
+    const pixels = PNG.sync.read(output.png);
+    for (const y of [50, 130]) assert.deepEqual(Array.from(pixels.data.subarray((y * 200 + 40) * 4, (y * 200 + 40) * 4 + 4)), [0, 0, 0, 255]);
+  }
 });
 
 test('rejects screenshots when coordinates, sensitive bounds or PNG data are unavailable', () => {
@@ -112,6 +154,14 @@ test('each attempt embeds its own native image directly below its result, with a
     const ios = readFileSync(writeReport({ caseId: 'TC-002', status: 'BLOCKED', attempts: [] }, fixture), 'utf8');
     assert.ok(ios.includes('<h1>Login on iOS: BLOCKED</h1>'));
     assert.ok(!ios.includes('<img'));
+    const input = { ...attempts[0].screenshot, privacyPolicy: 'visible-email-native-password-mask-v1', inputChecks: { before: { passed: true }, after: { passed: true } } };
+    const review = readFileSync(writeReport({ caseId: 'TC-002', status: 'FAIL', attempts: [{ ...attempts[1], inputScreenshot: input }] }, fixture), 'utf8');
+    assert.ok(review.includes('Before Sign in'));
+    assert.ok(review.includes('After attempt'));
+    assert.ok(review.includes('Private input verification'));
+    assert.equal((review.match(/<img /g) || []).length, 2);
+    const stopped = readFileSync(writeReport({ caseId: 'TC-002', status: 'FAIL', attempts: [{ ...attempts[0], inputScreenshot: input }] }, fixture), 'utf8');
+    assert.equal((stopped.match(/<img /g) || []).length, 1);
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
 
@@ -133,6 +183,9 @@ test('a functional pass with a missing required screenshot blocks automation wit
   assert.equal(resultExitCode({ ...report, evidenceStatus: 'COMPLETE' }), 0);
   assert.equal(resultExitCode({ status: 'FAIL', evidenceStatus: 'COMPLETE' }), 1);
   assert.equal(resultExitCode({ status: 'BLOCKED', evidenceStatus: 'NOT_AVAILABLE' }), 2);
+  const submitted = { requiresInputScreenshot: true, attempts: [{ submissionStarted: true, screenshot: { status: 'CAPTURED' } }] };
+  assert.equal(screenshotEvidenceStatus(submitted), 'INCOMPLETE');
+  assert.equal(screenshotEvidenceStatus({ ...submitted, attempts: [{ submissionStarted: false, status: 'FAIL', screenshot: { status: 'CAPTURED' } }] }), 'COMPLETE');
 });
 
 test('post-run suggestions follow observed evidence without inventing a root cause or launching work', () => {

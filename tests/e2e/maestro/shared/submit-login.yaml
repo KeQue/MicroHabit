@@ -1,0 +1,13 @@
+appId: ${MAESTRO_E2E_APP_ID}
+---
+- tapOn:
+    id: e2e-login-submit
+- evalScript: ${output.e2eCheckpoint = "login-submitted"}
+- runFlow: assert-authenticated.yaml
+- evalScript: ${output.e2eCheckpoint = "authenticated-loaded"}
+# A fresh app process must restore the saved session and load from the server.
+- stopApp
+- launchApp
+- evalScript: ${output.e2eCheckpoint = "process-restarted"}
+- runFlow: assert-authenticated.yaml
+- evalScript: ${output.e2eCheckpoint = "session-restored"}

@@ -1,0 +1,5 @@
+appId: ${MAESTRO_E2E_APP_ID}
+name: Login on iOS - submit and verify session
+---
+# Continue the same app/session after the runner's private input inspection.
+- runFlow: ../shared/submit-login.yaml

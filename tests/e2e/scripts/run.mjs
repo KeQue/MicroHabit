@@ -3,12 +3,13 @@ import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { completedReport, resultExitCode } from './maestro-result.mjs';
-import { authenticatedScreen, parseHierarchy, redactScreenshot, safeScreenState } from './screenshot.mjs';
+import { resultExitCode, screenshotEvidenceStatus } from './maestro-result.mjs';
+import { authenticatedScreen, inspectLoginInputs, parseHierarchy, redactScreenshot, safeScreenState } from './screenshot.mjs';
 import { recordRun, writeReport } from './report.mjs';
 import { failureDiagnostics } from './failure-diagnostics.mjs';
 import { inspectSimulator, mayRetrySimulatorProbe } from './ios-readiness.mjs';
 import { inspectAndroidWindows } from './android-readiness.mjs';
+import { executeLoginAttempt } from './login-attempt.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const resultsDir = join(root, 'tests/e2e/results');
@@ -270,11 +271,12 @@ async function prepare(platform) {
   return { metadata, blockers };
 }
 
-async function captureScreenshot(metadata, attempt, output, requireLoaded = false) {
+async function captureScreenshot(metadata, attempt, output, { requireLoaded = false, verifyInputs = false, reuseDriver = false } = {}) {
   const started = Date.now();
   let phase = 'hierarchy-before';
   let phaseStarted = started;
   const timings = {};
+  let inputChecks;
   const nextPhase = next => {
     timings[phase] = Math.round((Date.now() - phaseStarted) / 100) / 10;
     phase = next; phaseStarted = Date.now();
@@ -287,7 +289,7 @@ async function captureScreenshot(metadata, attempt, output, requireLoaded = fals
       if (child.status !== 0 || child.error) throw Error('Hierarchy command failed');
       return parseHierarchy(child.stdout);
     };
-    const before = await hierarchy();
+    const before = await hierarchy(reuseDriver);
     nextPhase('native-capture');
     const raw = join(output, 'native-screen.png');
     const image = metadata.platform === 'android'
@@ -297,21 +299,25 @@ async function captureScreenshot(metadata, attempt, output, requireLoaded = fals
     const capturedAt = new Date().toISOString();
     nextPhase('hierarchy-after');
     const after = await hierarchy(true);
+    if (verifyInputs) inputChecks = {
+      before: inspectLoginInputs(before, metadata.appId, env.MAESTRO_E2E_EMAIL, env.MAESTRO_E2E_PASSWORD),
+      after: inspectLoginInputs(after, metadata.appId, env.MAESTRO_E2E_EMAIL, env.MAESTRO_E2E_PASSWORD),
+    };
     nextPhase('validation-and-redaction');
     if (requireLoaded) {
       if (!authenticatedScreen(before, metadata.appId) || !authenticatedScreen(after, metadata.appId)) throw Error('Authenticated screenshot unavailable');
     }
-    const redacted = redactScreenshot(readFileSync(raw), [before, after], [env.MAESTRO_E2E_EMAIL, env.MAESTRO_E2E_PASSWORD]);
+    const redacted = redactScreenshot(readFileSync(raw), [before, after], [env.MAESTRO_E2E_PASSWORD], { showLoginInputs: true, appId: metadata.appId });
     const file = `${metadata.caseId}-${Date.now()}-attempt-${attempt}.png`;
     writeFileSync(join(resultsDir, file), redacted.png, { mode: 0o600 });
     timings[phase] = Math.round((Date.now() - phaseStarted) / 100) / 10;
-    return { status: 'CAPTURED', file, capturedAt, redactions: redacted.redactions, timings,
+    return { status: 'CAPTURED', file, capturedAt, redactions: redacted.redactions, privacyPolicy: 'visible-email-native-password-mask-v1', timings, ...(inputChecks ? { inputChecks } : {}),
       stateBefore: safeScreenState(before, metadata.appId), stateAfter: safeScreenState(after, metadata.appId),
       durationSeconds: Math.round((Date.now() - started) / 100) / 10 };
   } catch (error) {
     timings[phase] = Math.round((Date.now() - phaseStarted) / 100) / 10;
     const categories = { 'Hierarchy timed out': 'hierarchy-timeout', 'Hierarchy command failed': 'hierarchy-command-failed', 'Hierarchy unavailable': 'hierarchy-unavailable', 'Screenshot unavailable': 'native-capture-unavailable', 'Authenticated screenshot unavailable': 'authenticated-screen-not-visible', 'Cannot verify screenshot coordinates': 'unverified-coordinates', 'Cannot safely redact an element': 'unverified-redaction-bounds', 'Unsupported screenshot': 'unsupported-image' };
-    return { status: 'UNAVAILABLE', phase, timings, diagnostic: categories[error.message] || 'image-processing-or-output', durationSeconds: Math.round((Date.now() - started) / 100) / 10, finding: 'Native screenshot could not be captured and safely redacted; raw pixels were discarded.' };
+    return { status: 'UNAVAILABLE', phase, timings, ...(inputChecks ? { inputChecks } : {}), diagnostic: categories[error.message] || 'image-processing-or-output', durationSeconds: Math.round((Date.now() - started) / 100) / 10, finding: 'Native screenshot could not be captured and safely redacted; raw pixels were discarded.' };
   }
 }
 
@@ -323,7 +329,7 @@ async function run(platform, prerequisite = null) {
   if (!Number.isInteger(repetitions) || repetitions < 2 || repetitions > 5) blockers.push('E2E_REPEAT must be an integer from 2 to 5.');
   const report = {
     ...metadata, startedAt: new Date(started).toISOString(), status: 'BLOCKED',
-    blockers, attempts: [], durationSeconds: 0, authenticationEvidence: 'Not executed',
+    blockers, attempts: [], requiresInputScreenshot: platform === 'ios', durationSeconds: 0, authenticationEvidence: 'Not executed',
     rawArtifacts: 'Raw logs/reports deleted; only credential-redacted PNG evidence and a private HTML report are retained.',
   };
   if (!blockers.length) {
@@ -333,28 +339,27 @@ async function run(platform, prerequisite = null) {
       childEnv.MAESTRO_E2E_APP_ID = metadata.appId;
       for (let index = 1; index <= repetitions; index++) {
         console.log(`${metadata.caseId}: attempt ${index} started; credentials remain private.`);
-        const attemptStarted = Date.now();
         const output = join(temporary, `attempt-${index}`);
         mkdirSync(output, { mode: 0o700 });
-        const reportPath = join(output, 'report.xml');
-        const flow = join(root, `tests/e2e/maestro/${metadata.caseId}-${platform}-login.yaml`);
-        const args = ['--device', metadata.device, '--platform', platform, 'test',
-          '--format', 'junit', '--output', reportPath, '--debug-output', output,
-          '--test-output-dir', output, flow];
-        const child = await call(tools.maestro, args, { env: childEnv, cwd: temporary, timeout: 360000 });
-        const xml = existsSync(reportPath) ? readFileSync(reportPath, 'utf8') : '';
-        const completed = completedReport(child, xml);
-        const attempt = { attempt: index, status: completed ? 'PASS' : 'FAIL',
-          durationSeconds: Math.round((Date.now() - attemptStarted) / 100) / 10,
-          finding: completed ? 'All real UI assertions completed, including authenticated load after process restart.' :
-            child.error?.code === 'ETIMEDOUT' ? 'Maestro exceeded six minutes; no result is accepted.' :
-              'Maestro failed or did not produce a completed report. Inspect the redacted screenshot or emulator; raw output is intentionally discarded.' };
-        if (!completed) attempt.diagnostics = failureDiagnostics(output);
-        console.log(`${metadata.caseId}: attempt ${index} assertions ${attempt.status}; capturing a private screenshot.`);
-        attempt.screenshot = await captureScreenshot(metadata, index, output, completed);
+        const attempt = await executeLoginAttempt({ platform, attempt: index,
+          runFlow: async (phase, { reuseDriver, timeout }) => {
+            console.log(`${metadata.caseId}: attempt ${index} phase ${phase}.`);
+            const phaseOutput = join(output, phase);
+            mkdirSync(phaseOutput, { mode: 0o700 });
+            const reportPath = join(phaseOutput, 'report.xml');
+            const flow = join(root, 'tests/e2e/maestro', phase === 'full' ? `${metadata.caseId}-${platform}-login.yaml` : `ios/${phase}-login.yaml`);
+            const args = ['--device', metadata.device, '--platform', platform, 'test', ...(reuseDriver ? ['--no-reinstall-driver'] : []),
+              '--format', 'junit', '--output', reportPath, '--debug-output', phaseOutput, '--test-output-dir', phaseOutput, flow];
+            const child = await call(tools.maestro, args, { env: childEnv, cwd: temporary, timeout });
+            return { child, xml: existsSync(reportPath) ? readFileSync(reportPath, 'utf8') : '' };
+          },
+          capture: options => captureScreenshot(metadata, index, output, options),
+          diagnostics: () => failureDiagnostics(output),
+        });
+        console.log(`${metadata.caseId}: attempt ${index} assertions ${attempt.status}.`);
         console.log(`${metadata.caseId}: attempt ${index} screenshot ${attempt.screenshot.status}.`);
         report.attempts.push(attempt);
-        if (!completed) break;
+        if (attempt.status !== 'PASS') break;
       }
       report.status = report.attempts.length === repetitions && report.attempts.every(attempt => attempt.status === 'PASS') ? 'PASS' : 'FAIL';
       report.authenticationEvidence = report.status === 'PASS' ?
@@ -362,7 +367,7 @@ async function run(platform, prerequisite = null) {
     } finally { rmSync(temporary, { recursive: true, force: true }); }
   }
   report.durationSeconds = Math.round((Date.now() - started) / 100) / 10;
-  report.evidenceStatus = !report.attempts.length ? 'NOT_AVAILABLE' : report.attempts.every(attempt => attempt.screenshot?.status === 'CAPTURED') ? 'COMPLETE' : 'INCOMPLETE';
+  report.evidenceStatus = screenshotEvidenceStatus(report);
   try { recordRun(report); }
   catch {
     report.evidenceStatus = 'INCOMPLETE'; report.historyStatus = 'UNAVAILABLE'; report.evidenceFinding = 'The private HTML report or dated history could not be written.';
@@ -386,7 +391,7 @@ try {
       if (installed.status !== 0 || installed.stdout?.match(/\bversionName=([^\s]+)/)?.[1] !== report.appVersion || installed.stdout?.match(/\bversionCode=(\d+)/)?.[1] !== report.appBuild) throw Error('Installed build differs from recorded pass');
       const temporary = mkdtempSync(join(resultsDir, '.private-snapshot-'));
       try {
-        const screenshot = await captureScreenshot(report, 1, temporary, true);
+        const screenshot = await captureScreenshot(report, 1, temporary, { requireLoaded: true });
         report.supplementalScreenshot = { ...screenshot, context: 'Captured after the recorded run, not at assertion time. This is not a new login test.' };
         report.evidenceStatus = 'INCOMPLETE: earlier attempts have no assertion-time screenshots';
         writeReport(report);

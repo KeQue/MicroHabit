@@ -107,7 +107,8 @@ inside the emulator.
 ## Enter credentials securely and run Android
 
 Use an existing confirmed, dedicated test account. Never paste its password into
-chat, source files, YAML, a shell command, a bug report or a screenshot. Do not run
+chat, source files, YAML, a shell command or a shared bug report. The login email
+may appear in private screenshots as requested; the actual password must not. Do not run
 PowerShell transcription/screen recording while entering or running credentials.
 The prompt hides both email and password, passes them only to the test process,
 and restores the previous process environment afterward.
@@ -204,7 +205,7 @@ After TC-001 passes twice on the final committed source:
    remain BLOCKED. A green build step alone is not a TC-002 pass.
 
 The updated workflow gives the **build/install step at most 60 minutes**. Its
-overall job limit is 100 minutes, allowing dependency setup, the two tests,
+overall job limit is 110 minutes, allowing dependency setup, the two tests,
 report encryption and cleanup. The earlier run retains its original 60-minute
 overall limit; editing the workflow cannot change a running job.
 Do not start local Android login while cloud iOS uses the same
@@ -225,20 +226,42 @@ creates a dedicated iPhone 16 Simulator. It compiles before booting the Simulato
 to avoid consuming Simulator resources during compilation. Missing pinned tools
 block the job rather than downloading another Xcode/runtime.
 
-Download caching covers only npm's `_cacache` and CocoaPods' download cache.
+Download caching covers npm's `_cacache`, CocoaPods' downloads and the pinned
+Maestro ZIP. A restored Maestro archive is checked against its fixed SHA-256
+before extraction; a corrupt cache is downloaded again and reverified.
 Keys include OS, CPU architecture, Xcode and dependency/configuration hashes;
 `npm ci` and native dependency installation still run. Cache save occurs before
 account access, even after a compilation failure if prebuild completed. Failed
-cache operations are bounded and do not fail the tests. App bundles, DerivedData,
-Simulator/Keychain data, logs, credentials and screenshots are excluded. Cache
-savings are unmeasured until a newly approved run. Compiling only the selected
-Simulator's active architecture also avoids unnecessary architecture builds.
+cache operations are bounded and do not fail the tests. An optional ccache
+installation enables React Native's native compiler cache with a 1 GiB limit,
+keyed by OS, architecture, Xcode/compiler-cache versions and dependency/config
+hashes. This stores compiler results from the pre-account build, not installed
+apps, JS bundles, DerivedData, Simulator/Keychain data, reports or raw logs.
+Both caches are saved before account secrets become available. The build uses
+a fresh private directory at a stable path for cache reuse; a pre-existing path
+is never reused. Editor indexing is disabled, and only the active Simulator
+architecture is built. Cache savings remain unmeasured until an approved Mac run;
+the first compiler-cache fill still requires compilation. No larger/paid runner
+or hosted build service is enabled.
 
 For an already prepared Mac/Simulator, use `npm run e2e:ios`, with the same secret
 environment and backend metadata plus `E2E_IOS_DEVICE`, optional separate
 `E2E_IOS_APP_ID`, `E2E_ANDROID_PASS_SHA`, and `E2E_DISPOSABLE_SIMULATOR=yes`.
 **TC-002 clears the entire Simulator Keychain.** Use a disposable Simulator only.
 The second launch within each attempt preserves storage and Keychain.
+The runner now divides each iOS attempt into input and submission phases, without
+relaunching between them. It privately checks the entered email and nonempty
+password field, captures the screen, then continues only if both checks and the
+photo succeed. A masked field proves populated input, not the hidden password's
+exact value. Pre-submission and final images appear under their own attempt.
+The two phases share the original six-minute UI budget; image time is separate.
+Continuation and inspections reuse the installed driver. Explicit auth/load
+errors fail promptly while successful load still has its 60-second allowance.
+The disposable Simulator's Password AutoFill is disabled using
+[Maestro's documented workaround](https://docs.maestro.dev/extra-materials/troubleshooting/known-issues)
+and both settings are read back. Missing internal Apple settings paths block
+setup instead of silently skipping configuration. This workaround is a candidate
+for input flakiness; the earlier failure's cause remains unconfirmed.
 
 EAS is an alternative, not a second testing framework. The new `e2e` build
 profile creates Android APKs and iOS Simulator Release builds. Do not run
@@ -309,8 +332,8 @@ preflight allows 90 seconds per Simulator query and one read-only retry for a
 timeout, command failure or observed boot-in-progress. It records fixed categories
 and timings; a genuinely stopped, absent, unavailable or unidentifiable device
 still blocks. A setup blocker is not an executed login failure and has no attempt
-photo. The latest completed iOS follow-up was blocked at this preflight; see the
-execution record for the distinction from the earlier failed native attempt.
+photo. The latest completed iOS run passed preflight, then failed after login
+submission; see the execution record for the distinction from the earlier blocker.
 
 Local runs also retain a dated, self-contained HTML report and result JSON under
 `results/history/`. Reports never overwrite one another. Open their private index:
@@ -330,9 +353,16 @@ capture completeness and timings. The run review should also consider workflow,
 agent instructions and skills, state what is untested, and preserve the original
 findings. Suggestions do not authorize new cloud runs or other external changes.
 
-Credential fields are blacked out using UI bounds from before and after capture;
-when inputs are present the keyboard/autofill area is also hidden. Other pixels
-are preserved. If hierarchy, coordinates or capture cannot be verified, the raw
+At the founder's request, new private screenshots preserve the login email and
+the password field's native dots/asterisks. The password field is visible only
+when both hierarchy inspections show exclusively masking characters at the same
+verified bounds. Plaintext, partial last-character reveals and unknown masking
+remain covered. These are original pixels, not replacement stars. Other sensitive
+fields and keyboard/autofill areas remain hidden, including explicit keyboard
+overlays over the login fields. Logs and structured screen summaries retain
+no field values; the email is permitted only in the private image. Earlier masks
+cannot be removed because raw screenshots were deleted.
+If hierarchy, coordinates or capture cannot be verified, the raw
 image is discarded and the report explicitly says the image is unavailable.
 A setup/build failure may have no app to photograph. Screenshots from earlier
 runs cannot be reconstructed. A later supplemental screenshot is labelled with

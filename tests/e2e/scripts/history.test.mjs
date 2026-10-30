@@ -36,6 +36,11 @@ test('timing compares only complete passing runs with matching device/build/back
     }
     assert.deepEqual(timingTotals(report), { runSeconds: 120, uiSeconds: 60, captureSeconds: 40 });
     assert.equal(timingTotals({ ...report, attempts: [{ durationSeconds: 1 }] }).captureSeconds, null);
+    const photo = { file: 'TC-002-1-attempt-1.png', durationSeconds: 20 };
+    assert.equal(timingTotals({ attempts: [{ screenshot: photo, inputScreenshot: photo }] }).captureSeconds, 20);
+    assert.equal(timingTotals({ attempts: [{ finalScreenshotIsInput: true, screenshot: { durationSeconds: 15 }, inputScreenshot: { durationSeconds: 15 } }] }).captureSeconds, 15);
+    assert.equal(timingTotals({ attempts: [{ screenshot: photo, inputScreenshot: { file: 'TC-002-2-attempt-1.png', durationSeconds: 30 } }] }).captureSeconds, 50);
+    assert.equal(comparePreviousRun({ ...current, requiresInputScreenshot: true }, fixture), null);
     assert.ok(existsSync(join(fixture, 'history/index.html')));
   } finally { rmSync(fixture, { recursive: true, force: true }); }
 });

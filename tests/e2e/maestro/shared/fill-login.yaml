@@ -1,0 +1,40 @@
+appId: ${MAESTRO_E2E_APP_ID}
+---
+- evalScript: ${output.e2eCheckpoint = "app-launched"}
+- extendedWaitUntil:
+    visible:
+      id: e2e-login-email
+    timeout: 30000
+- assertVisible:
+    id: e2e-login-password
+- assertVisible:
+    id: e2e-login-submit
+- assertNotVisible:
+    id: e2e-leagues-loaded
+- evalScript: ${output.e2eCheckpoint = "login-controls-ready"}
+- tapOn:
+    id: e2e-login-email
+- inputText:
+    text: ${MAESTRO_E2E_EMAIL}
+    label: Enter runtime account email
+- evalScript: ${output.e2eCheckpoint = "email-entered"}
+- tapOn:
+    id: e2e-login-password
+- inputText:
+    text: ${MAESTRO_E2E_PASSWORD}
+    label: Enter runtime account password
+- evalScript: ${output.e2eCheckpoint = "password-entered"}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # Non-interactive text dismisses the keyboard through ScrollView's
+      # keyboardShouldPersistTaps="handled". Avoid iOS hideKeyboard swipes.
+      - tapOn:
+          text: "^COMMITO$"
+- evalScript: ${output.e2eCheckpoint = "keyboard-dismissed"}

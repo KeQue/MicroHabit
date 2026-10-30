@@ -18,6 +18,14 @@ a roadmap, confidence score, or claim that the model has been retrained.
   values in command/environment/error fields must not enter the summary. A native
   no-account fixture verified the actual pinned CLI schema, including its retained
   JavaScript delimiters. These checks do not establish the iOS login root cause.
+- A later run reached `login-submitted`, but this proved completed automation
+  commands, not correct field contents. Verify the email privately and distinguish
+  a populated native password mask from an exact password match. Preserve a
+  before-submission image and final image in the same attempt, with no login
+  retries. Check designated error-node children too: native accessibility may
+  place their text there. Synthetic mismatch/empty/masked fields and unrelated
+  neighboring error text exercise these boundaries; native confirmation remains
+  separate. A missing report cannot establish that no UI attempt executed.
 
 - Follow-up observation: a failed GitHub test step actually contained a BLOCKED
   preflight with zero native attempts. Its broad Simulator message also conflated

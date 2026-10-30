@@ -1,0 +1,9 @@
+appId: ${MAESTRO_E2E_APP_ID}
+name: Login on iOS - prepare inputs
+---
+# This is the input phase of TC-002, not another business test case.
+# Dedicated disposable Simulator only: clears its entire Keychain.
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- runFlow: ../shared/fill-login.yaml

@@ -42,14 +42,17 @@ export function writeReport(report, directory = results) {
     if (screenshot?.status === 'CAPTURED' && /^TC-00[12]-[0-9]+-attempt-[1-5]\.png$/.test(screenshot.file || '')) {
       const png = readFileSync(join(directory, screenshot.file));
       picture = `<p>Native device screenshot captured ${escape(screenshot.capturedAt)}. Opaque credential/keyboard masks: ${escape(screenshot.redactions)}.</p><img alt="Native app state after this attempt" src="data:image/png;base64,${png.toString('base64')}">`;
+      if (screenshot.privacyPolicy === 'visible-email-native-password-mask-v1') picture += '<p>The login email may be visible. Native password dots remain visible only when both screen inspections confirm masking; otherwise the field is covered. No password text or replacement dots are added to the image.</p>';
     } else if (screenshot) picture = `<p>Screenshot unavailable: ${escape(screenshot.finding)}</p><p>Capture phase: ${escape(screenshot.phase)}. Diagnostic: ${escape(screenshot.diagnostic)}.</p>`;
     const timings = screenshot?.timings ? `<p>Capture phase times (seconds): ${Object.entries(screenshot.timings).map(([phase, seconds]) => `${escape(phase)}: ${escape(seconds)}`).join('; ')}.</p>` : '';
-    const state = screenshot?.stateAfter ? `<p>Safe screen checks: ${escape(JSON.stringify(screenshot.stateAfter))}. No field values or error text are retained.</p>` : '';
-    return picture + timings + state;
+    const state = screenshot?.stateAfter ? `<p>Safe screen checks: ${escape(JSON.stringify(screenshot.stateAfter))}. These checks retain no field values or error text.</p>` : '';
+    const inputs = screenshot?.inputChecks ? `<p>Private input verification: ${escape(JSON.stringify(screenshot.inputChecks))}. A nonempty native password mask verifies populated input, not the hidden password's exact value.</p>` : '';
+    return picture + timings + state + inputs;
   };
   const attempts = (report.attempts || []).map(attempt => {
     const diagnostic = attempt.diagnostics ? `<p>Last completed checkpoint: ${escape(attempt.diagnostics.lastCompletedCheckpoint)}. Failed command: ${escape(attempt.diagnostics.failedCommand)}. Target: ${escape(attempt.diagnostics.failedTarget)}.</p>` : '';
-    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(attempt.durationSeconds)} seconds)</p>${diagnostic}${pictureFor(attempt.screenshot)}</section>`;
+    const before = attempt.inputScreenshot && !attempt.finalScreenshotIsInput && attempt.inputScreenshot !== attempt.screenshot && (!attempt.inputScreenshot.file || attempt.inputScreenshot.file !== attempt.screenshot?.file) ? `<h3>Before Sign in</h3>${pictureFor(attempt.inputScreenshot)}<h3>After attempt</h3>` : '';
+    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(attempt.durationSeconds)} seconds)</p>${diagnostic}${before}${pictureFor(attempt.screenshot)}</section>`;
   }).join('');
   const improvements = `<aside><h2>Suggested improvements after this run</h2><ul>${suggestedImprovements(report).map(item => `<li>${escape(item)}</li>`).join('')}</ul></aside>`;
   const totals = timingTotals(report);
@@ -111,11 +114,11 @@ async function cli() {
   } else if (mode === 'encrypt-ios') {
     const path = join(results, 'TC-002-latest.html');
     if (!existsSync(path)) {
-      const result = { caseId: 'TC-002', platform: 'ios', status: 'BLOCKED', attempts: [], blockers: ['No native result/report exists; inspect the sanitized build diagnostics.'], authenticationEvidence: 'Not executed' };
+      const result = { caseId: 'TC-002', platform: 'ios', status: 'BLOCKED', attempts: [], blockers: ['No native result/report exists; inspect the sanitized build diagnostics.'], authenticationEvidence: 'No completed native report is available; authentication is not proven.' };
       const buildPath = join(results, 'ios-build-summary.json');
       if (existsSync(buildPath)) {
         const build = JSON.parse(readFileSync(buildPath, 'utf8'));
-        const phases = ['not-started', 'configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete', 'unknown'];
+        const phases = ['not-started', 'configuration', 'expo-prebuild', 'cocoapods-install', 'simulator-startup', 'simulator-configuration', 'simulator-readiness', 'xcode-compilation', 'app-installation', 'complete', 'unknown'];
         if (phases.includes(build.phase)) result.blockers.push(`Build phase: ${build.phase}. Exit code: ${Number.isInteger(build.exitCode) ? build.exitCode : 'unavailable / interrupted'}.`);
         const categories = (build.diagnostics || []).filter(value => typeof value === 'string' && /^[a-z-]{1,60}$/.test(value));
         if (categories.length) result.blockers.push(`Sanitized build diagnostics: ${categories.join(', ')}.`);

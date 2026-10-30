@@ -25,6 +25,14 @@ For a failure, inspect the last completed checkpoint, failed command/target and
 fixed app-error category. Missing diagnostics stay unknown; a redacted sign-in
 image alone cannot prove a wrong password or keyboard failure. Preserve earlier
 failed/incomplete reports when checking a corrected revision.
+On iOS, review the private input checks and before-submission image as well as
+the final image. Completed typing commands alone do not prove field contents.
+A nonempty password mask proves populated input, not an exact password match.
+Never copy values into diagnostics. The founder permits the email in private
+images and native password dots only; cover unverifiable or revealed passwords.
+Two flow phases are one attempt: do not reset/relaunch or retry login between
+input review and submission. Compiler/download caches must be saved before
+account access and must exclude installed apps, device data and raw reports.
 Read the native JSON/HTML before calling a failed GitHub step a login failure:
 BLOCKED with zero attempts means the UI case did not execute. A Simulator query
 timeout is unknown state, not evidence that the Simulator was stopped.

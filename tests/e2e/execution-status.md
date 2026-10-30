@@ -1,11 +1,64 @@
 # Mobile login setup and execution record
 
-October 29, 2026. Setup checks and actual native execution are distinguished below.
+Updated October 30, 2026. Setup checks and actual native execution are distinguished below.
+
+Prepared locally after the final run: iOS now privately verifies fields and
+captures the input screen before submission, then continues the same session.
+The final screen is still captured for each attempt. Both phases share the
+six-minute UI budget; exact email matching and populated/masked password state
+are distinguished. Error classification includes only designated error-node
+children; explicit auth/load errors fail promptly without shortening the success
+allowance. The disposable Simulator's AutoFill workaround requires readback of
+both settings. These are diagnostic/input-workaround changes, not a proven fix
+for the previous authentication failure.
+
+Prepared speed changes: optional 1 GiB native compiler cache, verified Maestro
+download reuse, installed-driver reuse and disabled build indexing. The last
+Apple Silicon run's compilation took about **11m 29s**, compared with **18m 06s**
+on the preceding Intel run; these observations do not isolate a hardware cause.
+Other build/setup phases still took about six minutes. A warm native compiler
+cache has not yet been measured. Cache writes precede account access and exclude
+app bundles, JS bundles, device/Keychain data, raw logs and visual reports.
+The build limit remains **60 minutes**; the job allows **110 minutes**, with a
+28-minute test-step ceiling to accommodate the additional evidence. Standard
+runner/manual triggers remain in place. No cloud run or workflow publication
+was started while preparing these changes.
+
+Validation: **138 Node checks passed**, including 27 QA infrastructure checks.
+Four flows passed the installed Maestro 2.12.0 syntax checker; ten workflow Bash
+blocks parsed, and cache/account-step boundaries were checked. Focused ESLint
+and diff whitespace checks passed. These checks do not prove Mac execution,
+actual AutoFill file availability, cache savings or iOS authentication. Existing
+unrelated Deno import errors from the full TypeScript check remain outside scope.
 
 | Case | Status | Device / OS | App version/build | Backend | Authentication evidence |
 | --- | --- | --- | --- | --- | --- |
 | Login on Android (TC-001) | PASS: two native attempts, each with its own screenshot | Dedicated Commito_E2E emulator, Android 14 / API 34, emulator-5554 | Installed 1.0.2 / versionCode 1 | Production; normal profile/auth effects approved | Both reached successful authenticated leagues loading, then repeated it after process restart; loaded state verified around each photo |
-| Login on iOS (TC-002) | Latest run BLOCKED in Simulator preflight; earlier native attempt FAIL with a retained photo | Standard macos-15-intel runner; dedicated iPhone 16 Simulator, iOS 18.5 build target | Latest installed version unverified by runner; source 1.0.2 / 36 | Production; scoped environment secrets | No login attempt in latest run; earlier assertions did not complete; authenticated loading/session restoration is not proven |
+| Login on iOS (TC-002) | FAIL: first attempt submitted login but did not reach authenticated loading; its screenshot retained | Standard macos-15 Apple Silicon runner; dedicated iPhone 16 Simulator, iOS 18.5 | Installed 1.0.2 / 36 | Production; scoped environment secrets | Completed checkpoint login-submitted; failed assertion e2e-leagues-loaded; other-auth-error present; exact cause unknown. Second attempt not run |
+
+The final approved iOS run [40957455640](https://github.com/KeQue/MicroHabit/actions/runs/40957455640)
+tested source `b21d8d8fe0888a71d50ed5fb7f84768530f278dc` on October 29.
+Build and installation succeeded (phase messages from 21:25:37 to 21:43:03 UTC).
+Native preflight confirmed the selected Simulator booted in 4.3 seconds.
+The first login attempt started at **21:43:58 UTC (22:43 Berlin)** and failed
+after **238.9 seconds**. It completed `login-submitted` but failed the assertion
+for `e2e-leagues-loaded`. Both screenshot inspections found the login controls
+and `other-auth-error`, with no server-loaded marker. This establishes an
+executed login failure, not its root cause or an incorrect-password diagnosis.
+The actual redacted native photo was retained (90.3 seconds capture/inspection),
+visually reviewed, and embedded in the browser report. Total native runner time
+was **351.4 seconds**. The encrypted artifact digest was verified before local
+decryption. Local history:
+`history/TC-002-2026-10-29T21-43-58-165Z-aab61238/report.html`.
+The founder requested stopping after this run; no further native/cloud run began.
+
+On October 30 the founder requested visible email and native masked password
+fields in future private photos. The local screenshot policy now permits those
+specific stable fields while preserving password/keyboard redaction when masking
+cannot be verified. No native login was executed to check this change. Existing
+photos remain unchanged because their raw pixels were discarded. Synthetic PNG
+checks cover native mask preservation, plaintext/partial reveals, moved fields
+and keyboard overlays; these do not establish device behavior.
 
 Initial Android run: October 29 at 14:04:04 UTC (15:04 Berlin), **310 seconds**
 including preflight; attempts **184.1s** and **121.3s**, both PASS. Command:
@@ -99,6 +152,18 @@ the case had ended, the verified system Wait button was selected and the dialog
 cleared. A new preflight check blocks current Android error windows before login,
 with fixed diagnostics; historical ANR mentions and arbitrary window titles are
 not retained or treated as a current dialog.
+
+The final setup-guard source `b21d8d8fe0888a71d50ed5fb7f84768530f278dc`
+then passed both real Android attempts at **21:17:06 UTC (22:17 Berlin)**:
+114.0s/104.5s, with its own photos at **21:19:30 UTC** and **21:22:09 UTC**.
+Each image was visually reviewed and showed authenticated leagues, with the
+server-loaded marker and absence of login/error elements checked around capture.
+Capture took 56.9s/39.8s; total 319.3s. Compared with the matching `6459674` run,
+total time was 93.0s longer, including 43.7s more capture time; no causal speed
+claim is made. The new system-window preflight reported ready. Account reuse
+required no new entry. The failed `06798ca` run remains unchanged in history.
+All **131 Node checks** passed, as did nine Bash syntax checks and five actual
+readiness-pipeline fixtures (ready, stopped, absent, unavailable, malformed).
 
 ## Observed environment
 
@@ -305,12 +370,31 @@ The next dispatcher is prepared locally for the standard `macos-15` Apple Silico
 runner. Official image documentation confirms installed Xcode 16.4 and iOS 18.5;
 public standard runners remain free. This is a proposed hardware change to measure,
 not a demonstrated fix for the earlier Intel behavior. No further cloud run or
-workflow publication has been authorized or started at this entry's preparation.
+workflow publication had been started when that correction was prepared.
 
 A separate read-only configuration check at **20:30:05 UTC** returned HTTP 200
 from the production public Auth settings endpoint using the synchronized public
 key, with email login enabled. It used no account password and changed no setting.
 This verifies public backend configuration, not native iOS authentication.
+
+## Authorized Apple Silicon verification
+
+After the complete Android evidence above, the founder explicitly approved
+publishing the prepared workflow and **one** standard Apple Silicon run.
+Workflow-only main commit `7f978d970b18c67f9bf546f3cb7d108fb8e6b2a0` was freshly
+verified to change exactly `.github/workflows/e2e-ios-login.yml`; its content
+matches the reviewed dispatcher. The existing Pages rebuild has unchanged site
+content; no app release or backend policy was published. Final preflight freshly
+verified exact Android source/evidence, public-repository eligibility, production
+context, trusted environment policy, secret names and encryption recipient.
+
+[Run 40957455640](https://github.com/KeQue/MicroHabit/actions/runs/40957455640)
+was accepted at **21:23:56 UTC (22:23 Berlin)** for source `b21d8d8`. It retains
+Xcode 16.4/iOS 18.5, the 60-minute build limit, post-install readiness checks,
+scoped credentials, two native attempts and encrypted-only reporting. Setup
+succeeded and the bounded build is active at this entry's preparation; native
+iOS login success remains unproven. The local Android emulator was closed after
+its completed run to free laptop memory.
 
 ## Earlier prepared corrections and visual reports
 

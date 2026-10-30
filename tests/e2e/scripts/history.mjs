@@ -20,7 +20,12 @@ function entries(directory) {
 export function timingTotals(report) {
   const attempts = report.attempts || [];
   const sum = getter => attempts.every(attempt => Number.isFinite(getter(attempt))) ? round(attempts.reduce((total, attempt) => total + getter(attempt), 0)) : null;
-  return { runSeconds: Number.isFinite(report.durationSeconds) ? report.durationSeconds : null, uiSeconds: sum(attempt => attempt.durationSeconds), captureSeconds: sum(attempt => attempt.screenshot?.durationSeconds) };
+  return { runSeconds: Number.isFinite(report.durationSeconds) ? report.durationSeconds : null, uiSeconds: sum(attempt => attempt.durationSeconds), captureSeconds: sum(attempt => {
+    const final = attempt.screenshot?.durationSeconds;
+    if (!Number.isFinite(final)) return null;
+    if (!attempt.inputScreenshot || attempt.finalScreenshotIsInput || attempt.inputScreenshot.file && attempt.inputScreenshot.file === attempt.screenshot.file) return final;
+    return Number.isFinite(attempt.inputScreenshot.durationSeconds) ? final + attempt.inputScreenshot.durationSeconds : null;
+  }) };
 }
 
 export function comparePreviousRun(report, directory) {
@@ -28,7 +33,7 @@ export function comparePreviousRun(report, directory) {
   const fields = ['caseId', 'platform', 'appId', 'device', 'osVersion', 'appVersion', 'appBuild', 'backendEnvironment', 'backendHost', 'maestroVersion'];
   const previous = entries(directory).map(entry => entry.report).find(candidate => candidate.status === 'PASS' && candidate.evidenceStatus === 'COMPLETE'
     && candidate.startedAt < report.startedAt && fields.every(field => report[field] != null && candidate[field] === report[field])
-    && candidate.attempts?.length === report.attempts?.length);
+    && !!candidate.requiresInputScreenshot === !!report.requiresInputScreenshot && candidate.attempts?.length === report.attempts?.length);
   if (!previous) return null;
   const current = timingTotals(report), baseline = timingTotals(previous);
   const delta = Object.fromEntries(Object.keys(current).map(key => [key, current[key] !== null && baseline[key] !== null ? round(current[key] - baseline[key]) : null]));

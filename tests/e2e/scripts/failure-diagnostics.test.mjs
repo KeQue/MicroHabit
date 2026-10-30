@@ -28,4 +28,10 @@ test('safe screen diagnostics classify only designated app errors and never reta
   assert.equal(unknown.authErrorCategory, 'other-auth-error');
   assert.ok(!JSON.stringify(unknown).includes(secret));
   assert.equal(safeScreenState({ attributes: { 'resource-id': 'other.app:id/e2e-auth-error', text: 'Invalid API key' }, children: [] }, appId).authErrorCategory, null);
+  const nested = { attributes: {}, children: [
+    { attributes: { 'resource-id': 'e2e-auth-error' }, children: [{ attributes: { text: 'Password is required' }, children: [] }] },
+    { attributes: { text: 'Invalid login credentials ' + secret }, children: [] },
+  ] };
+  assert.equal(safeScreenState(nested, appId).authErrorCategory, 'missing-password');
+  assert.ok(!JSON.stringify(safeScreenState(nested, appId)).includes(secret));
 });

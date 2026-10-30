@@ -15,3 +15,9 @@ export function resultExitCode(report) {
   if (report.status === 'FAIL') return 1;
   return report.status === 'PASS' && report.evidenceStatus === 'COMPLETE' ? 0 : 2;
 }
+
+export function screenshotEvidenceStatus(report) {
+  if (!report.attempts.length) return 'NOT_AVAILABLE';
+  return report.attempts.every(attempt => attempt.screenshot?.status === 'CAPTURED'
+    && (!report.requiresInputScreenshot || attempt.submissionStarted !== true || attempt.inputScreenshot?.status === 'CAPTURED')) ? 'COMPLETE' : 'INCOMPLETE';
+}

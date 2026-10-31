@@ -21,7 +21,7 @@ $testDevice = $null
 $result = 2
 try {
 Write-Host 'Starting the dedicated Android emulator in the background, if needed.'
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/e2e/scripts/start-android.ps1 -Headless
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/e2e/scripts/start-android.ps1
 if ($LASTEXITCODE -ne 0) { Write-Host 'Could not start the dedicated Android emulator.'; exit 2 }
 $deadline = [DateTime]::UtcNow.AddMinutes(3)
 while ([DateTime]::UtcNow -lt $deadline) {
@@ -38,6 +38,24 @@ while ([DateTime]::UtcNow -lt $deadline) {
     Start-Sleep -Seconds 3
 }
 if (-not $testDevice -or $booted -ne '1') { Write-Host 'The dedicated Android emulator did not finish booting within three minutes.'; exit 2 }
+Write-Host 'Waiting for Android System UI to stabilize.'
+$stable = 0
+for ($i = 0; $i -lt 12; $i++) {
+    Start-Sleep -Seconds 5
+    $windows = (& $adb -s $testDevice shell dumpsys window windows 2>$null | Out-String)
+    $hasError = $windows -match '(?m)^\s*Window #\d+ Window\{[^\r\n]*Application (?:Not Responding|Error):'
+
+    if ($LASTEXITCODE -eq 0 -and $windows -match 'WINDOW MANAGER WINDOWS' -and -not $hasError) {
+        $stable++
+        if ($stable -ge 4) { break }
+    } else {
+        $stable = 0
+    }
+}
+if ($stable -lt 4) {
+    Write-Host 'Android System UI did not stabilize; login skipped.'
+    exit 2
+}
 $apk = 'android/app/build/outputs/apk/release/app-release.apk'
 $expectedHash = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
 function Get-InstalledApkHash {

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { Buffer } from 'node:buffer';
 import { createHash, createPublicKey } from 'node:crypto';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dispatchedRunId, waitForRun } from './wait.mjs';
 
 const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/SECRET|TOKEN|PASSWORD|ANON_KEY|MAESTRO_E2E_EMAIL/i.test(key)));
 const run = (command, args, options = {}) => spawnSync(command, args, { encoding: 'utf8', env: cleanEnv, windowsHide: true, timeout: 30000, ...options });
@@ -20,7 +21,7 @@ try {
   if (credential.error || credential.status !== 0) throw Error('GitHub sign-in is unavailable.');
   const fields = Object.fromEntries(credential.stdout.split(/\r?\n/).filter(line => line.includes('=')).map(line => { const i = line.indexOf('='); return [line.slice(0, i), line.slice(i + 1)]; }));
   if (!fields.password) throw Error('GitHub sign-in is unavailable.');
-  const headers = { Authorization: `Bearer ${fields.password}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' };
+  const headers = { Authorization: `Bearer ${fields.password}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10', 'Content-Type': 'application/json' };
   const base = 'https://api.github.com/repos/KeQue/MicroHabit';
   const request = async (path, options = {}) => {
     const response = await fetch(base + path, { headers, redirect: 'error', signal: AbortSignal.timeout(30000), ...options });
@@ -55,10 +56,20 @@ try {
   await ensureIdle();
   writeFileSync(intent, `${source}\n`, { flag: 'wx', mode: 0o600 });
   dispatchRequested = true;
-  await request('/actions/workflows/e2e-ios-login.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main', inputs: { ios_source_sha: source, allow_production_login: true, full_screenshots: false } }) });
+  const dispatched = await request('/actions/workflows/e2e-ios-login.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main', return_run_details: true, inputs: { ios_source_sha: source, allow_production_login: true, full_screenshots: false } }) });
+  const runId = dispatchedRunId(dispatched);
+  if (!runId) throw Error('GitHub did not return the run identifier.');
   rmSync(intent);
   dispatchRequested = false;
-  console.log('iOS workflow started. Open https://github.com/KeQue/MicroHabit/actions/workflows/e2e-ios-login.yml to follow it.');
+  console.log(`iOS workflow started: https://github.com/KeQue/MicroHabit/actions/runs/${runId}`);
+  console.log('Keep this VS Code task open; the private report will open when iOS finishes.');
+  const outcome = await waitForRun(request, runId);
+  if (!outcome) throw Error('iOS run has not completed; open its GitHub page to check later.');
+  console.log(`iOS workflow completed: ${outcome}. Opening its private report.`);
+  const opened = run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'regression/ios/open-report.ps1', '-RunId', runId], { timeout: 120000 });
+  if (opened.error || opened.status !== 0) throw Error('The iOS report could not be opened automatically; download the encrypted artifact from the run page.');
+  console.log('Opened the private iOS report in your browser.');
+  if (outcome !== 'success') process.exitCode = 1;
 } catch (error) {
   console.error(error.message);
   if (dispatchRequested) console.error('Dispatch outcome may be unknown. Check GitHub Actions before trying again; the pending marker prevents duplicate runs.');

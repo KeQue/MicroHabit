@@ -11,4 +11,4 @@ $androidResult = $results.Android
 $iosResult = $results.Ios
 Write-Host "Android exit code: $androidResult. iOS dispatch exit code: $iosResult."
 if ($androidResult -ne 0 -or $iosResult -ne 0) { exit 1 }
-Write-Host 'Android finished; iOS is running on GitHub. Check its report after completion.'
+Write-Host 'Android and iOS finished. Their private reports opened in your browser.'

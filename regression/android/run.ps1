@@ -7,6 +7,16 @@ $revision = (git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { Write-Host 'Could not identify the source revision.'; exit 2 }
 $adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
 if (-not (Test-Path -LiteralPath $adb)) { Write-Host 'Android SDK adb is unavailable.'; exit 2 }
+$runningDevices = @(& $adb devices | Select-String '^emulator-\d+\s+' | ForEach-Object { ($_ -split '\s+')[0] })
+foreach ($serial in $runningDevices) {
+    $name = (& $adb -s $serial shell getprop ro.boot.qemu.avd_name 2>$null | Out-String).Trim()
+    if ($name -ne 'Commito_E2E') { Write-Host 'Close other or offline emulators before preparing the Android build.'; exit 2 }
+    Write-Host 'Closing the dedicated emulator before the build to free memory.'
+    & $adb -s $serial emu kill | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Host 'Could not close the dedicated emulator.'; exit 2 }
+}
+& node regression/android/build-apk.mjs
+if ($LASTEXITCODE -ne 0) { Write-Host 'Android build verification failed; no Android login was attempted.'; exit 2 }
 $testDevice = $null
 $result = 2
 try {
@@ -28,6 +38,23 @@ while ([DateTime]::UtcNow -lt $deadline) {
     Start-Sleep -Seconds 3
 }
 if (-not $testDevice -or $booted -ne '1') { Write-Host 'The dedicated Android emulator did not finish booting within three minutes.'; exit 2 }
+$apk = 'android/app/build/outputs/apk/release/app-release.apk'
+$expectedHash = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
+function Get-InstalledApkHash {
+    $paths = @(& $adb -s $testDevice shell pm path com.sadik.microhabit 2>$null | Where-Object { $_ -match '^package:' })
+    if ($paths.Count -ne 1 -or $paths[0] -notmatch '^package:/data/app/[-A-Za-z0-9._~=/]+/base\.apk\s*$') { return $null }
+    $path = ($paths[0] -replace '^package:', '').Trim()
+    $output = (& $adb -s $testDevice shell sha256sum $path 2>$null | Out-String).Trim()
+    if ($output -match '^([a-fA-F0-9]{64})\s') { return $Matches[1].ToLowerInvariant() }
+    return $null
+}
+if ((Get-InstalledApkHash) -ne $expectedHash) {
+    Write-Host 'Installing the current Android APK on the dedicated emulator.'
+    & $adb -s $testDevice install -r $apk
+    if ($LASTEXITCODE -ne 0) { Write-Host 'Android APK installation failed.'; exit 2 }
+}
+if ((Get-InstalledApkHash) -ne $expectedHash) { Write-Host 'Could not verify the installed Android APK; no login was attempted.'; exit 2 }
+Write-Host 'Verified the installed Android APK matches the current build.'
 $env:E2E_ANDROID_DEVICE = $testDevice
 $env:E2E_ANDROID_APP_ID = 'com.sadik.microhabit'
 $env:E2E_BACKEND_ENV = 'production'

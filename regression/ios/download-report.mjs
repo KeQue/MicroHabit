@@ -1,0 +1,32 @@
+import { Buffer } from 'node:buffer';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+const runId=process.argv[2];
+try {
+  if(!/^\d{8,15}$/.test(runId))throw Error('Run ID required');
+  const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!/SECRET|TOKEN|PASSWORD|ANON_KEY|MAESTRO_E2E_EMAIL/i.test(key)));
+  const auth=spawnSync('git',['credential','fill'],{input:'protocol=https\nhost=github.com\npath=KeQue/MicroHabit.git\n\n',encoding:'utf8',env,windowsHide:true,timeout:30000});
+  const fields=Object.fromEntries(auth.stdout.trim().split(/\r?\n/).map(line=>{const i=line.indexOf('=');return[line.slice(0,i),line.slice(i+1)];}));
+  if(auth.status!==0||!fields.password)throw Error('GitHub sign-in unavailable');
+  const headers={Authorization:`Bearer ${fields.password}`,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'};
+  const base='https://api.github.com/repos/KeQue/MicroHabit';
+  const meta=await fetch(base+'/actions/runs/'+runId+'/artifacts',{headers,signal:AbortSignal.timeout(30000)});
+  if(!meta.ok)throw Error('Artifact metadata unavailable');
+  const data=await meta.json();
+  const artifact=data.artifacts.find(a=>a.name===`TC-002-report-${runId}-1`&&!a.expired);
+  if(!artifact||!/^sha256:[a-f0-9]{64}$/.test(artifact.digest)||artifact.size_in_bytes>20*1024*1024)throw Error('Expected artifact unavailable');
+  const redirect=await fetch(base+'/actions/artifacts/'+artifact.id+'/zip',{headers,redirect:'manual',signal:AbortSignal.timeout(30000)});
+  const location=redirect.headers.get('location');
+  if(redirect.status!==302||!location||!/^https:\/\/[a-z0-9-]+\.blob\.core\.windows\.net\//i.test(location))throw Error('Unexpected artifact destination');
+  const download=await fetch(location,{redirect:'error',signal:AbortSignal.timeout(60000)});
+  if(!download.ok)throw Error('Artifact download failed');
+  const zip=Buffer.from(await download.arrayBuffer());
+  if(zip.length>20*1024*1024||'sha256:'+createHash('sha256').update(zip).digest('hex')!==artifact.digest)throw Error('Artifact digest mismatch');
+  const directory=`tests/e2e/results/downloads/ios-${runId}`;
+  mkdirSync(directory,{recursive:true});
+  writeFileSync(directory+'/report.zip',zip);
+  const safe={runId,artifactId:artifact.id,name:artifact.name,bytes:zip.length,digest:artifact.digest,digestVerified:true};
+  writeFileSync(directory+'/artifact.json',JSON.stringify(safe,null,2));
+  console.log(JSON.stringify(safe));
+}catch{console.error('Encrypted report download stopped; no tokens, signed URLs or response bodies were printed.');process.exitCode=2;}

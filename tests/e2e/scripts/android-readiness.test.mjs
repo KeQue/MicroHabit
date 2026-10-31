@@ -39,6 +39,7 @@ test('recovery confirms the dialog cleared and stops after two attempts', async 
   assert.equal((await recovery.recover(anr, 'preflight')).diagnostic, 'android-recovery-limit');
   assert.equal(taps, 2);
   assert.deepEqual(recovery.events.map(x => x.result), ['recovered', 'recovered', 'limit-reached']);
+  assert.ok(recovery.events.every(x => Number.isFinite(x.durationSeconds) && x.durationSeconds >= 0));
 });
 
 test('failed verification never taps and active flow is stopped before recovery', async () => {
@@ -68,7 +69,27 @@ test('a tapped dialog that does not clear is not considered recovered', async ()
     return { status: 0 };
   }, async () => {});
   assert.equal((await recovery.recover(anr, 'preflight')).diagnostic, 'android-recovery-unconfirmed');
-  assert.deepEqual(recovery.events, [{ phase: 'preflight', result: 'not-confirmed' }]);
+  assert.deepEqual(recovery.events.map(({ phase, result }) => ({ phase, result })), [{ phase: 'preflight', result: 'not-confirmed' }]);
+});
+
+test('dialog geometry and accessibility can be read concurrently', async () => {
+  const anr = response('Application Not Responding: com.android.systemui');
+  const ready = response('com.example.app');
+  let pendingReads = 0, concurrentReads = false, windowChecks = 0;
+  const adb = async args => {
+    if (args.includes('dumpsys')) return ++windowChecks === 1 ? anr : ready;
+    if (args.includes('size') || args.includes('uiautomator')) {
+      pendingReads++;
+      if (pendingReads === 2) concurrentReads = true;
+      await new Promise(resolve => setImmediate(resolve));
+      return args.includes('size') ? { status: 0, stdout: 'Physical size: 200x200\n' } : { status: 0, stdout: waitNode };
+    }
+    if (args.includes('tap')) return { status: 0 };
+    throw Error('unexpected command');
+  };
+  const recovery = createSystemUiRecovery(adb, async () => {});
+  assert.equal((await recovery.recover(anr, 'preflight')).ready, true);
+  assert.equal(concurrentReads, true);
 });
 
 test('a recovered dialog during a flow permits a counted restart after stopping', async () => {

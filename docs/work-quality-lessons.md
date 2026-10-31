@@ -83,6 +83,16 @@ a roadmap, confidence score, or claim that the model has been retrained.
   restart within the existing login-attempt budget. Never relax screenshot
   coordinate or redaction checks to manufacture evidence. Native recovery and
   process-tree behavior still require device verification.
+- Follow-up observation: the Android HTML report showed about 3m40s of E2E
+  runner time while the founder observed about 18 minutes from starting the task.
+  The report's former "total including setup" label overstated what it measured;
+  it did not include APK preparation, emulator startup, installation, or browser
+  opening, and no historical stage timings can explain the remaining gap.
+  Label runner and launcher time separately, record launcher stages on future
+  runs, and do not infer a cause for old wall-clock differences without evidence.
+  Also check for a newly appeared Android error window during stabilization and
+  invoke only the existing verified Wait recovery; exact dialog safety and
+  native timing still require device verification.
 
 ## Keep private build diagnostics observable
 

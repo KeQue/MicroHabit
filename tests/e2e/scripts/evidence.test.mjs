@@ -28,6 +28,23 @@ test('Android recovery outcomes are recorded in the private HTML report', () => 
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('Android report separates runner time from launcher setup and records recovery duration', () => {
+  const directory = mkdtempSync(join(process.cwd(), 'tests/e2e/results/timing-test-'));
+  try {
+    const report = {
+      caseId: 'TC-001', platform: 'android', status: 'PASS', durationSeconds: 220,
+      attempts: [], androidRecoveries: [{ phase: 'preflight', result: 'recovered', durationSeconds: 4.2 }],
+      launcherTimings: { apkPreparationSeconds: 780, emulatorStartupSeconds: 95, androidDialogRecoverySeconds: 4.2, systemUiStabilizationSeconds: 3, apkInstallationSeconds: 8 },
+    };
+    const html = readFileSync(writeReport(report, directory), 'utf8');
+    assert.ok(html.includes('E2E runner total: 3 min 40 sec'));
+    assert.ok(html.includes('excludes the Android APK build, emulator startup'));
+    assert.ok(html.includes('APK preparation: 13 min'));
+    assert.ok(html.includes('System dialog check/recovery: 4.2 sec'));
+    assert.ok(html.includes('preflight: recovered (4.2 sec)'));
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('PASS image validation requires an identifier from this app, never static text or login fields', () => {
   const appId = 'com.sadik.microhabit';
   const marker = id => ({ attributes: { 'resource-id': id }, children: [] });

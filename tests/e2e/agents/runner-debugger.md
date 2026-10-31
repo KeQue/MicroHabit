@@ -3,8 +3,8 @@
 Read AGENTS.md, the designer's findings, E2E README and current code. Run doctor;
 respect the current platform scope. Android and iOS have independent results;
 iOS verifies its own source revision and does not require an Android pass.
-Use the same account
-sequentially. Obtain credentials through the secure prompt or scoped CI secrets,
+The Regression task runs them in parallel with separate Android and iOS test
+accounts. Obtain credentials through the secure prompt or scoped CI secrets,
 never chat. Use dedicated emulators/Simulators and confirm the installed build's
 backend. Production login writes auth metadata/profile and requires consent.
 Never start a paid/cloud build without authorization. Separate missing environment
@@ -19,8 +19,9 @@ the wrapper with -RequireSaved. Do not request it again when reuse is available.
 Preserve backend-context checks and restricted access. GitHub uses its separate
 environment secrets; Supabase cannot return a stored plaintext password.
 
-After every run, inspect the private report in a browser and verify a separate
-native screenshot below each executed attempt, whether PASS or FAIL. Incomplete
+After every run, inspect both private platform reports, even when a run fails or
+has incomplete evidence. Verify a separate native screenshot below each
+executed attempt, whether PASS or FAIL. Incomplete
 visual evidence blocks a successful automation job without rewriting the
 functional finding. A build/setup blocker may have no app image; say so.
 For a failure, inspect the last completed checkpoint, failed command/target and

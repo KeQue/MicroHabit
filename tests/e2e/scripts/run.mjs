@@ -25,7 +25,7 @@ mkdirSync(resultsDir, { recursive: true, mode: 0o700 });
 function toolEnv() {
   const result = { ...env };
   for (const key of Object.keys(result)) {
-    if (/SECRET|TOKEN|PASSWORD|ANON_KEY|MAESTRO_E2E_EMAIL|MAESTRO_CLOUD_API_KEY/i.test(key)) delete result[key];
+    if (/SECRET|TOKEN|PASSWORD|ANON_KEY|MAESTRO_E2E_EMAIL|MAESTRO_CLOUD_API_KEY|E2E_ANDROID_LAUNCHER_TIMINGS/i.test(key)) delete result[key];
   }
   return result;
 }
@@ -168,6 +168,34 @@ async function doctor() {
   } finally { rmSync(temporary, { recursive: true, force: true }); }
 }
 
+async function checkAndroidReadiness(device) {
+  if (!valid(device, /^emulator-\d+$/) || !tools.adb) {
+    console.error('Android System UI preflight blocked: dedicated emulator or ADB unavailable.');
+    return 2;
+  }
+  const adb = args => call(tools.adb, ['-s', device, ...args]);
+  const state = await adb(['get-state']);
+  const emulator = await adb(['shell', 'getprop', 'ro.kernel.qemu']);
+  if (state.status !== 0 || state.stdout?.trim() !== 'device' || emulator.stdout?.trim() !== '1') {
+    console.error('Android System UI preflight blocked: selected device is not a ready emulator.');
+    return 2;
+  }
+  const recovery = createSystemUiRecovery(adb);
+  const windows = await recovery.query();
+  const readiness = isSystemUiAnr(windows)
+    ? await recovery.recover(windows, 'preflight')
+    : inspectAndroidWindows(windows);
+  const elapsed = Math.round(recovery.events.reduce((sum, event) => sum + (event.durationSeconds || 0), 0) * 10) / 10;
+  if (!readiness.ready) {
+    console.error(`Android System UI preflight blocked: ${readiness.diagnostic || 'readiness unknown'}.`);
+    return 2;
+  }
+  console.log(recovery.events.length
+    ? `Android System UI ready; safely selected Wait and confirmed recovery (${elapsed} seconds).`
+    : 'Android System UI ready; no recovery dialog was present.');
+  return 0;
+}
+
 function valid(value, pattern) { return typeof value === 'string' && pattern.test(value); }
 async function prepare(platform) {
   const android = platform === 'android';
@@ -194,6 +222,14 @@ async function prepare(platform) {
   if (metadata.backendHost === productionHost && metadata.backendEnvironment !== 'production') block('The known production host must be labelled production.');
   if (metadata.backendEnvironment === 'production' || metadata.backendHost === productionHost) {
     if (env.E2E_ALLOW_PRODUCTION_LOGIN !== 'yes') block('Production login requires E2E_ALLOW_PRODUCTION_LOGIN=yes; auth metadata and profile writes occur.');
+  }
+  if (android && env.E2E_ANDROID_LAUNCHER_TIMINGS) {
+    const keys = ['apkPreparationSeconds', 'emulatorStartupSeconds', 'androidDialogRecoverySeconds', 'systemUiStabilizationSeconds', 'apkInstallationSeconds'];
+    try {
+      const timings = JSON.parse(env.E2E_ANDROID_LAUNCHER_TIMINGS);
+      if (!timings || Object.keys(timings).length !== keys.length || keys.some(key => !Number.isFinite(timings[key]) || timings[key] < 0 || timings[key] > 3600)) throw Error();
+      metadata.launcherTimings = Object.fromEntries(keys.map(key => [key, Math.round(timings[key] * 10) / 10]));
+    } catch { block('Android launcher timing metadata is invalid; rerun through the Regression launcher.'); }
   }
   if (env.E2E_BUILD_BACKEND_CONFIRMED !== 'yes') block('Confirm the installed build backend using E2E_BUILD_BACKEND_CONFIRMED=yes.');
   if (!env.MAESTRO_E2E_EMAIL || !env.MAESTRO_E2E_PASSWORD) block('Supply account email/password securely at runtime.');
@@ -396,6 +432,7 @@ async function run(platform, prerequisite = null) {
 let lock = false;
 try {
   if (mode === 'doctor') process.exitCode = await doctor();
+  else if (mode === 'android-readiness') process.exitCode = await checkAndroidReadiness(process.argv[3] || env.E2E_ANDROID_DEVICE);
   else if (['android', 'ios', 'all', 'snapshot-android'].includes(mode)) {
     try { writeFileSync(join(resultsDir, '.run.lock'), String(process.pid), { flag: 'wx', mode: 0o600 }); lock = true; }
     catch { throw new Error('Another E2E run holds the local lock. If a previous process was interrupted, verify it has stopped before removing tests/e2e/results/.run.lock.'); }
@@ -423,7 +460,7 @@ try {
       const result = await run(mode);
       process.exitCode = resultExitCode(result);
     }
-  } else { console.error('Usage: node tests/e2e/scripts/run.mjs doctor|android|ios|all'); process.exitCode = 2; }
+  } else { console.error('Usage: node tests/e2e/scripts/run.mjs doctor|android-readiness <emulator-id>|android|ios|all'); process.exitCode = 2; }
 } catch (error) {
   // Never print caught child output, stack traces, input values, or raw reports.
   console.error(error.message?.startsWith('Another E2E run') ? error.message : 'E2E runner could not finish. Check local tool permissions and setup; no PASS is recorded.');

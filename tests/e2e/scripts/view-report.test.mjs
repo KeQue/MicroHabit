@@ -17,7 +17,7 @@ test('each Android result opens one fresh report and never opens an old or missi
   }
 });
 
-test('Android invokes Edge once in app mode; iOS keeps its existing browser arguments', async () => {
+test('Android opens one visible Edge browser window; iOS keeps its existing browser arguments', async () => {
   const calls = [];
   const launch = (executable, args, options) => {
     calls.push({ executable, args, options });
@@ -28,8 +28,9 @@ test('Android invokes Edge once in app mode; iOS keeps its existing browser argu
   const options = { platform: 'win32', environment: { ProgramFiles: 'C:/Program Files' }, exists: () => true, launch };
   await openReport('android', options);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].args.length, 1);
-  assert.match(calls[0].args[0], /^--app=file:/);
+  assert.deepEqual(calls[0].args.slice(0, 1), ['--new-window']);
+  assert.ok(calls[0].args[1].startsWith('file:'));
+  assert.throws(() => browserCommand('win32', 'C:/private/report.html', options.environment, () => false, 'android'), /Microsoft Edge/);
   const ios = browserCommand('win32', 'C:/private/report.html', options.environment, options.exists, 'downloaded-ios');
   assert.equal(ios.args[0], '--new-window');
 });

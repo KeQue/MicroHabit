@@ -40,9 +40,14 @@ tests/e2e/
 ```
 
 After a run, the runner follows [the report and performance improvement agent](agents/report-improvement-engineer.md)
-to review recommendations and look for evidence-backed speed improvements. This
-is an assistant workflow, not an unattended service: it runs when an assistant is
-working on the report and does not independently start tests or cloud jobs.
+to review recommendations and look for evidence-backed speed improvements. After
+each mobile run, inspect both platform results with the
+[E2E report/performance skill](../../.github/skills/e2e-report-performance-review/SKILL.md),
+then assess the report suggestions with the
+[recommendation implementation skill](../../.github/skills/e2e-report-recommendation-implementer/SKILL.md).
+This is an assistant workflow, not an unattended service: it runs when an
+assistant is working on the reports and does not independently start tests or
+cloud jobs.
 
 Reuse Node/npm, Expo SDK 54, Java 21, Android SDK and the existing
 Pixel_7 Android 14 image. Maestro CLI is pinned to **2.12.0**. No npm testing

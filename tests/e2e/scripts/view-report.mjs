@@ -9,10 +9,15 @@ export function browserCommand(platform, path, environment = process.env, exists
   const url = pathToFileURL(path).href;
   if (platform === 'win32') {
     const bases = [environment['ProgramFiles(x86)'], environment.ProgramFiles, environment.LOCALAPPDATA].filter(Boolean);
+    if (mode === 'android') {
+      const executable = bases.map(base => join(base, 'Microsoft/Edge/Application/msedge.exe')).find(exists);
+      if (!executable) throw Error('Install Microsoft Edge to view the Android report.');
+      return { executable, args: ['--new-window', url] };
+    }
     const browsers = ['Microsoft/Edge/Application/msedge.exe', 'Google/Chrome/Application/chrome.exe', 'Mozilla Firefox/firefox.exe'];
     for (const browser of browsers) for (const base of bases) {
       const executable = join(base, browser);
-      if (exists(executable)) return { executable, args: mode === 'android' && browser.startsWith('Microsoft/Edge/') ? [`--app=${url}`] : ['--new-window', url] };
+      if (exists(executable)) return { executable, args: ['--new-window', url] };
     }
     throw Error('Install Edge, Chrome or Firefox to view the private report.');
   }

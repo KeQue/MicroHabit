@@ -46,22 +46,27 @@ export function createSystemUiRecovery(adb, sleep = ms => new Promise(resolve =>
   let attempts = 0;
   const query = () => adb(['shell', 'dumpsys', 'window', 'windows']);
   async function recover(initial, phase) {
+    const started = Date.now();
+    const record = result => events.push({ phase, result, durationSeconds: Math.round((Date.now() - started) / 100) / 10 });
     if (!isSystemUiAnr(initial)) return { ready: false, diagnostic: 'android-unrecoverable-dialog' };
-    if (attempts >= 2) { events.push({ phase, result: 'limit-reached' }); return { ready: false, diagnostic: 'android-recovery-limit' }; }
+    if (attempts >= 2) { record('limit-reached'); return { ready: false, diagnostic: 'android-recovery-limit' }; }
     attempts++;
-    const size = displaySize(await adb(['shell', 'wm', 'size']));
-    const hierarchy = await adb(['exec-out', 'uiautomator', 'dump', '/dev/tty']);
+    const [sizeResult, hierarchy] = await Promise.all([
+      adb(['shell', 'wm', 'size']),
+      adb(['exec-out', 'uiautomator', 'dump', '/dev/tty']),
+    ]);
+    const size = displaySize(sizeResult);
     const button = !hierarchy.error && hierarchy.status === 0 ? systemWaitButton(hierarchy.stdout, size) : null;
-    if (!button || !isSystemUiAnr(await query())) { events.push({ phase, result: 'wait-unverified' }); return { ready: false, diagnostic: 'android-wait-unverified' }; }
+    if (!button || !isSystemUiAnr(await query())) { record('wait-unverified'); return { ready: false, diagnostic: 'android-wait-unverified' }; }
     const tap = await adb(['shell', 'input', 'tap', String(button.x), String(button.y)]);
-    if (tap.error || tap.status !== 0) { events.push({ phase, result: 'tap-failed' }); return { ready: false, diagnostic: 'android-wait-failed' }; }
+    if (tap.error || tap.status !== 0) { record('tap-failed'); return { ready: false, diagnostic: 'android-wait-failed' }; }
     for (let i = 0; i < 5; i++) {
       await sleep(1000);
       const checked = inspectAndroidWindows(await query());
-      if (checked.ready) { events.push({ phase, result: 'recovered' }); return checked; }
+      if (checked.ready) { record('recovered'); return checked; }
       if (checked.diagnostic !== 'android-error-dialog-present' || checked.category !== 'system-ui') break;
     }
-    events.push({ phase, result: 'not-confirmed' });
+    record('not-confirmed');
     return { ready: false, diagnostic: 'android-recovery-unconfirmed' };
   }
   return { events, query, recover };

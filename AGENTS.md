@@ -60,5 +60,9 @@ Use `docs/beta-smoke-test.md` for device checks and recorded results.
 See `docs/codex-plus-tutorial.md` for assistant assessment and lesson checks.
 
 After each mobile E2E run, apply `tests/e2e/agents/report-improvement-engineer.md`
-to the report recommendations and performance evidence. This does not authorize
-additional device logins, cloud runs, publishing, downloads, or production writes.
+to review both Android and iOS reports, even when one platform fails or lacks
+visual evidence. Use `.github/skills/e2e-report-performance-review/SKILL.md` for
+the cross-platform report and speed review, then
+`.github/skills/e2e-report-recommendation-implementer/SKILL.md` to assess and
+implement supported report recommendations. This does not authorize additional
+device logins, cloud runs, publishing, downloads, or production writes.

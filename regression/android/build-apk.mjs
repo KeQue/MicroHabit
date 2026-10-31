@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { canReuse, fingerprint, isAppInput, isExpectedExpoPackageRewrite } from './apk-fingerprint.mjs';
+import { chooseBuildDrive, parseMappings } from './short-path.mjs';
 
 const apk = 'android/app/build/outputs/apk/release/app-release.apk';
 const manifestPath = 'tests/e2e/.tools/android-apk-provenance.json';
@@ -44,12 +45,26 @@ try {
   } else {
     const jdk = JSON.parse(readFileSync('tests/e2e/.tools/jdk/installation.json', 'utf8')).home;
     if (!existsSync(join(jdk, 'bin/java.exe'))) throw Error('The existing Android build JDK is unavailable.');
-    const buildEnv = { ...cleanEnv, JAVA_HOME: jdk, ANDROID_HOME: join(process.env.LOCALAPPDATA, 'Android/Sdk'), GRADLE_USER_HOME: join(process.cwd(), 'tests/e2e/.tools/gradle-cache'), NODE_ENV: 'production', CI: '1' };
+    const cache = join(process.cwd(), 'tests/e2e/.tools/gradle-cache');
+    const mappings = () => {
+      const result = spawnSync('subst.exe', [], { env: cleanEnv, encoding: 'utf8', windowsHide: true, timeout: 30000 });
+      if (result.error || result.status !== 0) throw Error('Cannot inspect existing build drive mappings.');
+      return parseMappings(result.stdout);
+    };
+    const used = new Set(mappings().keys());
+    for (const drive of ['X:', 'Y:', 'Z:', 'R:', 'Q:']) if (existsSync(`${drive}\\`)) used.add(drive);
+    const drive = chooseBuildDrive(used);
+    if (!drive) throw Error('No short build drive is available.');
     mkdirSync(results, { recursive: true, mode: 0o700 });
     const temporary = mkdtempSync(join(results, '.private-build-'));
-    const log = openSync(join(temporary, 'build.log'), 'w', 0o600);
-    const packageBefore = readFileSync('package.json');
+    let log, mappingCreated = false;
     try {
+      log = openSync(join(temporary, 'build.log'), 'w', 0o600);
+      const packageBefore = readFileSync('package.json');
+      const mapped = spawnSync('subst.exe', [drive, cache], { env: cleanEnv, windowsHide: true, timeout: 30000 });
+      if (mapped.error || mapped.status !== 0) throw Error('Cannot create a temporary short build drive.');
+      mappingCreated = true;
+      const buildEnv = { ...cleanEnv, JAVA_HOME: jdk, ANDROID_HOME: join(process.env.LOCALAPPDATA, 'Android/Sdk'), GRADLE_USER_HOME: `${drive}\\`, NODE_ENV: 'production', CI: '1' };
       console.log('Building a fresh Android Release APK; this may take several minutes.');
       const run = (command, args) => spawnSync(command, args, { env: buildEnv, stdio: ['ignore', log, log], windowsHide: true, timeout: 3600000 });
       const buildFailure = (phase, result) => {
@@ -63,6 +78,7 @@ try {
           ['process-start', /a problem occurred starting process|cannot run program|could not start process/i],
           ['daemon-exited', /gradle build daemon disappeared|daemon disappeared unexpectedly|daemon has disappeared/i],
           ['disk-space', /no space left on device|not enough space on the disk|disk full/i],
+          ['windows-path-length', /filename longer than 260 characters|the filename or extension is too long/i],
           ['gradle-configuration', /a problem occurred configuring|a problem occurred evaluating|could not determine the dependencies/i],
           ['javascript-bundling', /bundleReleaseJsAndAssets|react-native bundle|unable to resolve module/i],
         ].filter(([, pattern]) => pattern.test(tail)).map(([category]) => category);
@@ -84,10 +100,22 @@ try {
       if (inputs() !== inputHash) throw Error('App inputs changed during the build; the APK was not accepted.');
       writeFileSync(manifestPath, JSON.stringify({ version: 1, inputHash, apkHash: hashFile(apk) }) + '\n', { mode: 0o600 });
       console.log('Fresh Android APK built and recorded.');
-    } finally { closeSync(log); rmSync(temporary, { recursive: true, force: true }); }
+    } finally {
+      try {
+        if (log !== undefined) closeSync(log);
+        rmSync(temporary, { recursive: true, force: true });
+      } finally {
+        if (mappingCreated) try {
+          if (mappings().get(drive) === cache.replaceAll('/', '\\').replace(/\\+$/, '').toLowerCase()) {
+            const unmapped = spawnSync('subst.exe', [drive, '/d'], { env: cleanEnv, windowsHide: true, timeout: 30000 });
+            if (unmapped.error || unmapped.status !== 0) console.error('The temporary build drive could not be removed.');
+          } else console.error('The build drive mapping changed; it was left untouched.');
+        } catch { console.error('The temporary build drive could not be verified for removal.'); }
+      }
+    }
   }
 } catch (error) {
-  const safe = /^(?:Cannot inspect app source\.|Commit tracked changes before building the app\.|Untracked application files found; commit or remove them before building\.|Installed dependencies cannot be verified\.|Installed dependencies do not match the project lockfile\.|Cannot resolve the app build configuration\.|The Android build is not configured for the approved production backend\.|The existing Android build JDK is unavailable\.|Expo prebuild changed unexpected package settings; inspect them before continuing\.|Android build stopped; private build output was discarded\.|App inputs changed during the build; the APK was not accepted\.)$/;
+  const safe = /^(?:Cannot inspect app source\.|Commit tracked changes before building the app\.|Untracked application files found; commit or remove them before building\.|Installed dependencies cannot be verified\.|Installed dependencies do not match the project lockfile\.|Cannot resolve the app build configuration\.|The Android build is not configured for the approved production backend\.|The existing Android build JDK is unavailable\.|Cannot inspect existing build drive mappings\.|No short build drive is available\.|Cannot create a temporary short build drive\.|Expo prebuild changed unexpected package settings; inspect them before continuing\.|Android build stopped; private build output was discarded\.|App inputs changed during the build; the APK was not accepted\.)$/;
   console.error(safe.test(error.message) ? error.message : 'Android build preparation failed; private details were not printed.');
   process.exitCode = 2;
 }

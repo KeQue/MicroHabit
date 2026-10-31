@@ -3,6 +3,16 @@
 Record observed gaps and concrete changes to the working method. This is not
 a roadmap, confidence score, or claim that the model has been retrained.
 
+## Verify the Android APK and preserve build inputs
+
+- Observation: the regression runner recorded the current Git revision while
+  using an older installed APK. An Android rebuild also changed Expo package
+  scripts, and a native build hit Windows' 260-character path limit.
+- Correction: verify the build inputs and APK hash before attributing a run to a
+  revision, preserve known Expo script changes, and report build failures without
+  exposing raw logs. A shorter temporary cache mapping is prepared but needs a
+  successful native build to establish that it resolves the path failure.
+
 ## Check Simulator Keychain entitlements after a successful Auth response
 
 - Observation: a diagnostic iOS login received an Auth success response but

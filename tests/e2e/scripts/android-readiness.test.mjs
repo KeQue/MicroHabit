@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createSystemUiRecovery, inspectAndroidWindows, isSystemUiAnr, monitorAndroidFlow, systemWaitButton } from './android-readiness.mjs';
+import { createSystemUiRecovery, inspectAndroidWindows, isSystemUiAnr, monitorAndroidFlow, systemCloseButton, systemWaitButton } from './android-readiness.mjs';
 
 const secret = 'SYNTHETIC_PRIVATE_WINDOW_TITLE';
 const response = title => ({ status: 0, stdout: `WINDOW MANAGER WINDOWS (dumpsys window windows)\n  Window #0 Window{123abc u0 ${title}}:\n` });
@@ -14,9 +14,13 @@ test('current Android system/app error windows block setup without retaining arb
 });
 
 const waitNode = '<node text="Wait" resource-id="android:id/aerr_wait" package="android" clickable="true" enabled="true" bounds="[10,20][110,80]" />';
+const closeNode = '<node text="Close app" resource-id="android:id/aerr_close" package="android" clickable="true" enabled="true" bounds="[120,20][190,80]" />';
 test('only a verified system Wait element inside the display is eligible', () => {
   assert.deepEqual(systemWaitButton(waitNode, { width: 200, height: 200 }), { x: 60, y: 50 });
+  assert.deepEqual(systemCloseButton(closeNode, { width: 200, height: 200 }), { x: 155, y: 50 });
   assert.equal(systemWaitButton(waitNode + waitNode, { width: 200, height: 200 }), null);
+  assert.equal(systemCloseButton(closeNode + closeNode, { width: 200, height: 200 }), null);
+  assert.equal(systemCloseButton(closeNode.replace('text="Close app"', 'text="Wait"'), { width: 200, height: 200 }), null);
   assert.equal(systemWaitButton(waitNode.replace('package="android"', 'package="evil"'), { width: 200, height: 200 }), null);
   assert.equal(systemWaitButton(waitNode, { width: 100, height: 200 }), null);
   assert.equal(isSystemUiAnr(response('Application Error: com.android.systemui')), false);
@@ -56,8 +60,79 @@ test('failed verification never taps and active flow is stopped before recovery'
   const result = await monitorAndroidFlow(recovery, signal => new Promise(resolve => signal.addEventListener('abort', () => { stopped = true; resolve({ child: { status: 1, error: { code: 'EANDROIDBLOCKED' } } }); })));
   assert.equal(stopped, true);
   assert.equal(result.systemBlocked, true);
-  assert.equal(result.systemDiagnostic, 'android-wait-unverified');
+  assert.equal(result.systemDiagnostic, 'android-recovery-buttons-unverified');
   assert.equal(taps, 0);
+});
+
+test('a verified Close app fallback is used only when Wait is unavailable and System UI returns', async () => {
+  const anr = response('Application Not Responding: com.android.systemui');
+  const ready = response('com.example.app');
+  let windowChecks = 0, taps = 0;
+  const adb = async args => {
+    if (args.includes('dumpsys')) return ++windowChecks <= 2 ? anr : ready;
+    if (args.includes('size')) return { status: 0, stdout: 'Physical size: 200x200\n' };
+    if (args.includes('uiautomator')) return { status: 0, stdout: closeNode };
+    if (args.includes('tap')) { taps++; return { status: 0 }; }
+    if (args.includes('pidof')) return { status: 0, stdout: '1234\n' };
+    throw Error('unexpected command');
+  };
+  const recovery = createSystemUiRecovery(adb, async () => {});
+  assert.equal((await recovery.recover(anr, 'preflight')).ready, true);
+  assert.equal(taps, 1);
+  assert.deepEqual(recovery.events.map(({ result, action }) => ({ result, action })), [{ result: 'recovered', action: 'close-app' }]);
+});
+
+test('Wait is preferred when both verified System UI buttons are available', async () => {
+  const anr = response('Application Not Responding: com.android.systemui');
+  const ready = response('com.example.app');
+  let checks = 0, tapped = null;
+  const adb = async args => {
+    if (args.includes('dumpsys')) return ++checks % 2 ? anr : ready;
+    if (args.includes('size')) return { status: 0, stdout: 'Physical size: 200x200\n' };
+    if (args.includes('uiautomator')) return { status: 0, stdout: `${waitNode}${closeNode}` };
+    if (args.includes('tap')) { tapped = args.slice(-2); return { status: 0 }; }
+    throw Error('unexpected command');
+  };
+  const recovery = createSystemUiRecovery(adb, async () => {});
+  assert.equal((await recovery.recover(anr, 'preflight')).ready, true);
+  assert.deepEqual(tapped, ['60', '50']);
+  assert.equal(recovery.events[0].action, 'wait');
+});
+
+test('unverified recovery records fixed reasons and never taps', async () => {
+  const anr = response('Application Not Responding: com.android.systemui');
+  const recovery = createSystemUiRecovery(async args => {
+    if (args.includes('dumpsys')) return anr;
+    if (args.includes('size')) return { status: 0, stdout: 'Physical size: 200x200\n' };
+    if (args.includes('uiautomator')) return { status: 0, stdout: '<node text="private title" />' };
+    if (args.includes('tap')) assert.fail('must not tap an unverified button');
+    throw Error('unexpected command');
+  }, async () => {});
+  const result = await recovery.recover(anr, 'preflight');
+  assert.equal(result.diagnostic, 'android-recovery-buttons-unverified');
+  assert.equal(recovery.events[0].phase, 'preflight');
+  assert.equal(recovery.events[0].result, 'buttons-unverified');
+  assert.equal(recovery.events[0].diagnostic, 'wait-button-not-found; close-button-not-found');
+  assert.ok(!JSON.stringify(recovery.events).includes('private title'));
+});
+
+test('Close app does not count as recovery until System UI is responsive again', async () => {
+  const anr = response('Application Not Responding: com.android.systemui');
+  const ready = response('com.example.app');
+  let windowChecks = 0, taps = 0;
+  const adb = async args => {
+    if (args.includes('dumpsys')) return ++windowChecks <= 2 ? anr : ready;
+    if (args.includes('size')) return { status: 0, stdout: 'Physical size: 200x200\n' };
+    if (args.includes('uiautomator')) return { status: 0, stdout: closeNode };
+    if (args.includes('tap')) { taps++; return { status: 0 }; }
+    if (args.includes('pidof')) return { status: 0, stdout: '' };
+    throw Error('unexpected command');
+  };
+  const recovery = createSystemUiRecovery(adb, async () => {});
+  assert.equal((await recovery.recover(anr, 'preflight')).diagnostic, 'android-close-app-unconfirmed');
+  assert.equal(taps, 1);
+  assert.equal(recovery.events[0].result, 'not-confirmed');
+  assert.equal(recovery.events[0].action, 'close-app');
 });
 
 test('a tapped dialog that does not clear is not considered recovered', async () => {

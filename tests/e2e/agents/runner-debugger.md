@@ -28,6 +28,10 @@ For a failure, inspect the last completed checkpoint, failed command/target and
 fixed app-error category. Missing diagnostics stay unknown; a redacted sign-in
 image alone cannot prove a wrong password or keyboard failure. Preserve earlier
 failed/incomplete reports when checking a corrected revision.
+Android System UI ANR recovery prefers the verified Wait control and may use
+the exact verified Close app control as fallback; it must confirm System UI is
+responsive afterward. A missing/ambiguous control must block with its fixed
+diagnostic, never guessed taps or raw hierarchy output.
 On iOS, review the private input checks and before-submission image as well as
 the final image. Completed typing commands alone do not prove field contents.
 A nonempty password mask proves populated input, not an exact password match.

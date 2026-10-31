@@ -20,10 +20,10 @@ const raw = PNG.sync.write(image);
 test('Android recovery outcomes are recorded in the private HTML report', () => {
   const directory = mkdtempSync(join(process.cwd(), 'tests/e2e/results/recovery-test-'));
   try {
-    const report = { caseId: 'TC-001', platform: 'android', status: 'BLOCKED', attempts: [], androidRecoveries: [{ phase: 'preflight', result: 'recovered' }, { phase: 'during-test', result: 'not-confirmed' }] };
+    const report = { caseId: 'TC-001', platform: 'android', status: 'BLOCKED', attempts: [], androidRecoveries: [{ phase: 'preflight', result: 'recovered', action: 'close-app' }, { phase: 'during-test', result: 'buttons-unverified', diagnostic: 'wait-button-not-found; close-button-not-found' }] };
     const html = readFileSync(writeReport(report, directory), 'utf8');
-    assert.ok(html.includes('preflight: recovered'));
-    assert.ok(html.includes('during-test: not-confirmed'));
+    assert.ok(html.includes('preflight: recovered via close-app'));
+    assert.ok(html.includes('during-test: buttons-unverified (wait-button-not-found; close-button-not-found)'));
     assert.ok(html.includes('<th>Result</th><td>BLOCKED</td>'));
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
@@ -41,7 +41,7 @@ test('Android report separates runner time from launcher setup and records recov
     assert.ok(html.includes('excludes the Android APK build, emulator startup'));
     assert.ok(html.includes('APK preparation: 13 min'));
     assert.ok(html.includes('System dialog check/recovery: 4.2 sec'));
-    assert.ok(html.includes('preflight: recovered (4.2 sec)'));
+    assert.ok(html.includes('preflight: recovered [4.2 sec]'));
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 

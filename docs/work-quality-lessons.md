@@ -79,8 +79,10 @@ a roadmap, confidence score, or claim that the model has been retrained.
   Check current WindowManager error windows before login; exclude historical
   ANR mentions and retain fixed categories only. The founder later authorized
   bounded automatic recovery: stop an active Maestro process before interacting,
-  verify the system Wait control, confirm the dialog cleared, and count any
-  restart within the existing login-attempt budget. Never relax screenshot
+  prefer the verified system Wait control, and use the exact verified Close app
+  button only as fallback. Confirm the dialog clears and System UI remains
+  available; count any restart within the existing login-attempt budget. Record
+  fixed reasons when controls cannot be verified. Never relax screenshot
   coordinate or redaction checks to manufacture evidence. Native recovery and
   process-tree behavior still require device verification.
 - Follow-up observation: the Android HTML report showed about 3m40s of E2E

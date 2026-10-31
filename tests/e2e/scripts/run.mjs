@@ -187,11 +187,13 @@ async function checkAndroidReadiness(device) {
     : inspectAndroidWindows(windows);
   const elapsed = Math.round(recovery.events.reduce((sum, event) => sum + (event.durationSeconds || 0), 0) * 10) / 10;
   if (!readiness.ready) {
-    console.error(`Android System UI preflight blocked: ${readiness.diagnostic || 'readiness unknown'}.`);
+    const detail = recovery.events.at(-1)?.diagnostic;
+    console.error(`Android System UI preflight blocked: ${readiness.diagnostic || 'readiness unknown'}${detail ? ` (${detail})` : ''}.`);
     return 2;
   }
-  console.log(recovery.events.length
-    ? `Android System UI ready; safely selected Wait and confirmed recovery (${elapsed} seconds).`
+  const action = recovery.events.at(-1)?.action;
+  console.log(action
+    ? `Android System UI ready; selected the verified ${action} button and confirmed recovery (${elapsed} seconds).`
     : 'Android System UI ready; no recovery dialog was present.');
   return 0;
 }

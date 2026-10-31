@@ -13,24 +13,41 @@ export function inspectAndroidWindows(result) {
 
 // Only the System UI ANR is eligible; crashes or other application dialogs are not.
 export function isSystemUiAnr(result) {
-  if (!result || result.error || result.status !== 0 || !inspectAndroidWindows(result).diagnostic?.includes('android-error-dialog-present')) return false;
-  const errors = [...result.stdout.matchAll(/^\s*Window #\d+ Window\{[^\r\n]*Application (?:Not Responding|Error):[^\r\n]*/gm)].map(m => m[0]);
-  return errors.length === 1 && /Application Not Responding:\s*com\.android\.systemui(?:[}\s]|$)/.test(errors[0]);
+  return isAndroidAnrFor(result, 'com.android.systemui');
+}
+
+function isAndroidAnrFor(result, appId) {
+  if (!result || result.error || result.status !== 0 || inspectAndroidWindows(result).diagnostic !== 'android-error-dialog-present') return false;
+  const errors = [...result.stdout.matchAll(/^\s*Window #\d+ Window\{[^\r\n]*Application Not Responding:\s*([A-Za-z0-9._]+)(?:[}\s]|$)[^\r\n]*/gm)];
+  return errors.length === 1 && errors[0][1] === appId;
+}
+
+function dialogButton(xml, size, resourceId, text) {
+  if (typeof xml !== 'string') return { button: null, diagnostic: 'hierarchy-unavailable' };
+  if (!Number.isInteger(size?.width) || !Number.isInteger(size?.height)) return { button: null, diagnostic: 'display-size-unavailable' };
+  const nodes = xml.match(/<node\b[^>]*\/?>/g) || [];
+  const candidates = nodes.filter(node => new RegExp(`\\bresource-id="android:id/${resourceId}"`).test(node)
+    && /\bpackage="android"/.test(node));
+  if (!candidates.length) return { button: null, diagnostic: 'button-not-found' };
+  if (candidates.length !== 1) return { button: null, diagnostic: 'button-ambiguous' };
+  const node = candidates[0];
+  if (!new RegExp(`\\btext="${text}"`).test(node) || !/\bclickable="true"/.test(node) || !/\benabled="true"/.test(node)) {
+    return { button: null, diagnostic: 'button-not-actionable' };
+  }
+  const m = node.match(/\bbounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  if (!m) return { button: null, diagnostic: 'button-bounds-unavailable' };
+  const [left, top, right, bottom] = m.slice(1).map(Number);
+  if (left >= right || top >= bottom || right > size.width || bottom > size.height) return { button: null, diagnostic: 'button-bounds-invalid' };
+  return { button: { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) }, diagnostic: null };
 }
 
 // Return only coordinates, never hierarchy content. Refuse ambiguous or malformed elements.
 export function systemWaitButton(xml, size) {
-  if (typeof xml !== 'string' || !Number.isInteger(size?.width) || !Number.isInteger(size?.height)) return null;
-  const nodes = xml.match(/<node\b[^>]*\/>/g) || [];
-  const candidates = nodes.filter(node => /\bresource-id="android:id\/aerr_wait"/.test(node)
-    && /\bpackage="android"/.test(node) && /\btext="Wait"/.test(node)
-    && /\bclickable="true"/.test(node) && /\benabled="true"/.test(node));
-  if (candidates.length !== 1) return null;
-  const m = candidates[0].match(/\bbounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
-  if (!m) return null;
-  const [left, top, right, bottom] = m.slice(1).map(Number);
-  if (left >= right || top >= bottom || right > size.width || bottom > size.height) return null;
-  return { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) };
+  return dialogButton(xml, size, 'aerr_wait', 'Wait').button;
+}
+
+export function systemCloseButton(xml, size) {
+  return dialogButton(xml, size, 'aerr_close', 'Close app').button;
 }
 
 export function displaySize(result) {
@@ -47,8 +64,12 @@ export function createSystemUiRecovery(adb, sleep = ms => new Promise(resolve =>
   const query = () => adb(['shell', 'dumpsys', 'window', 'windows']);
   async function recover(initial, phase) {
     const started = Date.now();
-    const record = result => events.push({ phase, result, durationSeconds: Math.round((Date.now() - started) / 100) / 10 });
-    if (!isSystemUiAnr(initial)) return { ready: false, diagnostic: 'android-unrecoverable-dialog' };
+    const record = (result, action = null, diagnostic = null) => events.push({
+      phase, result, ...(action ? { action } : {}), ...(diagnostic ? { diagnostic } : {}),
+      durationSeconds: Math.round((Date.now() - started) / 100) / 10,
+    });
+    const systemUiAnr = isSystemUiAnr(initial);
+    if (!systemUiAnr) return { ready: false, diagnostic: 'android-unrecoverable-dialog' };
     if (attempts >= 2) { record('limit-reached'); return { ready: false, diagnostic: 'android-recovery-limit' }; }
     attempts++;
     const [sizeResult, hierarchy] = await Promise.all([
@@ -56,18 +77,43 @@ export function createSystemUiRecovery(adb, sleep = ms => new Promise(resolve =>
       adb(['exec-out', 'uiautomator', 'dump', '/dev/tty']),
     ]);
     const size = displaySize(sizeResult);
-    const button = !hierarchy.error && hierarchy.status === 0 ? systemWaitButton(hierarchy.stdout, size) : null;
-    if (!button || !isSystemUiAnr(await query())) { record('wait-unverified'); return { ready: false, diagnostic: 'android-wait-unverified' }; }
+    if (hierarchy.error || hierarchy.status !== 0) {
+      record('buttons-unverified', null, 'hierarchy-query-failed');
+      return { ready: false, diagnostic: 'android-recovery-buttons-unverified' };
+    }
+    const wait = dialogButton(hierarchy.stdout, size, 'aerr_wait', 'Wait');
+    const close = dialogButton(hierarchy.stdout, size, 'aerr_close', 'Close app');
+    const selected = wait.button ? { ...wait, action: 'wait' }
+      : close.button ? { ...close, action: 'close-app' } : null;
+    if (!selected) {
+      record('buttons-unverified', null, `wait-${wait.diagnostic}; close-${close.diagnostic}`);
+      return { ready: false, diagnostic: 'android-recovery-buttons-unverified' };
+    }
+    if (!isSystemUiAnr(await query())) {
+      record('dialog-changed', selected.action, 'android-dialog-changed-before-tap');
+      return { ready: false, diagnostic: 'android-dialog-changed-before-tap' };
+    }
+    const button = selected.button;
     const tap = await adb(['shell', 'input', 'tap', String(button.x), String(button.y)]);
-    if (tap.error || tap.status !== 0) { record('tap-failed'); return { ready: false, diagnostic: 'android-wait-failed' }; }
+    if (tap.error || tap.status !== 0) {
+      record('tap-failed', selected.action);
+      return { ready: false, diagnostic: `android-${selected.action}-failed` };
+    }
     for (let i = 0; i < 5; i++) {
       await sleep(1000);
       const checked = inspectAndroidWindows(await query());
-      if (checked.ready) { record('recovered'); return checked; }
+      if (checked.ready) {
+        if (selected.action === 'close-app') {
+          const systemUi = await adb(['shell', 'pidof', 'com.android.systemui']);
+          if (systemUi.error || systemUi.status !== 0 || !systemUi.stdout?.trim()) continue;
+        }
+        record('recovered', selected.action);
+        return checked;
+      }
       if (checked.diagnostic !== 'android-error-dialog-present' || checked.category !== 'system-ui') break;
     }
-    record('not-confirmed');
-    return { ready: false, diagnostic: 'android-recovery-unconfirmed' };
+    record('not-confirmed', selected.action);
+    return { ready: false, diagnostic: selected.action === 'close-app' ? 'android-close-app-unconfirmed' : 'android-recovery-unconfirmed' };
   }
   return { events, query, recover };
 }

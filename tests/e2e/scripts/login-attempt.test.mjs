@@ -8,6 +8,15 @@ const success = { child: { status: 0 }, xml: '<testsuite tests="1"><testcase nam
 const failure = { child: { status: 1 }, xml: '<testsuite tests="1"><testcase><failure/></testcase></testsuite>' };
 const verified = { status: 'CAPTURED', file: 'TC-002-123-attempt-1.png', inputChecks: { before: { passed: true }, after: { passed: true } } };
 
+test('an Android system interruption is blocked even if the UI report passed', async () => {
+  const result = await executeLoginAttempt({ platform: 'android', attempt: 1,
+    runFlow: async () => ({ ...success, systemBlocked: true, systemDiagnostic: 'android-recovery-unconfirmed' }),
+    capture: async () => ({ status: 'UNAVAILABLE' }), diagnostics: () => ({}),
+  });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.systemDiagnostic, 'android-recovery-unconfirmed');
+});
+
 test('iOS submits only after both private field checks and the required photo, without retry/reset', async () => {
   const events = [];
   let clock = 0;

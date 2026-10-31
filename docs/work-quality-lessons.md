@@ -77,8 +77,12 @@ a roadmap, confidence score, or claim that the model has been retrained.
   an awake/unlocked screen and a live app process had all been true. Selecting
   the verified system Wait button after the failed case cleared the dialog.
   Check current WindowManager error windows before login; exclude historical
-  ANR mentions and retain fixed categories only. Never dismiss it during a case
-  or relax screenshot coordinate/redaction checks to manufacture evidence.
+  ANR mentions and retain fixed categories only. The founder later authorized
+  bounded automatic recovery: stop an active Maestro process before interacting,
+  verify the system Wait control, confirm the dialog cleared, and count any
+  restart within the existing login-attempt budget. Never relax screenshot
+  coordinate or redaction checks to manufacture evidence. Native recovery and
+  process-tree behavior still require device verification.
 
 ## Keep private build diagnostics observable
 

@@ -17,6 +17,17 @@ const image = new PNG({ width: 200, height: 400 });
 image.data.fill(255);
 const raw = PNG.sync.write(image);
 
+test('Android recovery outcomes are recorded in the private HTML report', () => {
+  const directory = mkdtempSync(join(process.cwd(), 'tests/e2e/results/recovery-test-'));
+  try {
+    const report = { caseId: 'TC-001', platform: 'android', status: 'BLOCKED', attempts: [], androidRecoveries: [{ phase: 'preflight', result: 'recovered' }, { phase: 'during-test', result: 'not-confirmed' }] };
+    const html = readFileSync(writeReport(report, directory), 'utf8');
+    assert.ok(html.includes('preflight: recovered'));
+    assert.ok(html.includes('during-test: not-confirmed'));
+    assert.ok(html.includes('<th>Result</th><td>BLOCKED</td>'));
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('PASS image validation requires an identifier from this app, never static text or login fields', () => {
   const appId = 'com.sadik.microhabit';
   const marker = id => ({ attributes: { 'resource-id': id }, children: [] });

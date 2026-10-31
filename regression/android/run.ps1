@@ -53,8 +53,12 @@ for ($i = 0; $i -lt 12; $i++) {
     }
 }
 if ($stable -lt 4) {
-    Write-Host 'Android System UI did not stabilize; login skipped.'
-    exit 2
+    $errorWindows = @($windows -split "`n" | Where-Object { $_ -match '^\s*Window #\d+ Window\{[^\r\n]*Application (?:Not Responding|Error):' })
+    if ($LASTEXITCODE -ne 0 -or $errorWindows.Count -ne 1 -or $errorWindows[0] -notmatch 'Application Not Responding:\s*com\.android\.systemui(?:[}\s]|$)') {
+        Write-Host 'Android System UI did not stabilize; login skipped.'
+        exit 2
+    }
+    Write-Host 'System UI ANR detected; the test preflight will verify recovery.'
 }
 $apk = 'android/app/build/outputs/apk/release/app-release.apk'
 $expectedHash = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -83,12 +87,10 @@ Write-Host 'Allowing Android System UI 30 seconds to stabilize.'
 Start-Sleep -Seconds 30
 Write-Host 'Running login against production on the dedicated test emulator.'
 $reportPath = 'tests/e2e/results/TC-001-latest.html'
-$previousWrite = if (Test-Path -LiteralPath $reportPath) { (Get-Item -LiteralPath $reportPath).LastWriteTimeUtc } else { [DateTime]::MinValue }
+$previousWriteNs = if (Test-Path -LiteralPath $reportPath) { ((Get-Item -LiteralPath $reportPath).LastWriteTimeUtc.Ticks - 621355968000000000) * 100 } else { -1 }
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/e2e/scripts/prompt-credentials.ps1 -Platform android -RequireSaved
 $result = $LASTEXITCODE
-if ((Test-Path -LiteralPath $reportPath) -and (Get-Item -LiteralPath $reportPath).LastWriteTimeUtc -gt $previousWrite) {
-    & node tests/e2e/scripts/view-report.mjs android
-}
+& node tests/e2e/scripts/view-report.mjs android --newer-than-ns $previousWriteNs
 if ($result -eq 0) { Write-Host "Android passed with evidence for source revision: $revision" }
 } finally {
     if ($testDevice) {

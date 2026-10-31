@@ -39,6 +39,7 @@ export function writeReport(report, directory = results) {
   const rows = [['Result', result], ['Duration', formatDuration(report.durationSeconds)], ['App version / build', `${report.appVersion ?? '?'} / ${report.appBuild ?? '?'}`], ['Screenshot evidence', report.evidenceStatus ?? 'Unavailable for this earlier run'], ['Case ID', report.caseId], ['Platform', report.platform], ['Device', report.device], ['OS', report.osVersion], ['Backend', `${report.backendEnvironment ?? '?'} / ${report.backendHost ?? '?'}`], ['Source revision', report.sourceRevision], ['Started (UTC)', report.startedAt], ['Command', report.command]];
   if (report.simulatorReadiness) rows.push(['Simulator checks', report.simulatorReadiness.map(check => `${check.diagnostic || 'ready'}; state ${check.state || 'unknown'}; ${formatDuration(check.durationSeconds)}`).join(' / ')]);
   if (report.androidReadiness) rows.push(['Android system check', `${report.androidReadiness.diagnostic || 'ready'}; category ${report.androidReadiness.category || 'none'}`]);
+  if (report.androidRecoveries) rows.push(['System UI recovery', report.androidRecoveries.length ? report.androidRecoveries.map(event => `${event.phase}: ${event.result}`).join(' / ') : 'No recovery needed']);
   const pictureFor = screenshot => {
     let picture = '<p>Screenshot unavailable: this earlier run did not retain visual evidence.</p>';
     if (screenshot?.status === 'CAPTURED' && /^TC-00[12]-[0-9]+-attempt-[1-5]\.png$/.test(screenshot.file || '')) {
@@ -52,7 +53,7 @@ export function writeReport(report, directory = results) {
     return picture + timings + state + inputs;
   };
   const attempts = (report.attempts || []).map(attempt => {
-    const diagnostic = attempt.diagnostics ? `<p>Last completed checkpoint: ${escape(attempt.diagnostics.lastCompletedCheckpoint)}. Failed command: ${escape(attempt.diagnostics.failedCommand)}. Target: ${escape(attempt.diagnostics.failedTarget)}.</p>` : '';
+    const diagnostic = (attempt.diagnostics ? `<p>Last completed checkpoint: ${escape(attempt.diagnostics.lastCompletedCheckpoint)}. Failed command: ${escape(attempt.diagnostics.failedCommand)}. Target: ${escape(attempt.diagnostics.failedTarget)}.</p>` : '') + (attempt.systemDiagnostic ? `<p>Android system diagnostic: ${escape(attempt.systemDiagnostic)}.</p>` : '');
     const before = attempt.inputScreenshot && !attempt.finalScreenshotIsInput && attempt.inputScreenshot !== attempt.screenshot && (!attempt.inputScreenshot.file || attempt.inputScreenshot.file !== attempt.screenshot?.file) ? `<h3>Before Sign in</h3>${pictureFor(attempt.inputScreenshot)}<h3>After attempt</h3>` : '';
     return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(formatDuration(attempt.durationSeconds))})</p>${diagnostic}${before}${pictureFor(attempt.screenshot)}</section>`;
   }).join('');

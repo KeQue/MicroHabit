@@ -8,7 +8,7 @@ import { authenticatedScreen, inspectLoginInputs, parseHierarchy, redactScreensh
 import { recordRun, writeReport } from './report.mjs';
 import { failureDiagnostics } from './failure-diagnostics.mjs';
 import { inspectSimulator, mayRetrySimulatorProbe } from './ios-readiness.mjs';
-import { inspectAndroidWindows } from './android-readiness.mjs';
+import { createSystemUiRecovery, inspectAndroidWindows, isSystemUiAnr, monitorAndroidFlow } from './android-readiness.mjs';
 import { executeLoginAttempt } from './login-attempt.mjs';
 import { runAttempts } from './retry-policy.mjs';
 import { matchesIosSource } from './ios-source.mjs';
@@ -71,8 +71,9 @@ async function call(binary, args, options = {}) {
       // raw artifacts or releasing the run lock. Killing PowerShell alone can
       // leave Java holding credentials and continuing the device run.
       if (windows) {
-        spawnSync(join(env.SystemRoot || 'C:/Windows', 'System32/taskkill.exe'),
+        const killed = spawnSync(join(env.SystemRoot || 'C:/Windows', 'System32/taskkill.exe'),
           ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore', timeout: 15000 });
+        if (code === 'EANDROIDBLOCKED' && (killed.error || killed.status !== 0)) error = { code: 'EANDROIDSTOPFAILED' };
       } else {
         try { process.kill(-child.pid, 'SIGTERM'); } catch { /* Already exited. */ }
         termination = new Promise(done => setTimeout(() => {
@@ -82,6 +83,9 @@ async function call(binary, args, options = {}) {
       }
     };
     const timer = setTimeout(() => stop('ETIMEDOUT'), options.timeout || 20000);
+    const onAbort = () => stop('EANDROIDBLOCKED');
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+    if (options.signal?.aborted) onAbort();
     const collect = destination => chunk => {
       bytes += chunk.length;
       if (bytes > 8 * 1024 * 1024) { stop('ENOBUFS'); return; }
@@ -93,6 +97,7 @@ async function call(binary, args, options = {}) {
     child.on('error', caught => { error = { code: caught.code }; });
     child.on('close', async status => {
       clearTimeout(timer);
+      options.signal?.removeEventListener('abort', onAbort);
       await termination;
       if (outputFile !== null) closeSync(outputFile);
       resolveCall({ status, stdout, stderr, error });
@@ -179,6 +184,7 @@ async function prepare(platform) {
     command: `npm run e2e:${platform}`,
   };
   const blockers = [];
+  let recovery = null;
   const block = message => blockers.push(message);
   // Only allow bounded metadata suitable for sanitized reports.
   if (!valid(metadata.appId, /^[A-Za-z][A-Za-z0-9_.]{2,150}$/)) { metadata.appId = null; block('Invalid application identifier.'); }
@@ -221,7 +227,9 @@ async function prepare(platform) {
       const emulator = (await adb(['shell', 'getprop', 'ro.kernel.qemu'])).stdout?.trim() === '1';
       if (!emulator) block('TC-001 requires a dedicated Android emulator.');
       else {
-        metadata.androidReadiness = inspectAndroidWindows(await adb(['shell', 'dumpsys', 'window', 'windows']));
+        recovery = createSystemUiRecovery(adb);
+        const windows = await recovery.query();
+        metadata.androidReadiness = isSystemUiAnr(windows) ? await recovery.recover(windows, 'preflight') : inspectAndroidWindows(windows);
         if (!metadata.androidReadiness.ready) block(`Android readiness blocked: ${metadata.androidReadiness.diagnostic}; category: ${metadata.androidReadiness.category || 'unknown'}. Resolve device setup before login.`);
       }
       const os = (await adb(['shell', 'getprop', 'ro.build.version.release'])).stdout?.trim();
@@ -270,7 +278,7 @@ async function prepare(platform) {
   for (const [field, suffix] of [['appVersion', 'APP_VERSION'], ['appBuild', 'APP_BUILD']]) {
     if (env[`E2E_${key}_${suffix}`] && env[`E2E_${key}_${suffix}`] !== metadata[field]) block(`Installed ${field} differs from the expected E2E_${key}_${suffix}.`);
   }
-  return { metadata, blockers };
+  return { metadata, blockers, recovery };
 }
 
 async function captureScreenshot(metadata, attempt, output, { requireLoaded = false, verifyInputs = false, reuseDriver = false } = {}) {
@@ -325,7 +333,7 @@ async function captureScreenshot(metadata, attempt, output, { requireLoaded = fa
 
 async function run(platform, prerequisite = null) {
   const started = Date.now();
-  const { metadata, blockers } = await prepare(platform);
+  const { metadata, blockers, recovery } = await prepare(platform);
   if (prerequisite) blockers.push(prerequisite);
   const report = {
     ...metadata, startedAt: new Date(started).toISOString(), status: 'BLOCKED',
@@ -350,8 +358,11 @@ async function run(platform, prerequisite = null) {
             const flow = join(root, 'tests/e2e/maestro', phase === 'full' ? `${metadata.caseId}-${platform}-login.yaml` : `ios/${phase}-login.yaml`);
             const args = ['--device', metadata.device, '--platform', platform, 'test', ...(reuseDriver ? ['--no-reinstall-driver'] : []),
               '--format', 'junit', '--output', reportPath, '--debug-output', phaseOutput, '--test-output-dir', phaseOutput, flow];
-            const child = await call(tools.maestro, args, { env: childEnv, cwd: temporary, timeout });
-            return { child, xml: existsSync(reportPath) ? readFileSync(reportPath, 'utf8') : '' };
+            const execute = async signal => {
+              const child = await call(tools.maestro, args, { env: childEnv, cwd: temporary, timeout, signal });
+              return { child, xml: existsSync(reportPath) ? readFileSync(reportPath, 'utf8') : '' };
+            };
+            return platform === 'android' ? await monitorAndroidFlow(recovery, execute) : await execute();
           },
           capture: options => captureScreenshot(metadata, index, output, options),
           diagnostics: () => failureDiagnostics(output),
@@ -361,10 +372,12 @@ async function run(platform, prerequisite = null) {
         return attempt;
       });
       Object.assign(report, outcome);
+      if (report.status === 'BLOCKED') report.blockers.push('Android system monitoring blocked the test or no counted login attempt remained after recovery.');
       report.authenticationEvidence = report.status === 'PASS' ?
         'The passing attempt reached the conditional server-loaded leagues marker with no auth/load errors, then repeated it after restart without clearing storage.' : 'Assertions did not complete successfully; authentication is not proven.';
     } finally { rmSync(temporary, { recursive: true, force: true }); }
   }
+  if (recovery) report.androidRecoveries = recovery.events;
   report.durationSeconds = Math.round((Date.now() - started) / 100) / 10;
   report.evidenceStatus = screenshotEvidenceStatus(report);
   try { recordRun(report); }

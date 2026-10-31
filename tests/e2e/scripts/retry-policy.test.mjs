@@ -25,6 +25,21 @@ test('two failures stop and remain failed', async () => {
   assert.equal(result.flaky, false);
 });
 
+test('system blockers stop without another login attempt', async () => {
+  const result = await runAttempts(async () => ({ status: 'BLOCKED' }));
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.attempts.length, 1);
+});
+
+test('recovery may restart only within the existing two-attempt budget', async () => {
+  const restarted = await runAttempts(async index => ({ status: index === 1 ? 'INTERRUPTED' : 'PASS' }));
+  assert.equal(restarted.status, 'PASS');
+  assert.deepEqual(restarted.attempts.map(a => a.status), ['INTERRUPTED', 'PASS']);
+  const exhausted = await runAttempts(async () => ({ status: 'INTERRUPTED' }));
+  assert.equal(exhausted.status, 'BLOCKED');
+  assert.equal(exhausted.attempts.length, 2);
+});
+
 test('durations show minutes after one minute and preserve signed comparisons', () => {
   for (const [seconds, expected] of [[59.9, '59.9 sec'], [60, '1 min 0 sec'], [65.2, '1 min 5.2 sec'], [125.5, '2 min 5.5 sec'], [-61, '-1 min 1 sec'], [null, 'Not available']]) assert.equal(formatDuration(seconds), expected);
 });

@@ -1,9 +1,9 @@
-param([Parameter(Mandatory=$true)][ValidatePattern('^\d{8,15}$')][string]$RunId)
+param([Parameter(Mandatory=$true)][ValidatePattern('^\d{8,15}$')][string]$RunId, [Parameter(Mandatory=$true)][ValidateRange(1,100)][int]$Attempt)
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '../..')
-& node regression/ios/download-report.mjs $RunId
+& node regression/ios/download-report.mjs $RunId $Attempt
 if ($LASTEXITCODE -ne 0) { Write-Host 'Could not download the encrypted iOS report.'; exit 2 }
-$directory = Join-Path 'tests/e2e/results/downloads' "ios-$RunId"
+$directory = Join-Path 'tests/e2e/results/downloads' "ios-$RunId-$Attempt"
 $zipPath = Join-Path $directory 'report.zip'
 $encryptedPath = Join-Path $directory 'TC-002-report.encrypted.json'
 Add-Type -AssemblyName System.IO.Compression.FileSystem

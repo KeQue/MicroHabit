@@ -65,11 +65,12 @@ try {
   console.log('Keep this VS Code task open; the private report will open when iOS finishes.');
   const outcome = await waitForRun(request, runId);
   if (!outcome) throw Error('iOS run has not completed; open its GitHub page to check later.');
-  console.log(`iOS workflow completed: ${outcome}. Opening its private report.`);
-  const opened = run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'regression/ios/open-report.ps1', '-RunId', runId], { timeout: 120000 });
+  if (!Number.isInteger(outcome.attempt) || outcome.attempt < 1 || outcome.attempt > 100) throw Error('Could not verify the completed iOS run attempt.');
+  console.log(`iOS workflow completed: ${outcome.conclusion}. Opening its private report.`);
+  const opened = run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'regression/ios/open-report.ps1', '-RunId', runId, '-Attempt', String(outcome.attempt)], { timeout: 120000 });
   if (opened.error || opened.status !== 0) throw Error('The iOS report could not be opened automatically; download the encrypted artifact from the run page.');
   console.log('Opened the private iOS report in your browser.');
-  if (outcome !== 'success') process.exitCode = 1;
+  if (outcome.conclusion !== 'success') process.exitCode = 1;
 } catch (error) {
   console.error(error.message);
   if (dispatchRequested) console.error('Dispatch outcome may be unknown. Check GitHub Actions before trying again; the pending marker prevents duplicate runs.');

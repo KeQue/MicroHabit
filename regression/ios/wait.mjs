@@ -7,7 +7,7 @@ export async function waitForRun(request, runId, { now = Date.now, sleep = ms =>
   const deadline = now() + timeout;
   while (now() < deadline) {
     const run = await request(`/actions/runs/${runId}`);
-    if (run.status === 'completed') return run.conclusion;
+    if (run.status === 'completed') return { conclusion: run.conclusion, attempt: run.run_attempt };
     await sleep(20000);
   }
   return null;

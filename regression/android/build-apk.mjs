@@ -5,7 +5,8 @@ import { basename, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { canReuse, fingerprint, isAppInput, isExpectedExpoPackageRewrite } from './apk-fingerprint.mjs';
 import { chooseBuildDrive, parseMappings } from './short-path.mjs';
-import { seedGradleCache } from './temporary-gradle-cache.mjs';
+import { prepareAndroidSdk, removeAndroidSdk } from './temporary-android-sdk.mjs';
+import { nativePathFailures } from './build-diagnostics.mjs';
 
 const apk = 'android/app/build/outputs/apk/release/app-release.apk';
 const manifestPath = 'tests/e2e/.tools/android-apk-provenance.json';
@@ -55,26 +56,32 @@ try {
     };
     const used = new Set(mappings().keys());
     for (const drive of ['X:', 'Y:', 'Z:', 'R:', 'Q:']) if (existsSync(`${drive}\\`)) used.add(drive);
+    const drive = chooseBuildDrive(used);
+    if (drive) used.add(drive);
     const projectDrive = chooseBuildDrive(used);
-    if (!projectDrive) throw Error('No short build drive is available.');
+    if (!drive || !projectDrive) throw Error('No short build drive is available.');
     mkdirSync(results, { recursive: true, mode: 0o700 });
     const temporary = mkdtempSync(join(results, '.private-build-'));
     let log;
-    let temporaryCache;
+    let temporarySdk;
     const createdMappings = [];
     try {
       log = openSync(join(temporary, 'build.log'), 'w', 0o600);
       const packageBefore = readFileSync('package.json');
-      temporaryCache = mkdtempSync(join(tmpdir(), 'cm-'));
-      if (temporaryCache.length > 46) throw Error('The temporary Gradle cache path is too long.');
-      console.log('Preparing a temporary Gradle cache using existing downloads.');
-      seedGradleCache(cache, temporaryCache);
+      const ninja = 'tests/e2e/.tools/ninja-1.13.2/ninja.exe';
+      if (!existsSync(ninja) || hashFile(ninja) !== 'e52a7ad9538d9618c67a0bd777964e2eec8a30f68b810a2f6adce1f2da847b8') throw Error('The verified Ninja build tool is unavailable.');
+      temporarySdk = mkdtempSync(join(tmpdir(), 'cm-sdk-'));
+      console.log('Preparing a temporary Android toolchain.');
+      prepareAndroidSdk(join(process.env.LOCALAPPDATA, 'Android/Sdk'), temporarySdk, join(process.cwd(), ninja));
+      const mapped = spawnSync('subst.exe', [drive, cache], { env: cleanEnv, windowsHide: true, timeout: 30000 });
+      if (mapped.error || mapped.status !== 0) throw Error('Cannot create a temporary short build drive.');
+      createdMappings.push([drive, cache]);
       // Expo autolinking does not inspect the drive root for package.json.
       const project = dirname(process.cwd());
       const mappedProject = spawnSync('subst.exe', [projectDrive, project], { env: cleanEnv, windowsHide: true, timeout: 30000 });
       if (mappedProject.error || mappedProject.status !== 0) throw Error('Cannot create a temporary short build drive.');
       createdMappings.push([projectDrive, project]);
-      const buildEnv = { ...cleanEnv, JAVA_HOME: jdk, ANDROID_HOME: join(process.env.LOCALAPPDATA, 'Android/Sdk'), GRADLE_USER_HOME: temporaryCache, NODE_ENV: 'production', CI: '1' };
+      const buildEnv = { ...cleanEnv, JAVA_HOME: jdk, ANDROID_HOME: temporarySdk, ANDROID_SDK_ROOT: temporarySdk, GRADLE_USER_HOME: `${drive}\\`, NODE_ENV: 'production', CI: '1' };
       console.log('Building a fresh Android Release APK; this may take several minutes.');
       const run = (command, args) => spawnSync(command, args, { cwd: join(`${projectDrive}\\`, basename(process.cwd())), env: buildEnv, stdio: ['ignore', log, log], windowsHide: true, timeout: 3600000 });
       const buildFailure = (phase, result) => {
@@ -95,6 +102,9 @@ try {
         if (result.error?.code === 'ETIMEDOUT') categories.push('timeout');
         const task = tail.match(/Execution failed for task '(:[A-Za-z0-9_:.-]+)'/);
         if (task) console.error(`Failed Gradle task: ${task[1]}.`);
+        for (const finding of nativePathFailures(tail, cache, process.cwd())) {
+          console.error(`Native path failure: ${finding.location}, ${finding.length} characters.`);
+        }
         console.error(`${phase} failed. Safe categories: ${categories.join(', ') || 'unknown'}. Exit code: ${Number.isInteger(result.status) ? result.status : 'unavailable'}.`);
         throw Error('Android build stopped; private build output was discarded.');
       };
@@ -121,13 +131,13 @@ try {
             if (unmapped.error || unmapped.status !== 0) console.error('The temporary build drive could not be removed.');
           } else console.error('The build drive mapping changed; it was left untouched.');
         } catch { console.error('The temporary build drive could not be verified for removal.'); }
-        if (temporaryCache) try { rmSync(temporaryCache, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 }); }
-        catch { console.error('The temporary Gradle cache could not be removed.'); }
+        if (temporarySdk) try { removeAndroidSdk(temporarySdk); }
+        catch { console.error('The temporary Android toolchain could not be removed.'); }
       }
     }
   }
 } catch (error) {
   const safe = /^(?:Cannot inspect app source\.|Commit tracked changes before building the app\.|Untracked application files found; commit or remove them before building\.|Installed dependencies cannot be verified\.|Installed dependencies do not match the project lockfile\.|Cannot resolve the app build configuration\.|The Android build is not configured for the approved production backend\.|The existing Android build JDK is unavailable\.|Cannot inspect existing build drive mappings\.|No short build drive is available\.|Cannot create a temporary short build drive\.|The temporary Gradle cache path is too long\.|Expo prebuild changed unexpected package settings; inspect them before continuing\.|Android build stopped; private build output was discarded\.|App inputs changed during the build; the APK was not accepted\.)$/;
-  console.error(safe.test(error.message) ? error.message : 'Android build preparation failed; private details were not printed.');
+  console.error(safe.test(error.message) || error.message === 'The verified Ninja build tool is unavailable.' ? error.message : 'Android build preparation failed; private details were not printed.');
   process.exitCode = 2;
 }

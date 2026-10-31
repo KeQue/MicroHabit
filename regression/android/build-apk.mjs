@@ -61,6 +61,10 @@ try {
           ['compile', /compilation failed|compilation error|error: (?:cannot find symbol|package .* does not exist)/i],
           ['permission', /accessdeniedexception|\bEPERM\b|\bEACCES\b|permission denied|access is denied/i],
           ['process-start', /a problem occurred starting process|cannot run program|could not start process/i],
+          ['daemon-exited', /gradle build daemon disappeared|daemon disappeared unexpectedly|daemon has disappeared/i],
+          ['disk-space', /no space left on device|not enough space on the disk|disk full/i],
+          ['gradle-configuration', /a problem occurred configuring|a problem occurred evaluating|could not determine the dependencies/i],
+          ['javascript-bundling', /bundleReleaseJsAndAssets|react-native bundle|unable to resolve module/i],
         ].filter(([, pattern]) => pattern.test(tail)).map(([category]) => category);
         if (result.error?.code === 'ETIMEDOUT') categories.push('timeout');
         const task = tail.match(/Execution failed for task '(:[A-Za-z0-9_:.-]+)'/);

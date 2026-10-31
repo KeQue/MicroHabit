@@ -1,8 +1,8 @@
 # Commito mobile login regression
 
 Only two mobile cases exist: [Login on Android](cases/TC-001-android-login.md)
-and [Login on iOS](cases/TC-002-ios-login.md). Both use the same existing
-email/password account, sequentially, through the real UI and Supabase backend.
+and [Login on iOS](cases/TC-002-ios-login.md). Each uses its own existing
+email/password test account through the real UI and Supabase backend.
 No accounts or leagues are created, no check-ins change, and nothing is deleted.
 Normal login **does** update authentication metadata and upsert the profile's
 ID/email. Production use needs approval covering those effects.
@@ -199,7 +199,8 @@ For a manual iOS run:
    Add required reviewers if available. This environment gates account secrets.
 3. Add environment **variables** `E2E_BACKEND_ENV` (`production` or `staging`) and
    `E2E_BACKEND_HOST` (hostname only). Add environment **secrets**
-   `E2E_LOGIN_EMAIL` and `E2E_LOGIN_PASSWORD`. Enter the same existing account
+   `E2E_IOS_LOGIN_EMAIL` and `E2E_IOS_LOGIN_PASSWORD` for a dedicated iOS
+   account, different from the Windows-protected Android account. Enter these
    through GitHub's secret form, never chat. Add `E2E_SUPABASE_ANON_KEY` as a
    secret or variable: it is the app's public Supabase key, never a service-role
    or management key. A secret takes precedence if both are present.
@@ -213,8 +214,9 @@ The updated workflow gives the **build/install step at most 60 minutes**. Its
 overall job limit is 110 minutes, allowing dependency setup, the two tests,
 report encryption and cleanup. The earlier run retains its original 60-minute
 overall limit; editing the workflow cannot change a running job.
-Do not start local Android login while cloud iOS uses the same
-account. Account secrets are available only to the test step, not dependency
+The Windows Regression task starts local Android and cloud iOS concurrently,
+using the local protected account and the separate iOS GitHub secrets. Account
+secrets are available only to the test step, not dependency
 installation or compilation. Only an encrypted visual report is uploaded. Restrict who can
 edit and dispatch workflows with this account's environment access.
 

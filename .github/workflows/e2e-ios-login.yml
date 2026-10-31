@@ -306,8 +306,8 @@ jobs:
         timeout-minutes: 28
         shell: bash
         env:
-          MAESTRO_E2E_EMAIL: ${{ secrets.E2E_LOGIN_EMAIL }}
-          MAESTRO_E2E_PASSWORD: ${{ secrets.E2E_LOGIN_PASSWORD }}
+          MAESTRO_E2E_EMAIL: ${{ secrets.E2E_IOS_LOGIN_EMAIL }}
+          MAESTRO_E2E_PASSWORD: ${{ secrets.E2E_IOS_LOGIN_PASSWORD }}
         run: npm run e2e:ios
       - name: Encrypt the private visual report
         id: encrypt-report

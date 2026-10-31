@@ -1,12 +1,13 @@
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
-Write-Host 'Regression runs Android locally and iOS on GitHub using the production test account.'
+Write-Host 'Regression runs Android locally and iOS on GitHub in parallel, using separate production test accounts.'
 Write-Host 'Normal login updates auth metadata and the profile. The QA branch may be published.'
-Write-Host 'Before continuing, make sure no other login test is running with this account.'
+Write-Host 'The saved Android account and GitHub iOS account must be different; this launcher cannot verify the GitHub secret.'
+Write-Host 'Before continuing, make sure no other login test is using either account.'
 if ((Read-Host 'Type YES to run regression') -cne 'YES') { Write-Host 'Cancelled.'; exit 2 }
-Write-Host 'Starting Android regression.'
+Write-Host 'Starting Android and iOS regression in parallel.'
 . (Join-Path $PSScriptRoot 'orchestrate.ps1')
-$results = Invoke-Regression -Android { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File regression/android/run.ps1 | Out-Host; return $LASTEXITCODE } -Ios { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File regression/ios/run.ps1 -SuiteConfirmed | Out-Host; return $LASTEXITCODE }
+$results = Invoke-Regression -Root (Get-Location).Path
 $androidResult = $results.Android
 $iosResult = $results.Ios
 Write-Host "Android exit code: $androidResult. iOS dispatch exit code: $iosResult."

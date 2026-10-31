@@ -45,7 +45,7 @@ try {
   const publicHash = key => createHash('sha256').update(createPublicKey(key).export({ type: 'spki', format: 'der' })).digest('hex');
   if (publicHash(values.E2E_REPORT_PUBLIC_KEY) !== publicHash(readFileSync('tests/e2e/.tools/report-keys/public.pem'))) throw Error('The report encryption key does not match this laptop.');
   const secrets = await request('/environments/e2e-login/secrets');
-  if (!['E2E_LOGIN_EMAIL', 'E2E_LOGIN_PASSWORD', 'E2E_SUPABASE_ANON_KEY'].every(name => secrets.secrets.some(s => s.name === name))) throw Error('GitHub environment secrets are incomplete.');
+  if (!['E2E_IOS_LOGIN_EMAIL', 'E2E_IOS_LOGIN_PASSWORD', 'E2E_SUPABASE_ANON_KEY'].every(name => secrets.secrets.some(s => s.name === name))) throw Error('GitHub iOS account secrets are incomplete; configure E2E_IOS_LOGIN_EMAIL and E2E_IOS_LOGIN_PASSWORD.');
   const policy = await request('/environments/e2e-login/deployment-branch-policies');
   if (policy.branch_policies.length !== 1 || policy.branch_policies[0].name !== 'main') throw Error('The GitHub environment branch restriction changed.');
   console.log('Publishing the tested QA revision if needed.');

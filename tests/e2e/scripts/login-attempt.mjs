@@ -39,5 +39,9 @@ export async function executeLoginAttempt({ platform, attempt, runFlow, capture,
     outcome.finalScreenshotIsInput = true;
     outcome.screenshot = inputScreenshot;
   } else outcome.screenshot = await capture({ requireLoaded: completed, reuseDriver: true });
+  if (platform === 'android' && result.child.error?.code === 'ETIMEDOUT'
+      && outcome.screenshot?.stateBefore?.serverLoaded === true && outcome.screenshot?.stateAfter?.serverLoaded === true) {
+    outcome.finding += ' The later screenshot showed loaded leagues, but it does not prove the test completed its restart and session assertions.';
+  }
   return outcome;
 }

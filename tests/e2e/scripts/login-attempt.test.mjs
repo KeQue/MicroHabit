@@ -8,6 +8,16 @@ const success = { child: { status: 0 }, xml: '<testsuite tests="1"><testcase nam
 const failure = { child: { status: 1 }, xml: '<testsuite tests="1"><testcase><failure/></testcase></testsuite>' };
 const verified = { status: 'CAPTURED', file: 'TC-002-123-attempt-1.png', inputChecks: { before: { passed: true }, after: { passed: true } } };
 
+test('a loaded Android screenshot after a timeout does not turn the attempt into a pass', async () => {
+  const result = await executeLoginAttempt({ platform: 'android', attempt: 1,
+    runFlow: async () => ({ child: { status: null, error: { code: 'ETIMEDOUT' } }, xml: '' }),
+    capture: async () => ({ status: 'CAPTURED', stateBefore: { serverLoaded: true }, stateAfter: { serverLoaded: true } }),
+    diagnostics: () => ({}),
+  });
+  assert.equal(result.status, 'FAIL');
+  assert.match(result.finding, /does not prove the test completed its restart and session assertions/);
+});
+
 test('an Android system interruption is blocked even if the UI report passed', async () => {
   const result = await executeLoginAttempt({ platform: 'android', attempt: 1,
     runFlow: async () => ({ ...success, systemBlocked: true, systemDiagnostic: 'android-recovery-unconfirmed' }),

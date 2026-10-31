@@ -212,6 +212,9 @@ test('post-run suggestions follow observed evidence without inventing a root cau
   const incomplete = suggestedImprovements({ status: 'PASS', evidenceStatus: 'INCOMPLETE', attempts: [{ screenshot: { status: 'UNAVAILABLE' } }] });
   assert.ok(incomplete.some(item => item.includes('capture phase')));
   assert.ok(!incomplete.some(item => item.includes('baseline')));
+  const retry = suggestedImprovements({ status: 'PASS', flaky: true, attempts: [{ finding: 'Maestro exceeded the shared six-minute UI budget; no result is accepted.' }] });
+  assert.ok(retry.some(item => item.includes('six-minute Maestro timeout')));
+  assert.ok(retry.some(item => item.includes('earlier attempt stopped')));
 });
 
 test('cloud reporting writes no plaintext archive, while a local blocked run retains an honest dated report', () => {

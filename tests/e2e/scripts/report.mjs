@@ -14,6 +14,9 @@ const escape = value => String(value ?? 'Not available').replace(/[&<>"']/g, cha
 export function suggestedImprovements(report) {
   const suggestions = [];
   const attempts = report.attempts || [];
+  if (attempts.some(attempt => /Maestro exceeded the shared six-minute UI budget/.test(attempt.finding || ''))) {
+    suggestions.push('Performance: an attempt reached the six-minute Maestro timeout. Inspect the recorded checkpoint and tool startup before reducing time limits or changing assertions.');
+  }
   if (attempts.some(attempt => attempt.screenshot?.status !== 'CAPTURED')) {
     suggestions.push('Workflow: isolate the recorded capture phase and diagnostic. Verify repeated capture on the existing device before requesting another login run.');
   }
@@ -21,6 +24,8 @@ export function suggestedImprovements(report) {
     suggestions.push('Debugging: compare the failed attempt with its screenshot and sanitized finding before changing the app. Preserve the failed result and existing assertions.');
   } else if (report.status === 'BLOCKED') {
     suggestions.push('Workflow: resolve the recorded setup/build blocker before another login attempt. For iOS, inspect the phase diagnostics; obtain approval before another cloud run.');
+  } else if (report.status === 'PASS' && report.flaky) {
+    suggestions.push('Debugging: the passing retry does not establish why the earlier attempt stopped. Review its recorded diagnostics before treating this run as a stable baseline.');
   } else if (report.status === 'PASS' && report.evidenceStatus === 'COMPLETE') {
     suggestions.push('System: keep this run as a baseline. Compare later durations and screenshots before expanding test coverage or changing time limits.');
   }

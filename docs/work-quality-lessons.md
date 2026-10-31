@@ -21,6 +21,12 @@ a roadmap, confidence score, or claim that the model has been retrained.
   directory below the root made the isolated prebuild succeed. Verify the
   affected operation itself where practical, retain safe diagnostic categories,
   and do not infer the cause from the phase. Native compilation remains untested.
+- A subsequent build reached Ninja and failed while inspecting a 268-character
+  React Native header path under the physical Gradle cache. The cache's drive
+  mapping had been resolved back to its long physical path. The runner now
+  seeds a physically shorter temporary cache with downloaded artifacts and
+  regenerates transforms there. A successful native build is still needed to
+  verify all paths and dependency availability.
 
 ## Check Simulator Keychain entitlements after a successful Auth response
 

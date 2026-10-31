@@ -77,3 +77,20 @@ export function checkpointTimings(records) {
   }
   return values.length ? values : null;
 }
+
+export function uiTimingSummary(maestroSeconds, checkpoints) {
+  if (!Number.isFinite(maestroSeconds) || maestroSeconds < 0 || maestroSeconds > 360) return null;
+  const total = Math.round(maestroSeconds * 10) / 10;
+  if (!Array.isArray(checkpoints) || checkpoints.length === 0) {
+    return { maestroSeconds: total, checkpointedSeconds: null, notCheckpointedSeconds: null, checkpointCount: 0 };
+  }
+  if (checkpoints.some(item => !Number.isFinite(item?.seconds) || item.seconds < 0 || item.seconds > 360)) return null;
+  const checkpointed = Math.round(checkpoints.reduce((sum, item) => sum + item.seconds, 0) * 10) / 10;
+  if (checkpointed > total + 1) return { maestroSeconds: total, checkpointedSeconds: checkpointed, notCheckpointedSeconds: null, checkpointCount: checkpoints.length };
+  return {
+    maestroSeconds: total,
+    checkpointedSeconds: checkpointed,
+    notCheckpointedSeconds: Math.round(Math.max(0, total - checkpointed) * 10) / 10,
+    checkpointCount: checkpoints.length,
+  };
+}

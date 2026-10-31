@@ -45,6 +45,32 @@ test('Android report separates runner time from launcher setup and records recov
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+test('reports separate Maestro execution phases, checkpoint coverage and iOS build/cache timings', () => {
+  const directory = mkdtempSync(join(process.cwd(), 'tests/e2e/results/phase-timing-test-'));
+  try {
+    const report = {
+      caseId: 'TC-002', platform: 'ios', status: 'PASS', attempts: [{
+        attempt: 1, status: 'PASS', durationSeconds: 212.4,
+        maestroPhaseTimings: [{ phase: 'prepare', seconds: 90 }, { phase: 'submit', seconds: 122.4 }],
+        screenshot: { status: 'UNAVAILABLE', finding: 'Synthetic report fixture', timings: {} },
+        uiTiming: { maestroSeconds: 212.4, checkpointedSeconds: 170, notCheckpointedSeconds: 42.4, checkpointCount: 6 },
+      }],
+      iosBuildMetrics: {
+        phaseTimingsStatus: 'available',
+        phaseDurationsSeconds: { 'expo-prebuild': 12, 'xcode-compilation': 645, 'simulator-startup': 20 },
+        compilerCache: { status: 'available', cacheableCalls: 5, hits: 3, misses: 2 },
+      },
+    };
+    const html = readFileSync(writeReport(report, directory), 'utf8');
+    assert.ok(html.includes('iOS build phases'));
+    assert.ok(html.includes('Xcode compile: 10 min 45 sec'));
+    assert.ok(html.includes('3 hits / 5 cacheable calls; 2 misses'));
+    assert.ok(html.includes('Maestro phase durations: prepare: 1 min 30 sec; submit: 2 min 2.4 sec.'));
+    assert.ok(html.includes('recorded checkpoints cover 2 min 50 sec; 42.4 sec falls outside recorded checkpoint intervals'));
+    assert.ok(html.includes('The residual is not a diagnosed wait.'));
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('PASS image validation requires an identifier from this app, never static text or login fields', () => {
   const appId = 'com.sadik.microhabit';
   const marker = id => ({ attributes: { 'resource-id': id }, children: [] });

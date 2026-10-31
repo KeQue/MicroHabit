@@ -4,11 +4,14 @@ import { completedReport } from './maestro-result.mjs';
 // or app relaunch occur between input review and submission.
 export async function executeLoginAttempt({ platform, attempt, runFlow, capture, diagnostics, now = Date.now }) {
   let uiMilliseconds = 0;
+  const maestroPhaseTimings = [];
   const execute = async (phase, reuseDriver) => {
     if (uiMilliseconds >= 360000) return { child: { error: { code: 'ETIMEDOUT' } }, xml: '', completed: false, started: false };
     const started = now();
     const result = await runFlow(phase, { reuseDriver, timeout: Math.max(1, 360000 - uiMilliseconds) });
-    uiMilliseconds += now() - started;
+    const elapsed = now() - started;
+    uiMilliseconds += elapsed;
+    maestroPhaseTimings.push({ phase, seconds: Math.round(elapsed / 100) / 10 });
     return { ...result, completed: completedReport(result.child, result.xml), started: true };
   };
   let result = await execute(platform === 'ios' ? 'prepare' : 'full', false);
@@ -30,7 +33,7 @@ export async function executeLoginAttempt({ platform, attempt, runFlow, capture,
       : result.systemVerificationUnavailable && result.completed ? 'UI assertions passed, but the Android system monitor could not verify the final window state; this attempt is blocked.'
         : result.systemVerificationUnavailable ? 'Native UI assertions did not complete, and the Android system monitor could not verify the final window state.'
         : 'Native UI assertions did not complete. Inspect the fixed diagnostics and private screenshot; raw output is discarded.';
-  const outcome = { attempt, status: result.systemBlocked ? 'BLOCKED' : result.systemInterrupted ? 'INTERRUPTED' : result.systemVerificationUnavailable && result.completed ? 'BLOCKED' : completed ? 'PASS' : 'FAIL', durationSeconds: Math.round(uiMilliseconds / 100) / 10, finding: result.systemBlocked ? 'Android system monitoring stopped the flow; recovery was checked before leaving the attempt.' : result.systemInterrupted ? 'System UI recovered after this interrupted attempt. Any restart counts as another login attempt.' : finding };
+  const outcome = { attempt, status: result.systemBlocked ? 'BLOCKED' : result.systemInterrupted ? 'INTERRUPTED' : result.systemVerificationUnavailable && result.completed ? 'BLOCKED' : completed ? 'PASS' : 'FAIL', durationSeconds: Math.round(uiMilliseconds / 100) / 10, maestroPhaseTimings, finding: result.systemBlocked ? 'Android system monitoring stopped the flow; recovery was checked before leaving the attempt.' : result.systemInterrupted ? 'System UI recovered after this interrupted attempt. Any restart counts as another login attempt.' : finding };
   if (result.systemBlocked || result.systemInterrupted || result.systemVerificationUnavailable) outcome.systemDiagnostic = result.systemDiagnostic;
   if (platform === 'ios') outcome.submissionStarted = submitted;
   if (inputScreenshot) outcome.inputScreenshot = inputScreenshot;

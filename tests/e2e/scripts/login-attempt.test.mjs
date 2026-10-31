@@ -68,6 +68,7 @@ test('iOS submits only after both private field checks and the required photo, w
   assert.equal(result.status, 'PASS');
   assert.equal(result.submissionStarted, true);
   assert.equal(result.durationSeconds, 2);
+  assert.deepEqual(result.maestroPhaseTimings, [{ phase: 'prepare', seconds: 1 }, { phase: 'submit', seconds: 1 }]);
   assert.deepEqual(events, [{ phase: 'prepare', reuseDriver: false, timeout: 360000 }, 'input-photo', { phase: 'submit', reuseDriver: true, timeout: 359000 }, 'final-photo']);
 });
 
@@ -103,6 +104,7 @@ test('a preparation failure is preserved, a submission failure is not retried, a
   assert.deepEqual(phases, ['full']);
   assert.equal(result.status, 'PASS');
   assert.equal(result.inputScreenshot, undefined);
+  assert.deepEqual(result.maestroPhaseTimings, [{ phase: 'full', seconds: 0 }]);
   let clock = 0;
   const limited = [];
   const exhausted = await executeLoginAttempt({ platform: 'ios', attempt: 1, now: () => clock,

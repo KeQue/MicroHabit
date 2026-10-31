@@ -45,6 +45,16 @@ export function writeReport(report, directory = results) {
   if (report.simulatorReadiness) rows.push(['Simulator checks', report.simulatorReadiness.map(check => `${check.diagnostic || 'ready'}; state ${check.state || 'unknown'}; ${formatDuration(check.durationSeconds)}`).join(' / ')]);
   if (report.androidReadiness) rows.push(['Android system check', `${report.androidReadiness.diagnostic || 'ready'}; category ${report.androidReadiness.category || 'none'}`]);
   if (report.androidRecoveries) rows.push(['System UI recovery', report.androidRecoveries.length ? report.androidRecoveries.map(event => `${event.phase}: ${event.result}${event.action ? ` via ${event.action}` : ''}${event.selector ? ` (${event.selector})` : ''}${event.diagnostic ? ` (${event.diagnostic})` : ''}${Number.isInteger(event.hierarchyReads) ? ` [${event.hierarchyReads} hierarchy reads]` : ''}${Number.isFinite(event.durationSeconds) ? ` [${formatDuration(event.durationSeconds)}]` : ''}`).join(' / ') : 'No recovery needed']);
+  if (report.iosBuildMetrics) {
+    const phaseLabels = { configuration: 'Configuration', 'expo-prebuild': 'Expo prebuild', 'cocoapods-install': 'CocoaPods', 'xcode-compilation': 'Xcode compile', 'simulator-startup': 'Simulator startup', 'simulator-configuration': 'Simulator setup', 'app-installation': 'App install', 'simulator-readiness': 'Simulator readiness', complete: 'Complete' };
+    const phases = Object.entries(phaseLabels).filter(([phase]) => Number.isFinite(report.iosBuildMetrics.phaseDurationsSeconds?.[phase]))
+      .map(([phase, label]) => `${label}: ${formatDuration(report.iosBuildMetrics.phaseDurationsSeconds[phase])}`).join(' / ');
+    rows.push(['iOS build phases', report.iosBuildMetrics.phaseTimingsStatus === 'available' && phases ? phases : 'Unavailable']);
+    const cache = report.iosBuildMetrics.compilerCache;
+    rows.push(['iOS native compiler cache', cache?.status === 'available'
+      ? `${cache.hits} hits / ${cache.cacheableCalls} cacheable calls; ${cache.misses} misses`
+      : 'Unavailable']);
+  }
   if (report.launcherTimings) {
     const labels = { apkPreparationSeconds: 'APK preparation', emulatorStartupSeconds: 'Emulator startup', androidDialogRecoverySeconds: 'System dialog check/recovery', systemUiStabilizationSeconds: 'System UI stabilization', apkInstallationSeconds: 'APK installation' };
     rows.push(['Android launcher setup', Object.entries(labels).map(([key, label]) => `${label}: ${formatDuration(report.launcherTimings[key])}`).join(' / ')]);
@@ -64,8 +74,12 @@ export function writeReport(report, directory = results) {
   const attempts = (report.attempts || []).map(attempt => {
     const diagnostic = (attempt.diagnostics ? `<p>Last completed checkpoint: ${escape(attempt.diagnostics.lastCompletedCheckpoint)}. Failed command: ${escape(attempt.diagnostics.failedCommand)}. Target: ${escape(attempt.diagnostics.failedTarget)}.</p>` : '') + (attempt.systemDiagnostic ? `<p>Android system diagnostic: ${escape(attempt.systemDiagnostic)}.</p>` : '');
     const checkpointTiming = attempt.checkpointTimings?.length ? `<p>Time between test checkpoints: ${attempt.checkpointTimings.map(item => `${escape(item.phase)}: ${escape(formatDuration(item.seconds))}`).join('; ')}. These intervals omit startup and any missing checkpoints.</p>` : '';
+    const maestroPhaseTiming = attempt.maestroPhaseTimings?.length ? `<p>Maestro phase durations: ${attempt.maestroPhaseTimings.map(item => `${escape(item.phase)}: ${escape(formatDuration(item.seconds))}`).join('; ')}.</p>` : '';
+    const uiTiming = attempt.uiTiming ? `<p>Maestro execution: ${escape(formatDuration(attempt.uiTiming.maestroSeconds))}${attempt.uiTiming.checkpointCount
+      ? `; recorded checkpoints cover ${escape(formatDuration(attempt.uiTiming.checkpointedSeconds))}; ${attempt.uiTiming.notCheckpointedSeconds === null ? 'checkpoint timing could not be reconciled with execution time' : `${escape(formatDuration(attempt.uiTiming.notCheckpointedSeconds))} falls outside recorded checkpoint intervals`}. The residual is not a diagnosed wait.`
+      : '; no completed checkpoint intervals were available.'}</p>` : '';
     const before = attempt.inputScreenshot && !attempt.finalScreenshotIsInput && attempt.inputScreenshot !== attempt.screenshot && (!attempt.inputScreenshot.file || attempt.inputScreenshot.file !== attempt.screenshot?.file) ? `<h3>Before Sign in</h3>${pictureFor(attempt.inputScreenshot)}<h3>After attempt</h3>` : '';
-    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(formatDuration(attempt.durationSeconds))})</p>${diagnostic}${checkpointTiming}${before}${pictureFor(attempt.screenshot)}</section>`;
+    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(formatDuration(attempt.durationSeconds))})</p>${diagnostic}${maestroPhaseTiming}${checkpointTiming}${uiTiming}${before}${pictureFor(attempt.screenshot)}</section>`;
   }).join('');
   const improvements = `<aside><h2>Suggested improvements after this run</h2><ul>${suggestedImprovements(report).map(item => `<li>${escape(item)}</li>`).join('')}</ul></aside>`;
   const totals = timingTotals(report);

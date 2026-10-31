@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { resultExitCode, screenshotEvidenceStatus } from './maestro-result.mjs';
 import { authenticatedScreen, inspectLoginInputs, parseHierarchy, redactScreenshot, safeScreenState } from './screenshot.mjs';
 import { recordRun, writeReport } from './report.mjs';
-import { checkpointTimings, failureDiagnostics, readCommandRecords } from './failure-diagnostics.mjs';
+import { checkpointTimings, failureDiagnostics, readCommandRecords, uiTimingSummary } from './failure-diagnostics.mjs';
+import { matchingIosBuildMetrics } from './ios-build-metrics.mjs';
 import { inspectSimulator, mayRetrySimulatorProbe } from './ios-readiness.mjs';
 import { createSystemUiRecovery, inspectAndroidWindows, isSystemUiAnr, monitorAndroidFlow } from './android-readiness.mjs';
 import { executeLoginAttempt } from './login-attempt.mjs';
@@ -198,6 +199,21 @@ async function checkAndroidReadiness(device) {
   return 0;
 }
 
+function readIosBuildMetrics(sourceRevision) {
+  if (env.E2E_IOS_SOURCE_SHA !== sourceRevision) return null;
+  const summaryPath = join(resultsDir, 'ios-build-summary.json');
+  if (!existsSync(summaryPath)) {
+    console.warn('iOS build metrics summary is missing; build timings and cache counts will be unavailable.');
+    return { phaseTimingsStatus: 'unavailable', phaseDurationsSeconds: {}, compilerCache: { status: 'unavailable' } };
+  }
+  const summary = JSON.parse(readFileSync(summaryPath, 'utf8'));
+  const metrics = matchingIosBuildMetrics(summary, sourceRevision);
+  if (!metrics) console.warn('iOS build metrics summary did not match the tested source revision or expected schema.');
+  return metrics || {
+    phaseTimingsStatus: 'unavailable', phaseDurationsSeconds: {}, compilerCache: { status: 'unavailable' },
+  };
+}
+
 function valid(value, pattern) { return typeof value === 'string' && pattern.test(value); }
 async function prepare(platform) {
   const android = platform === 'android';
@@ -378,6 +394,7 @@ async function run(platform, prerequisite = null) {
     blockers, attempts: [], requiresInputScreenshot: platform === 'ios', durationSeconds: 0, authenticationEvidence: 'Not executed',
     rawArtifacts: 'Raw logs/reports deleted; only credential-redacted PNG evidence and a private HTML report are retained.',
   };
+  if (!android) report.iosBuildMetrics = readIosBuildMetrics(metadata.sourceRevision);
   if (!blockers.length) {
     const temporary = mkdtempSync(join(resultsDir, '.private-run-'));
     try {
@@ -405,10 +422,10 @@ async function run(platform, prerequisite = null) {
           capture: options => captureScreenshot(metadata, index, output, options),
           diagnostics: () => failureDiagnostics(output),
         });
-        if (platform === 'android') {
-          const timings = checkpointTimings(readCommandRecords(output));
-          if (timings) attempt.checkpointTimings = timings;
-        }
+        const timings = checkpointTimings(readCommandRecords(output));
+        if (timings) attempt.checkpointTimings = timings;
+        const uiTiming = uiTimingSummary(attempt.durationSeconds, timings);
+        if (uiTiming) attempt.uiTiming = uiTiming;
         console.log(`${metadata.caseId}: attempt ${index} assertions ${attempt.status}.`);
         console.log(`${metadata.caseId}: attempt ${index} screenshot ${attempt.screenshot.status}.`);
         return attempt;

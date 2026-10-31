@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { checkpointTimings, summarizeCommands } from './failure-diagnostics.mjs';
+import { checkpointTimings, summarizeCommands, uiTimingSummary } from './failure-diagnostics.mjs';
 import { safeScreenState } from './screenshot.mjs';
 
 const secret = 'SYNTHETIC_SECRET_NEVER_RETAINED';
@@ -15,6 +15,21 @@ test('checkpoint timing retains only bounded intervals between known completed m
   assert.equal(checkpointTimings([checkpoint('app-launched', 'COMPLETED', 5000), checkpoint('login-controls-ready', 'COMPLETED', 1000)]), null);
   assert.equal(checkpointTimings([checkpoint('app-launched', 'COMPLETED', 1), checkpoint('login-controls-ready', 'COMPLETED', 360002)]), null);
   assert.equal(checkpointTimings(null), null);
+});
+
+test('UI timing summary separates checkpointed time from unmeasured intervals', () => {
+  assert.deepEqual(uiTimingSummary(120, [{ phase: 'a', seconds: 30 }, { phase: 'b', seconds: 45 }]), {
+    maestroSeconds: 120, checkpointedSeconds: 75, notCheckpointedSeconds: 45, checkpointCount: 2,
+  });
+  assert.deepEqual(uiTimingSummary(80, null), {
+    maestroSeconds: 80, checkpointedSeconds: null, notCheckpointedSeconds: null, checkpointCount: 0,
+  });
+  assert.deepEqual(uiTimingSummary(40, [{ phase: 'a', seconds: 42 }]), {
+    maestroSeconds: 40, checkpointedSeconds: 42, notCheckpointedSeconds: null, checkpointCount: 1,
+  });
+  assert.equal(uiTimingSummary(-1, []), null);
+  assert.equal(uiTimingSummary(361, []), null);
+  assert.equal(uiTimingSummary(20, [{ phase: 'private value', seconds: 361 }]), null);
 });
 
 test('diagnostics use only completed fixed checkpoints and the deepest failed command, ignoring secret-bearing fields', () => {

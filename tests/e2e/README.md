@@ -49,6 +49,13 @@ This is an assistant workflow, not an unattended service: it runs when an
 assistant is working on the reports and does not independently start tests or
 cloud jobs.
 
+Reports include per-invocation Maestro durations and distinguish completed
+checkpoint intervals from time not covered by those checkpoints. iOS CI reports
+also include bounded build-phase durations and native compiler-cache hits/misses
+when counters are available for the exact tested source revision. These
+measurements diagnose cost; they do not prove a specific cause or change test
+coverage.
+
 Reuse Node/npm, Expo SDK 54, Java 21, Android SDK and the existing
 Pixel_7 Android 14 image. Maestro CLI is pinned to **2.12.0**. No npm testing
 framework is added. `app.config.ts` resolves to version 1.0.2, iOS build 36 and

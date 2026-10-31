@@ -12,6 +12,15 @@ a roadmap, confidence score, or claim that the model has been retrained.
   revision, preserve known Expo script changes, and report build failures without
   exposing raw logs. A shorter temporary cache mapping is prepared but needs a
   successful native build to establish that it resolves the path failure.
+- Follow-up observation: after mapping the project to a short drive, the next
+  run failed in Expo prebuild with an unknown category and its private log was
+  discarded. Drive-selection unit tests did not exercise prebuild. A read-only
+  Expo config probe through a temporary mapping passed, but did not exercise
+  prebuild. An isolated prebuild reproduced Expo autolinking's failure to find
+  package.json at a drive root; mapping the parent and keeping the project one
+  directory below the root made the isolated prebuild succeed. Verify the
+  affected operation itself where practical, retain safe diagnostic categories,
+  and do not infer the cause from the phase. Native compilation remains untested.
 
 ## Check Simulator Keychain entitlements after a successful Auth response
 

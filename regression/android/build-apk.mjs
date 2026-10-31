@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { canReuse, fingerprint, isAppInput, isExpectedExpoPackageRewrite } from './apk-fingerprint.mjs';
 import { chooseBuildDrive, parseMappings } from './short-path.mjs';
 
@@ -67,13 +67,14 @@ try {
       const mapped = spawnSync('subst.exe', [drive, cache], { env: cleanEnv, windowsHide: true, timeout: 30000 });
       if (mapped.error || mapped.status !== 0) throw Error('Cannot create a temporary short build drive.');
       createdMappings.push([drive, cache]);
-      const project = process.cwd();
+      // Expo autolinking does not inspect the drive root for package.json.
+      const project = dirname(process.cwd());
       const mappedProject = spawnSync('subst.exe', [projectDrive, project], { env: cleanEnv, windowsHide: true, timeout: 30000 });
       if (mappedProject.error || mappedProject.status !== 0) throw Error('Cannot create a temporary short build drive.');
       createdMappings.push([projectDrive, project]);
       const buildEnv = { ...cleanEnv, JAVA_HOME: jdk, ANDROID_HOME: join(process.env.LOCALAPPDATA, 'Android/Sdk'), GRADLE_USER_HOME: `${drive}\\`, NODE_ENV: 'production', CI: '1' };
       console.log('Building a fresh Android Release APK; this may take several minutes.');
-      const run = (command, args) => spawnSync(command, args, { cwd: `${projectDrive}\\`, env: buildEnv, stdio: ['ignore', log, log], windowsHide: true, timeout: 3600000 });
+      const run = (command, args) => spawnSync(command, args, { cwd: join(`${projectDrive}\\`, basename(process.cwd())), env: buildEnv, stdio: ['ignore', log, log], windowsHide: true, timeout: 3600000 });
       const buildFailure = (phase, result) => {
         const tail = readFileSync(join(temporary, 'build.log'), 'utf8').slice(-65536);
         const categories = [

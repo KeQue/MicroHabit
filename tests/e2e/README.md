@@ -112,8 +112,9 @@ Do not delete keys or wipe a device holding important data to resolve this.
 The helper refuses to start while another emulator is detected. It writes only
 the dedicated AVD under ignored `.tools/avd`; it never downloads an image or wipes
 an existing AVD. Its first boot creates local guest storage from the installed
-image. `-Headless` is available for automated sessions; native UI tests still run
-inside the emulator.
+image. The Regression task starts it headless by default (`-Headless`); native UI
+tests and screenshots still run inside the emulator. Calling the helper directly
+without `-Headless` keeps its visible-window behavior.
 
 ## Enter credentials securely and run Android
 

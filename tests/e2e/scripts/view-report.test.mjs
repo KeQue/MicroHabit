@@ -41,3 +41,11 @@ test('the Android runner owns one report launch, and the suite does not launch i
   assert.equal((android.match(/view-report\.mjs android --newer-than-ns/g) || []).length, 1);
   assert.doesNotMatch(suite, /view-report\.mjs android/);
 });
+
+test('Regression launches the dedicated Android emulator headless by default', () => {
+  const android = readFileSync('regression/android/run.ps1', 'utf8');
+  const launcher = readFileSync('tests/e2e/scripts/start-android.ps1', 'utf8');
+  assert.match(android, /start-android\.ps1\s+-Headless/);
+  assert.match(launcher, /param\(\[switch\]\$Headless\)/);
+  assert.match(launcher, /if \(\$Headless\) \{ \$launchArgs \+= '-no-window' \}/);
+});

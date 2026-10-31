@@ -27,8 +27,8 @@ $testDevice = $null
 $result = 2
 try {
 $bootTimer = [Diagnostics.Stopwatch]::StartNew()
-Write-Host 'Starting the dedicated Android emulator in the background, if needed.'
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/e2e/scripts/start-android.ps1
+Write-Host 'Starting the dedicated Android emulator headless in the background, if needed.'
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/e2e/scripts/start-android.ps1 -Headless
 if ($LASTEXITCODE -ne 0) { Write-Host 'Could not start the dedicated Android emulator.'; exit 2 }
 $deadline = [DateTime]::UtcNow.AddMinutes(3)
 while ([DateTime]::UtcNow -lt $deadline) {

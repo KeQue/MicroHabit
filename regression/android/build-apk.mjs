@@ -54,19 +54,26 @@ try {
     const used = new Set(mappings().keys());
     for (const drive of ['X:', 'Y:', 'Z:', 'R:', 'Q:']) if (existsSync(`${drive}\\`)) used.add(drive);
     const drive = chooseBuildDrive(used);
-    if (!drive) throw Error('No short build drive is available.');
+    if (drive) used.add(drive);
+    const projectDrive = chooseBuildDrive(used);
+    if (!drive || !projectDrive) throw Error('No short build drive is available.');
     mkdirSync(results, { recursive: true, mode: 0o700 });
     const temporary = mkdtempSync(join(results, '.private-build-'));
-    let log, mappingCreated = false;
+    let log;
+    const createdMappings = [];
     try {
       log = openSync(join(temporary, 'build.log'), 'w', 0o600);
       const packageBefore = readFileSync('package.json');
       const mapped = spawnSync('subst.exe', [drive, cache], { env: cleanEnv, windowsHide: true, timeout: 30000 });
       if (mapped.error || mapped.status !== 0) throw Error('Cannot create a temporary short build drive.');
-      mappingCreated = true;
+      createdMappings.push([drive, cache]);
+      const project = process.cwd();
+      const mappedProject = spawnSync('subst.exe', [projectDrive, project], { env: cleanEnv, windowsHide: true, timeout: 30000 });
+      if (mappedProject.error || mappedProject.status !== 0) throw Error('Cannot create a temporary short build drive.');
+      createdMappings.push([projectDrive, project]);
       const buildEnv = { ...cleanEnv, JAVA_HOME: jdk, ANDROID_HOME: join(process.env.LOCALAPPDATA, 'Android/Sdk'), GRADLE_USER_HOME: `${drive}\\`, NODE_ENV: 'production', CI: '1' };
       console.log('Building a fresh Android Release APK; this may take several minutes.');
-      const run = (command, args) => spawnSync(command, args, { env: buildEnv, stdio: ['ignore', log, log], windowsHide: true, timeout: 3600000 });
+      const run = (command, args) => spawnSync(command, args, { cwd: `${projectDrive}\\`, env: buildEnv, stdio: ['ignore', log, log], windowsHide: true, timeout: 3600000 });
       const buildFailure = (phase, result) => {
         const tail = readFileSync(join(temporary, 'build.log'), 'utf8').slice(-65536);
         const categories = [
@@ -105,9 +112,9 @@ try {
         if (log !== undefined) closeSync(log);
         rmSync(temporary, { recursive: true, force: true });
       } finally {
-        if (mappingCreated) try {
-          if (mappings().get(drive) === cache.replaceAll('/', '\\').replace(/\\+$/, '').toLowerCase()) {
-            const unmapped = spawnSync('subst.exe', [drive, '/d'], { env: cleanEnv, windowsHide: true, timeout: 30000 });
+        for (const [mappedDrive, target] of createdMappings.reverse()) try {
+          if (mappings().get(mappedDrive) === target.replaceAll('/', '\\').replace(/\\+$/, '').toLowerCase()) {
+            const unmapped = spawnSync('subst.exe', [mappedDrive, '/d'], { env: cleanEnv, windowsHide: true, timeout: 30000 });
             if (unmapped.error || unmapped.status !== 0) console.error('The temporary build drive could not be removed.');
           } else console.error('The build drive mapping changed; it was left untouched.');
         } catch { console.error('The temporary build drive could not be verified for removal.'); }

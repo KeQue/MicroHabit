@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { canReuse, fingerprint, isAppInput } from './apk-fingerprint.mjs';
+import { canReuse, fingerprint, isAppInput, isExpectedExpoPackageRewrite } from './apk-fingerprint.mjs';
 
 const apk = 'android/app/build/outputs/apk/release/app-release.apk';
 const manifestPath = 'tests/e2e/.tools/android-apk-provenance.json';
@@ -48,16 +48,38 @@ try {
     mkdirSync(results, { recursive: true, mode: 0o700 });
     const temporary = mkdtempSync(join(results, '.private-build-'));
     const log = openSync(join(temporary, 'build.log'), 'w', 0o600);
+    const packageBefore = readFileSync('package.json');
     try {
       console.log('Building a fresh Android Release APK; this may take several minutes.');
       const run = (command, args) => spawnSync(command, args, { env: buildEnv, stdio: ['ignore', log, log], windowsHide: true, timeout: 3600000 });
+      const buildFailure = (phase, result) => {
+        const tail = readFileSync(join(temporary, 'build.log'), 'utf8').slice(-65536);
+        const categories = [
+          ['memory', /outofmemoryerror|java heap space|unable to create native thread|not enough memory/i],
+          ['dependency-or-network', /could not resolve|could not download|connection timed out|unknownhostexception|network is unreachable/i],
+          ['android-toolchain', /sdk location not found|failed to find target|ndk.*not found|cmake.*not found/i],
+          ['compile', /compilation failed|compilation error|error: (?:cannot find symbol|package .* does not exist)/i],
+        ].filter(([, pattern]) => pattern.test(tail)).map(([category]) => category);
+        if (result.error?.code === 'ETIMEDOUT') categories.push('timeout');
+        console.error(`${phase} failed. Safe categories: ${categories.join(', ') || 'unknown'}. Exit code: ${Number.isInteger(result.status) ? result.status : 'unavailable'}.`);
+        throw Error('Android build stopped; private build output was discarded.');
+      };
       const prebuild = run(process.execPath, ['node_modules/expo/bin/cli', 'prebuild', '--platform', 'android', '--no-install', '--skip-dependency-update', 'react,react-native']);
-      if (prebuild.error || prebuild.status !== 0) throw Error('Android Expo prebuild failed; private build output was discarded.');
+      const packageAfter = readFileSync('package.json');
+      if (!packageAfter.equals(packageBefore)) {
+        if (!isExpectedExpoPackageRewrite(JSON.parse(packageBefore), JSON.parse(packageAfter))) throw Error('Expo prebuild changed unexpected package settings; inspect them before continuing.');
+        writeFileSync('package.json', packageBefore);
+      }
+      if (prebuild.error || prebuild.status !== 0) buildFailure('Expo prebuild', prebuild);
       const gradle = run(process.env.ComSpec || 'cmd.exe', ['/d', '/c', 'android\\gradlew.bat', '-p', 'android', ':app:assembleRelease', '--no-daemon', '--max-workers=2', '-Dorg.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m', '-PreactNativeArchitectures=x86_64']);
-      if (gradle.error || gradle.status !== 0 || !existsSync(apk)) throw Error('Android Release build failed; private build output was discarded.');
+      if (gradle.error || gradle.status !== 0 || !existsSync(apk)) buildFailure('Android Release compilation', gradle);
       if (inputs() !== inputHash) throw Error('App inputs changed during the build; the APK was not accepted.');
       writeFileSync(manifestPath, JSON.stringify({ version: 1, inputHash, apkHash: hashFile(apk) }) + '\n', { mode: 0o600 });
       console.log('Fresh Android APK built and recorded.');
     } finally { closeSync(log); rmSync(temporary, { recursive: true, force: true }); }
   }
-} catch (error) { console.error(error.message); process.exitCode = 2; }
+} catch (error) {
+  const safe = /^(?:Cannot inspect app source\.|Commit tracked changes before building the app\.|Untracked application files found; commit or remove them before building\.|Installed dependencies cannot be verified\.|Installed dependencies do not match the project lockfile\.|Cannot resolve the app build configuration\.|The Android build is not configured for the approved production backend\.|The existing Android build JDK is unavailable\.|Expo prebuild changed unexpected package settings; inspect them before continuing\.|Android build stopped; private build output was discarded\.|App inputs changed during the build; the APK was not accepted\.)$/;
+  console.error(safe.test(error.message) ? error.message : 'Android build preparation failed; private details were not printed.');
+  process.exitCode = 2;
+}

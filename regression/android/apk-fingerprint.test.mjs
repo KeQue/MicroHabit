@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canReuse, fingerprint, isAppInput } from './apk-fingerprint.mjs';
+import { canReuse, fingerprint, isAppInput, isExpectedExpoPackageRewrite } from './apk-fingerprint.mjs';
 
 test('app input changes invalidate the build while regression files do not', () => {
   assert.equal(isAppInput('app/index.tsx'), true);
@@ -12,4 +12,10 @@ test('app input changes invalidate the build while regression files do not', () 
   assert.equal(canReuse({ version: 1, inputHash: before, apkHash: 'a'.repeat(64) }, before, 'a'.repeat(64)), true);
   assert.equal(canReuse({ version: 1, inputHash: before, apkHash: 'a'.repeat(64) }, before, 'b'.repeat(64)), false);
   assert.equal(canReuse(null, before, 'a'.repeat(64)), false);
+});
+
+test('only Expo native script rewrites are restored automatically', () => {
+  const before = { scripts: { android: 'expo start --android', ios: 'expo start --ios' }, dependencies: { safe: '1' } };
+  assert.equal(isExpectedExpoPackageRewrite(before, { ...before, scripts: { android: 'expo run:android', ios: 'expo run:ios' } }), true);
+  assert.equal(isExpectedExpoPackageRewrite(before, { ...before, dependencies: { safe: '2' } }), false);
 });

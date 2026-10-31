@@ -69,7 +69,7 @@ try {
       log = openSync(join(temporary, 'build.log'), 'w', 0o600);
       const packageBefore = readFileSync('package.json');
       const ninja = 'tests/e2e/.tools/ninja-1.13.2/ninja.exe';
-      if (!existsSync(ninja) || hashFile(ninja) !== 'e52a7ad9538d9618c67a0bd777964e2eec8a30f68b810a2f6adce1f2da847b8') throw Error('The verified Ninja build tool is unavailable.');
+      if (!existsSync(ninja) || hashFile(ninja) !== 'e52a7ad9538d9618c67a0bd777964e2eec8a30f68b810a2f6adce1f2daf847b8') throw Error('The verified Ninja build tool is unavailable.');
       temporarySdk = mkdtempSync(join(tmpdir(), 'cm-sdk-'));
       console.log('Preparing a temporary Android toolchain.');
       prepareAndroidSdk(join(process.env.LOCALAPPDATA, 'Android/Sdk'), temporarySdk, join(process.cwd(), ninja));

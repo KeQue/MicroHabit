@@ -59,8 +59,12 @@ try {
           ['dependency-or-network', /could not resolve|could not download|connection timed out|unknownhostexception|network is unreachable/i],
           ['android-toolchain', /sdk location not found|failed to find target|ndk.*not found|cmake.*not found/i],
           ['compile', /compilation failed|compilation error|error: (?:cannot find symbol|package .* does not exist)/i],
+          ['permission', /accessdeniedexception|\bEPERM\b|\bEACCES\b|permission denied|access is denied/i],
+          ['process-start', /a problem occurred starting process|cannot run program|could not start process/i],
         ].filter(([, pattern]) => pattern.test(tail)).map(([category]) => category);
         if (result.error?.code === 'ETIMEDOUT') categories.push('timeout');
+        const task = tail.match(/Execution failed for task '(:[A-Za-z0-9_:.-]+)'/);
+        if (task) console.error(`Failed Gradle task: ${task[1]}.`);
         console.error(`${phase} failed. Safe categories: ${categories.join(', ') || 'unknown'}. Exit code: ${Number.isInteger(result.status) ? result.status : 'unavailable'}.`);
         throw Error('Android build stopped; private build output was discarded.');
       };

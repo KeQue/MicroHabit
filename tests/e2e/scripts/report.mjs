@@ -59,8 +59,9 @@ export function writeReport(report, directory = results) {
   };
   const attempts = (report.attempts || []).map(attempt => {
     const diagnostic = (attempt.diagnostics ? `<p>Last completed checkpoint: ${escape(attempt.diagnostics.lastCompletedCheckpoint)}. Failed command: ${escape(attempt.diagnostics.failedCommand)}. Target: ${escape(attempt.diagnostics.failedTarget)}.</p>` : '') + (attempt.systemDiagnostic ? `<p>Android system diagnostic: ${escape(attempt.systemDiagnostic)}.</p>` : '');
+    const checkpointTiming = attempt.checkpointTimings?.length ? `<p>Time between test checkpoints: ${attempt.checkpointTimings.map(item => `${escape(item.phase)}: ${escape(formatDuration(item.seconds))}`).join('; ')}. These intervals omit startup and any missing checkpoints.</p>` : '';
     const before = attempt.inputScreenshot && !attempt.finalScreenshotIsInput && attempt.inputScreenshot !== attempt.screenshot && (!attempt.inputScreenshot.file || attempt.inputScreenshot.file !== attempt.screenshot?.file) ? `<h3>Before Sign in</h3>${pictureFor(attempt.inputScreenshot)}<h3>After attempt</h3>` : '';
-    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(formatDuration(attempt.durationSeconds))})</p>${diagnostic}${before}${pictureFor(attempt.screenshot)}</section>`;
+    return `<section><h2>Attempt ${escape(attempt.attempt)}: ${escape(attempt.status)}</h2><p>${escape(attempt.finding)} (${escape(formatDuration(attempt.durationSeconds))})</p>${diagnostic}${checkpointTiming}${before}${pictureFor(attempt.screenshot)}</section>`;
   }).join('');
   const improvements = `<aside><h2>Suggested improvements after this run</h2><ul>${suggestedImprovements(report).map(item => `<li>${escape(item)}</li>`).join('')}</ul></aside>`;
   const totals = timingTotals(report);

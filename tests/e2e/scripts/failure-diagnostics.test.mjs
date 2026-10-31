@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { summarizeCommands } from './failure-diagnostics.mjs';
+import { checkpointTimings, summarizeCommands } from './failure-diagnostics.mjs';
 import { safeScreenState } from './screenshot.mjs';
 
 const secret = 'SYNTHETIC_SECRET_NEVER_RETAINED';
 const checkpoint = (name, status, timestamp) => ({ command: { evalScriptCommand: { scriptString: '${output.e2eCheckpoint = "' + name + '"}' } }, metadata: { status, timestamp } });
+
+test('checkpoint timing retains only bounded intervals between known completed markers', () => {
+  const records = [checkpoint('app-launched', 'COMPLETED', 1000), checkpoint('login-controls-ready', 'COMPLETED', 3500), checkpoint('email-entered', 'COMPLETED', 4500), checkpoint('password-entered', 'PENDING', 5000), checkpoint(secret, 'COMPLETED', 6000)];
+  const result = checkpointTimings(records);
+  assert.deepEqual(result, [{ phase: 'login-controls', seconds: 2.5 }, { phase: 'enter-email', seconds: 1 }]);
+  assert.ok(!JSON.stringify(result).includes(secret));
+  assert.equal(checkpointTimings([...records, checkpoint('app-launched', 'COMPLETED', 2000)]), null);
+  assert.equal(checkpointTimings([checkpoint('app-launched', 'COMPLETED', 5000), checkpoint('login-controls-ready', 'COMPLETED', 1000)]), null);
+  assert.equal(checkpointTimings([checkpoint('app-launched', 'COMPLETED', 1), checkpoint('login-controls-ready', 'COMPLETED', 360002)]), null);
+  assert.equal(checkpointTimings(null), null);
+});
 
 test('diagnostics use only completed fixed checkpoints and the deepest failed command, ignoring secret-bearing fields', () => {
   const data = [

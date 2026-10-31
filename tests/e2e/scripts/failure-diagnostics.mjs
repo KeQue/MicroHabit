@@ -24,7 +24,7 @@ export function summarizeCommands(records) {
   return { lastCompletedCheckpoint, failedCommand: kinds[kind] || 'unknown', failedTarget: targets.has(id) ? id : null };
 }
 
-export function failureDiagnostics(directory) {
+export function readCommandRecords(directory) {
   const records = [];
   const inspect = (path, depth = 0) => {
     if (depth > 5) return;
@@ -36,6 +36,44 @@ export function failureDiagnostics(directory) {
       }
     }
   };
-  try { inspect(directory); return summarizeCommands(records); }
-  catch { return { lastCompletedCheckpoint: null, failedCommand: 'unavailable', failedTarget: null }; }
+  try { inspect(directory); return records; }
+  catch { return null; }
+}
+
+export function failureDiagnostics(directory) {
+  const records = readCommandRecords(directory);
+  return records ? summarizeCommands(records) : { lastCompletedCheckpoint: null, failedCommand: 'unavailable', failedTarget: null };
+}
+
+// Maestro 2.12 stores checkpoint start times as milliseconds. Keep only
+// durations between fixed, completed markers; discard commands and values.
+export function checkpointTimings(records) {
+  if (!Array.isArray(records)) return null;
+  const markers = new Map();
+  for (const record of records) {
+    const script = record?.command?.evalScriptCommand?.scriptString;
+    const name = typeof script === 'string' ? /^\$\{output\.e2eCheckpoint = "([a-z-]+)"\}$/.exec(script.trim())?.[1] : null;
+    const time = record?.metadata?.timestamp;
+    if (!checkpoints.has(name) || record?.metadata?.status !== 'COMPLETED' || !Number.isSafeInteger(time) || time <= 0) continue;
+    if (markers.has(name)) return null;
+    markers.set(name, time);
+  }
+  const phases = [
+    ['login-controls', 'app-launched', 'login-controls-ready'],
+    ['enter-email', 'login-controls-ready', 'email-entered'],
+    ['enter-password', 'email-entered', 'password-entered'],
+    ['dismiss-keyboard', 'password-entered', 'keyboard-dismissed'],
+    ['submit-login', 'keyboard-dismissed', 'login-submitted'],
+    ['load-leagues', 'login-submitted', 'authenticated-loaded'],
+    ['restart-app', 'authenticated-loaded', 'process-restarted'],
+    ['restore-session', 'process-restarted', 'session-restored'],
+  ];
+  const values = [];
+  for (const [phase, from, to] of phases) {
+    if (!markers.has(from) || !markers.has(to)) continue;
+    const delta = markers.get(to) - markers.get(from);
+    if (delta < 0 || delta > 360000) return null;
+    values.push({ phase, seconds: Math.round(delta / 100) / 10 });
+  }
+  return values.length ? values : null;
 }

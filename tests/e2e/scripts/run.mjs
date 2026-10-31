@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { resultExitCode, screenshotEvidenceStatus } from './maestro-result.mjs';
 import { authenticatedScreen, inspectLoginInputs, parseHierarchy, redactScreenshot, safeScreenState } from './screenshot.mjs';
 import { recordRun, writeReport } from './report.mjs';
-import { failureDiagnostics } from './failure-diagnostics.mjs';
+import { checkpointTimings, failureDiagnostics, readCommandRecords } from './failure-diagnostics.mjs';
 import { inspectSimulator, mayRetrySimulatorProbe } from './ios-readiness.mjs';
 import { createSystemUiRecovery, inspectAndroidWindows, isSystemUiAnr, monitorAndroidFlow } from './android-readiness.mjs';
 import { executeLoginAttempt } from './login-attempt.mjs';
@@ -367,6 +367,10 @@ async function run(platform, prerequisite = null) {
           capture: options => captureScreenshot(metadata, index, output, options),
           diagnostics: () => failureDiagnostics(output),
         });
+        if (platform === 'android') {
+          const timings = checkpointTimings(readCommandRecords(output));
+          if (timings) attempt.checkpointTimings = timings;
+        }
         console.log(`${metadata.caseId}: attempt ${index} assertions ${attempt.status}.`);
         console.log(`${metadata.caseId}: attempt ${index} screenshot ${attempt.screenshot.status}.`);
         return attempt;

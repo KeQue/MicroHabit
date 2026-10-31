@@ -26,19 +26,26 @@ function dialogButton(xml, size, resourceId, text) {
   if (typeof xml !== 'string') return { button: null, diagnostic: 'hierarchy-unavailable' };
   if (!Number.isInteger(size?.width) || !Number.isInteger(size?.height)) return { button: null, diagnostic: 'display-size-unavailable' };
   const nodes = xml.match(/<node\b[^>]*\/?>/g) || [];
-  const candidates = nodes.filter(node => new RegExp(`\\bresource-id="android:id/${resourceId}"`).test(node)
-    && /\bpackage="android"/.test(node));
+  const systemPackage = /(?:^|\s)package="(?:android|com\.android\.systemui)"/;
+  const hasLabel = node => new RegExp(`(?:^|\\s)(?:text|content-desc)="${text}"`).test(node);
+  let candidates = nodes.filter(node => new RegExp(`(?:^|\\s)resource-id="android:id/${resourceId}"`).test(node)
+    && systemPackage.test(node));
+  let selector = 'resource-id';
+  if (!candidates.length) {
+    candidates = nodes.filter(node => hasLabel(node) && systemPackage.test(node));
+    selector = 'system-label';
+  }
   if (!candidates.length) return { button: null, diagnostic: 'button-not-found' };
   if (candidates.length !== 1) return { button: null, diagnostic: 'button-ambiguous' };
   const node = candidates[0];
-  if (!new RegExp(`\\btext="${text}"`).test(node) || !/\bclickable="true"/.test(node) || !/\benabled="true"/.test(node)) {
-    return { button: null, diagnostic: 'button-not-actionable' };
+  if (!hasLabel(node) || !/(?:^|\s)clickable="true"/.test(node) || !/(?:^|\s)enabled="true"/.test(node)) {
+    return { button: null, diagnostic: 'button-not-actionable', selector };
   }
-  const m = node.match(/\bbounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
-  if (!m) return { button: null, diagnostic: 'button-bounds-unavailable' };
+  const m = node.match(/(?:^|\s)bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  if (!m) return { button: null, diagnostic: 'button-bounds-unavailable', selector };
   const [left, top, right, bottom] = m.slice(1).map(Number);
-  if (left >= right || top >= bottom || right > size.width || bottom > size.height) return { button: null, diagnostic: 'button-bounds-invalid' };
-  return { button: { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) }, diagnostic: null };
+  if (left >= right || top >= bottom || right > size.width || bottom > size.height) return { button: null, diagnostic: 'button-bounds-invalid', selector };
+  return { button: { x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2) }, diagnostic: null, selector };
 }
 
 // Return only coordinates, never hierarchy content. Refuse ambiguous or malformed elements.
@@ -64,9 +71,10 @@ export function createSystemUiRecovery(adb, sleep = ms => new Promise(resolve =>
   const query = () => adb(['shell', 'dumpsys', 'window', 'windows']);
   async function recover(initial, phase) {
     const started = Date.now();
-    const record = (result, action = null, diagnostic = null, hierarchyReads = null) => events.push({
+    const record = (result, action = null, diagnostic = null, hierarchyReads = null, selector = null) => events.push({
       phase, result, ...(action ? { action } : {}), ...(diagnostic ? { diagnostic } : {}),
       ...(hierarchyReads ? { hierarchyReads } : {}),
+      ...(selector ? { selector } : {}),
       durationSeconds: Math.round((Date.now() - started) / 100) / 10,
     });
     const systemUiAnr = isSystemUiAnr(initial);
@@ -102,13 +110,13 @@ export function createSystemUiRecovery(adb, sleep = ms => new Promise(resolve =>
       return { ready: false, diagnostic: 'android-recovery-buttons-unverified' };
     }
     if (!isSystemUiAnr(await query())) {
-      record('dialog-changed', selected.action, 'android-dialog-changed-before-tap', hierarchyReads);
+      record('dialog-changed', selected.action, 'android-dialog-changed-before-tap', hierarchyReads, selected.selector);
       return { ready: false, diagnostic: 'android-dialog-changed-before-tap' };
     }
     const button = selected.button;
     const tap = await adb(['shell', 'input', 'tap', String(button.x), String(button.y)]);
     if (tap.error || tap.status !== 0) {
-      record('tap-failed', selected.action, null, hierarchyReads);
+      record('tap-failed', selected.action, null, hierarchyReads, selected.selector);
       return { ready: false, diagnostic: `android-${selected.action}-failed` };
     }
     for (let i = 0; i < 5; i++) {
@@ -119,12 +127,12 @@ export function createSystemUiRecovery(adb, sleep = ms => new Promise(resolve =>
           const systemUi = await adb(['shell', 'pidof', 'com.android.systemui']);
           if (systemUi.error || systemUi.status !== 0 || !systemUi.stdout?.trim()) continue;
         }
-        record('recovered', selected.action, null, hierarchyReads);
+        record('recovered', selected.action, null, hierarchyReads, selected.selector);
         return checked;
       }
       if (checked.diagnostic !== 'android-error-dialog-present' || checked.category !== 'system-ui') break;
     }
-    record('not-confirmed', selected.action, null, hierarchyReads);
+    record('not-confirmed', selected.action, null, hierarchyReads, selected.selector);
     return { ready: false, diagnostic: selected.action === 'close-app' ? 'android-close-app-unconfirmed' : 'android-recovery-unconfirmed' };
   }
   return { events, query, recover };

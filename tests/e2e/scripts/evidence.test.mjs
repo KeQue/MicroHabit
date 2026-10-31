@@ -20,9 +20,9 @@ const raw = PNG.sync.write(image);
 test('Android recovery outcomes are recorded in the private HTML report', () => {
   const directory = mkdtempSync(join(process.cwd(), 'tests/e2e/results/recovery-test-'));
   try {
-    const report = { caseId: 'TC-001', platform: 'android', status: 'BLOCKED', attempts: [], androidRecoveries: [{ phase: 'preflight', result: 'recovered', action: 'close-app', hierarchyReads: 2 }, { phase: 'during-test', result: 'buttons-unverified', diagnostic: 'wait-button-not-found; close-button-not-found', hierarchyReads: 2 }] };
+    const report = { caseId: 'TC-001', platform: 'android', status: 'BLOCKED', attempts: [], androidRecoveries: [{ phase: 'preflight', result: 'recovered', action: 'close-app', selector: 'system-label', hierarchyReads: 2 }, { phase: 'during-test', result: 'buttons-unverified', diagnostic: 'wait-button-not-found; close-button-not-found', hierarchyReads: 2 }] };
     const html = readFileSync(writeReport(report, directory), 'utf8');
-    assert.ok(html.includes('preflight: recovered via close-app [2 hierarchy reads]'));
+    assert.ok(html.includes('preflight: recovered via close-app (system-label) [2 hierarchy reads]'));
     assert.ok(html.includes('during-test: buttons-unverified (wait-button-not-found; close-button-not-found) [2 hierarchy reads]'));
     assert.ok(html.includes('<th>Result</th><td>BLOCKED</td>'));
   } finally { rmSync(directory, { recursive: true, force: true }); }

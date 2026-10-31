@@ -15,13 +15,19 @@ test('current Android system/app error windows block setup without retaining arb
 
 const waitNode = '<node text="Wait" resource-id="android:id/aerr_wait" package="android" clickable="true" enabled="true" bounds="[10,20][110,80]" />';
 const closeNode = '<node text="Close app" resource-id="android:id/aerr_close" package="android" clickable="true" enabled="true" bounds="[120,20][190,80]" />';
+const systemUiWaitNode = '<node text="Wait" resource-id="com.android.systemui:id/confirm" package="com.android.systemui" clickable="true" enabled="true" bounds="[10,20][110,80]" />';
 test('only a verified system Wait element inside the display is eligible', () => {
   assert.deepEqual(systemWaitButton(waitNode, { width: 200, height: 200 }), { x: 60, y: 50 });
   assert.deepEqual(systemCloseButton(closeNode, { width: 200, height: 200 }), { x: 155, y: 50 });
+  assert.deepEqual(systemWaitButton(systemUiWaitNode, { width: 200, height: 200 }), { x: 60, y: 50 });
+  assert.deepEqual(systemWaitButton(systemUiWaitNode.replace('text="Wait"', 'content-desc="Wait"'), { width: 200, height: 200 }), { x: 60, y: 50 });
   assert.equal(systemWaitButton(waitNode + waitNode, { width: 200, height: 200 }), null);
+  assert.equal(systemWaitButton(systemUiWaitNode + systemUiWaitNode, { width: 200, height: 200 }), null);
   assert.equal(systemCloseButton(closeNode + closeNode, { width: 200, height: 200 }), null);
   assert.equal(systemCloseButton(closeNode.replace('text="Close app"', 'text="Wait"'), { width: 200, height: 200 }), null);
   assert.equal(systemWaitButton(waitNode.replace('package="android"', 'package="evil"'), { width: 200, height: 200 }), null);
+  assert.equal(systemWaitButton(systemUiWaitNode.replace('clickable="true"', 'clickable="false"'), { width: 200, height: 200 }), null);
+  assert.equal(systemWaitButton(systemUiWaitNode.replace('text="Wait"', 'content-text="Wait"'), { width: 200, height: 200 }), null);
   assert.equal(systemWaitButton(waitNode, { width: 100, height: 200 }), null);
   assert.equal(isSystemUiAnr(response('Application Error: com.android.systemui')), false);
 });
@@ -139,6 +145,23 @@ test('a transient incomplete hierarchy is re-read once before using a verified b
   assert.equal(taps, 1);
   assert.equal(recovery.events[0].result, 'recovered');
   assert.equal(recovery.events[0].hierarchyReads, 2);
+});
+
+test('a system-owned exact button label is used when Android resource IDs differ', async () => {
+  const anr = response('Application Not Responding: com.android.systemui');
+  const ready = response('com.example.app');
+  let windowChecks = 0, taps = 0;
+  const adb = async args => {
+    if (args.includes('dumpsys')) return [anr, anr, ready][windowChecks++];
+    if (args.includes('size')) return { status: 0, stdout: 'Physical size: 200x200\n' };
+    if (args.includes('uiautomator')) return { status: 0, stdout: systemUiWaitNode };
+    if (args.includes('tap')) { taps++; assert.deepEqual(args.slice(-2), ['60', '50']); return { status: 0 }; }
+    throw Error('unexpected command');
+  };
+  const recovery = createSystemUiRecovery(adb, async () => {});
+  assert.equal((await recovery.recover(anr, 'preflight')).ready, true);
+  assert.equal(taps, 1);
+  assert.equal(recovery.events[0].selector, 'system-label');
 });
 
 test('recovery does not retry or tap if the ANR dialog disappears before the hierarchy re-read', async () => {

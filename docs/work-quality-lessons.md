@@ -92,6 +92,11 @@ a roadmap, confidence score, or claim that the model has been retrained.
   one bounded, privacy-safe hierarchy re-read only while the same ANR is still
   present; keep failing closed when controls remain unverified. Device validation
   is still needed to establish whether this resolves the observed emulator case.
+- Follow-up observation: the next run still found neither expected Android
+  resource ID after two hierarchy reads and skipped login. Also accept only an
+  exact Wait/Close app text or content-description on a unique, enabled,
+  clickable node owned by Android or System UI, with valid display bounds. Keep
+  reporting which safe selector was verified; never use guessed coordinates.
 - Follow-up observation: the Android HTML report showed about 3m40s of E2E
   runner time while the founder observed about 18 minutes from starting the task.
   The report's former "total including setup" label overstated what it measured;

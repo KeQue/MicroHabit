@@ -414,7 +414,9 @@ async function run(platform, prerequisite = null) {
         return attempt;
       });
       Object.assign(report, outcome);
-      if (report.status === 'BLOCKED') report.blockers.push('Android system monitoring blocked the test or no counted login attempt remained after recovery.');
+      if (report.status === 'BLOCKED') report.blockers.push(report.attempts.at(-1)?.systemDiagnostic
+        ? `Android system monitoring prevented a verified result: ${report.attempts.at(-1).systemDiagnostic}.`
+        : 'No counted login attempt remained after Android system recovery.');
       report.authenticationEvidence = report.status === 'PASS' ?
         'The passing attempt reached the conditional server-loaded leagues marker with no auth/load errors, then repeated it after restart without clearing storage.' : 'Assertions did not complete successfully; authentication is not proven.';
     } finally { rmSync(temporary, { recursive: true, force: true }); }

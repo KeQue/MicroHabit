@@ -188,6 +188,39 @@ test('an unconfirmed process stop cannot trigger a system tap or retry', async (
   assert.equal(recoveries, 0);
 });
 
+test('an unrecognized final window query preserves the underlying Maestro failure', async () => {
+  let queries = 0;
+  const recovery = {
+    query: async () => ++queries === 1 ? response('com.example.app') : { status: 0, stdout: 'unexpected WindowManager output' },
+    recover: async () => assert.fail('must not treat an unrecognized query as a dialog'),
+  };
+  const result = await monitorAndroidFlow(recovery, async () => ({ child: { status: 1 }, xml: '<testsuite/>' }));
+  assert.equal(result.child.status, 1);
+  assert.equal(result.systemVerificationUnavailable, true);
+  assert.equal(result.systemBlocked, undefined);
+  assert.equal(result.systemDiagnostic, 'android-window-query-unrecognized');
+});
+
+test('an unknown window query during the flow is retried rather than aborting the test', async () => {
+  let queries = 0, finished = false, aborted = false;
+  const recovery = {
+    query: async () => {
+      queries++;
+      return queries === 1 ? { status: 0, stdout: 'unexpected WindowManager output' } : response('com.example.app');
+    },
+    recover: async () => assert.fail('must not recover an unrecognized query'),
+  };
+  const result = await monitorAndroidFlow(recovery, async signal => {
+    signal.addEventListener('abort', () => { aborted = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    finished = true;
+    return { child: { status: 1 }, xml: '' };
+  }, () => new Promise(resolve => setImmediate(resolve)));
+  assert.equal(aborted, false);
+  assert.equal(finished, true);
+  assert.equal(result.systemVerificationUnavailable, undefined);
+});
+
 test('a historical mention is not a current dialog and failed/unknown queries never claim readiness', () => {
   const normal = response(secret); normal.stdout += '\nEarlier diagnostic: Application Not Responding: com.android.systemui\n';
   assert.equal(inspectAndroidWindows(normal).ready, true);

@@ -128,7 +128,7 @@ export async function monitorAndroidFlow(recovery, execute, sleep = ms => new Pr
     const windows = await recovery.query();
     if (finished) break;
     const status = inspectAndroidWindows(windows);
-    if (!status.ready) { interruption = { windows, status }; controller.abort(); break; }
+    if (status.diagnostic === 'android-error-dialog-present') { interruption = { windows, status }; controller.abort(); break; }
     await Promise.race([process, sleep(2000)]);
   }
   const result = await process;
@@ -141,6 +141,9 @@ export async function monitorAndroidFlow(recovery, execute, sleep = ms => new Pr
   const final = await recovery.query();
   const status = inspectAndroidWindows(final);
   if (!status.ready) {
+    if (status.diagnostic !== 'android-error-dialog-present') {
+      return { ...result, systemVerificationUnavailable: true, systemDiagnostic: status.diagnostic };
+    }
     const recovered = isSystemUiAnr(final) ? await recovery.recover(final, 'after-test') : status;
     return recovered.ready ? result : { ...result, systemBlocked: true, systemDiagnostic: recovered.diagnostic || 'android-recovery-unconfirmed' };
   }

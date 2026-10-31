@@ -95,6 +95,16 @@ a roadmap, confidence score, or claim that the model has been retrained.
   Also check for a newly appeared Android error window during stabilization and
   invoke only the existing verified Wait recovery; exact dialog safety and
   native timing still require device verification.
+- Follow-up observation: the first headless-by-default Android run ended
+  BLOCKED after one 328-second UI attempt; its native hierarchy-before capture
+  timed out at 90.8 seconds and the final WindowManager response was
+  unrecognized. The matching iOS run passed, but used a different source
+  revision. These reports do not prove headless caused the Android symptoms.
+  Keep the Regression emulator visible until headless has a validated run. Also
+  preserve a Maestro assertion failure when the final Android window query is
+  unrecognized; an unknown monitor response should block a passing result, not
+  overwrite a failed one. The underlying Android UI timeout still needs native
+  evidence.
 
 ## Keep private build diagnostics observable
 

@@ -27,6 +27,36 @@ test('an Android system interruption is blocked even if the UI report passed', a
   assert.equal(result.systemDiagnostic, 'android-recovery-unconfirmed');
 });
 
+test('an Android window-query failure does not hide a failed UI assertion', async () => {
+  const result = await executeLoginAttempt({ platform: 'android', attempt: 1,
+    runFlow: async () => ({ child: { status: 1 }, xml: '', systemVerificationUnavailable: true, systemDiagnostic: 'android-window-query-unrecognized' }),
+    capture: async () => ({ status: 'UNAVAILABLE' }), diagnostics: () => ({}),
+  });
+  assert.equal(result.status, 'FAIL');
+  assert.equal(result.systemDiagnostic, 'android-window-query-unrecognized');
+  assert.match(result.finding, /assertions did not complete/);
+});
+
+test('an Android window-query failure does not hide a Maestro timeout', async () => {
+  const result = await executeLoginAttempt({ platform: 'android', attempt: 1,
+    runFlow: async () => ({ child: { status: null, error: { code: 'ETIMEDOUT' } }, xml: '', systemVerificationUnavailable: true, systemDiagnostic: 'android-window-query-unrecognized' }),
+    capture: async () => ({ status: 'UNAVAILABLE' }), diagnostics: () => ({}),
+  });
+  assert.equal(result.status, 'FAIL');
+  assert.match(result.finding, /Maestro exceeded the shared six-minute UI budget/);
+  assert.match(result.finding, /system monitoring also could not verify/);
+});
+
+test('an Android window-query failure blocks an otherwise passing UI assertion', async () => {
+  const result = await executeLoginAttempt({ platform: 'android', attempt: 1,
+    runFlow: async () => ({ ...success, systemVerificationUnavailable: true, systemDiagnostic: 'android-window-query-unrecognized' }),
+    capture: async () => ({ status: 'UNAVAILABLE' }), diagnostics: () => ({}),
+  });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.systemDiagnostic, 'android-window-query-unrecognized');
+  assert.match(result.finding, /UI assertions passed.*attempt is blocked/);
+});
+
 test('iOS submits only after both private field checks and the required photo, without retry/reset', async () => {
   const events = [];
   let clock = 0;

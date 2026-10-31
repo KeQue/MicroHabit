@@ -85,6 +85,13 @@ a roadmap, confidence score, or claim that the model has been retrained.
   fixed reasons when controls cannot be verified. Never relax screenshot
   coordinate or redaction checks to manufacture evidence. Native recovery and
   process-tree behavior still require device verification.
+- Follow-up observation: a later Android preflight report again found a System UI
+  ANR but neither verified recovery button in the hierarchy. The report retained
+  only fixed diagnostic codes, so it could not establish whether the hierarchy
+  was transiently incomplete or the controls were represented differently. Allow
+  one bounded, privacy-safe hierarchy re-read only while the same ANR is still
+  present; keep failing closed when controls remain unverified. Device validation
+  is still needed to establish whether this resolves the observed emulator case.
 - Follow-up observation: the Android HTML report showed about 3m40s of E2E
   runner time while the founder observed about 18 minutes from starting the task.
   The report's former "total including setup" label overstated what it measured;

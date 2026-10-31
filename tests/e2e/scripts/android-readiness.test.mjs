@@ -101,10 +101,11 @@ test('Wait is preferred when both verified System UI buttons are available', asy
 
 test('unverified recovery records fixed reasons and never taps', async () => {
   const anr = response('Application Not Responding: com.android.systemui');
+  let hierarchyReads = 0;
   const recovery = createSystemUiRecovery(async args => {
     if (args.includes('dumpsys')) return anr;
     if (args.includes('size')) return { status: 0, stdout: 'Physical size: 200x200\n' };
-    if (args.includes('uiautomator')) return { status: 0, stdout: '<node text="private title" />' };
+    if (args.includes('uiautomator')) { hierarchyReads++; return { status: 0, stdout: '<node text="private title" />' }; }
     if (args.includes('tap')) assert.fail('must not tap an unverified button');
     throw Error('unexpected command');
   }, async () => {});
@@ -113,7 +114,50 @@ test('unverified recovery records fixed reasons and never taps', async () => {
   assert.equal(recovery.events[0].phase, 'preflight');
   assert.equal(recovery.events[0].result, 'buttons-unverified');
   assert.equal(recovery.events[0].diagnostic, 'wait-button-not-found; close-button-not-found');
+  assert.equal(recovery.events[0].hierarchyReads, 2);
+  assert.equal(hierarchyReads, 2);
   assert.ok(!JSON.stringify(recovery.events).includes('private title'));
+});
+
+test('a transient incomplete hierarchy is re-read once before using a verified button', async () => {
+  const anr = response('Application Not Responding: com.android.systemui');
+  const ready = response('com.example.app');
+  let windowChecks = 0, hierarchyReads = 0, taps = 0;
+  const adb = async args => {
+    if (args.includes('dumpsys')) return [anr, anr, ready][windowChecks++];
+    if (args.includes('size')) return { status: 0, stdout: 'Physical size: 200x200\n' };
+    if (args.includes('uiautomator')) {
+      hierarchyReads++;
+      return { status: 0, stdout: hierarchyReads === 1 ? '<hierarchy />' : waitNode };
+    }
+    if (args.includes('tap')) { taps++; return { status: 0 }; }
+    throw Error('unexpected command');
+  };
+  const recovery = createSystemUiRecovery(adb, async () => {});
+  assert.equal((await recovery.recover(anr, 'preflight')).ready, true);
+  assert.equal(hierarchyReads, 2);
+  assert.equal(taps, 1);
+  assert.equal(recovery.events[0].result, 'recovered');
+  assert.equal(recovery.events[0].hierarchyReads, 2);
+});
+
+test('recovery does not retry or tap if the ANR dialog disappears before the hierarchy re-read', async () => {
+  const anr = response('Application Not Responding: com.android.systemui');
+  const ready = response('com.example.app');
+  let windowChecks = 0, hierarchyReads = 0, taps = 0;
+  const adb = async args => {
+    if (args.includes('dumpsys')) return ++windowChecks === 1 ? ready : anr;
+    if (args.includes('size')) return { status: 0, stdout: 'Physical size: 200x200\n' };
+    if (args.includes('uiautomator')) { hierarchyReads++; return { status: 0, stdout: '<hierarchy />' }; }
+    if (args.includes('tap')) { taps++; return { status: 0 }; }
+    throw Error('unexpected command');
+  };
+  const recovery = createSystemUiRecovery(adb, async () => {});
+  const result = await recovery.recover(anr, 'preflight');
+  assert.equal(result.diagnostic, 'android-dialog-changed-before-retry');
+  assert.equal(hierarchyReads, 1);
+  assert.equal(taps, 0);
+  assert.equal(recovery.events[0].diagnostic, 'android-dialog-changed-before-retry');
 });
 
 test('Close app does not count as recovery until System UI is responsive again', async () => {

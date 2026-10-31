@@ -64,39 +64,51 @@ export function createSystemUiRecovery(adb, sleep = ms => new Promise(resolve =>
   const query = () => adb(['shell', 'dumpsys', 'window', 'windows']);
   async function recover(initial, phase) {
     const started = Date.now();
-    const record = (result, action = null, diagnostic = null) => events.push({
+    const record = (result, action = null, diagnostic = null, hierarchyReads = null) => events.push({
       phase, result, ...(action ? { action } : {}), ...(diagnostic ? { diagnostic } : {}),
+      ...(hierarchyReads ? { hierarchyReads } : {}),
       durationSeconds: Math.round((Date.now() - started) / 100) / 10,
     });
     const systemUiAnr = isSystemUiAnr(initial);
     if (!systemUiAnr) return { ready: false, diagnostic: 'android-unrecoverable-dialog' };
     if (attempts >= 2) { record('limit-reached'); return { ready: false, diagnostic: 'android-recovery-limit' }; }
     attempts++;
-    const [sizeResult, hierarchy] = await Promise.all([
-      adb(['shell', 'wm', 'size']),
-      adb(['exec-out', 'uiautomator', 'dump', '/dev/tty']),
-    ]);
-    const size = displaySize(sizeResult);
-    if (hierarchy.error || hierarchy.status !== 0) {
-      record('buttons-unverified', null, 'hierarchy-query-failed');
-      return { ready: false, diagnostic: 'android-recovery-buttons-unverified' };
-    }
-    const wait = dialogButton(hierarchy.stdout, size, 'aerr_wait', 'Wait');
-    const close = dialogButton(hierarchy.stdout, size, 'aerr_close', 'Close app');
-    const selected = wait.button ? { ...wait, action: 'wait' }
-      : close.button ? { ...close, action: 'close-app' } : null;
+    let hierarchyReads = 0;
+    const readButtons = async () => {
+      hierarchyReads++;
+      const [sizeResult, hierarchy] = await Promise.all([
+        adb(['shell', 'wm', 'size']),
+        adb(['exec-out', 'uiautomator', 'dump', '/dev/tty']),
+      ]);
+      if (hierarchy.error || hierarchy.status !== 0) return { selected: null, diagnostic: 'hierarchy-query-failed' };
+      const size = displaySize(sizeResult);
+      const wait = dialogButton(hierarchy.stdout, size, 'aerr_wait', 'Wait');
+      const close = dialogButton(hierarchy.stdout, size, 'aerr_close', 'Close app');
+      const selected = wait.button ? { ...wait, action: 'wait' }
+        : close.button ? { ...close, action: 'close-app' } : null;
+      return { selected, diagnostic: `wait-${wait.diagnostic}; close-${close.diagnostic}` };
+    };
+    let { selected, diagnostic } = await readButtons();
     if (!selected) {
-      record('buttons-unverified', null, `wait-${wait.diagnostic}; close-${close.diagnostic}`);
+      if (!isSystemUiAnr(await query())) {
+        record('dialog-changed', null, 'android-dialog-changed-before-retry', hierarchyReads);
+        return { ready: false, diagnostic: 'android-dialog-changed-before-retry' };
+      }
+      await sleep(500);
+      ({ selected, diagnostic } = await readButtons());
+    }
+    if (!selected) {
+      record('buttons-unverified', null, diagnostic, hierarchyReads);
       return { ready: false, diagnostic: 'android-recovery-buttons-unverified' };
     }
     if (!isSystemUiAnr(await query())) {
-      record('dialog-changed', selected.action, 'android-dialog-changed-before-tap');
+      record('dialog-changed', selected.action, 'android-dialog-changed-before-tap', hierarchyReads);
       return { ready: false, diagnostic: 'android-dialog-changed-before-tap' };
     }
     const button = selected.button;
     const tap = await adb(['shell', 'input', 'tap', String(button.x), String(button.y)]);
     if (tap.error || tap.status !== 0) {
-      record('tap-failed', selected.action);
+      record('tap-failed', selected.action, null, hierarchyReads);
       return { ready: false, diagnostic: `android-${selected.action}-failed` };
     }
     for (let i = 0; i < 5; i++) {
@@ -107,12 +119,12 @@ export function createSystemUiRecovery(adb, sleep = ms => new Promise(resolve =>
           const systemUi = await adb(['shell', 'pidof', 'com.android.systemui']);
           if (systemUi.error || systemUi.status !== 0 || !systemUi.stdout?.trim()) continue;
         }
-        record('recovered', selected.action);
+        record('recovered', selected.action, null, hierarchyReads);
         return checked;
       }
       if (checked.diagnostic !== 'android-error-dialog-present' || checked.category !== 'system-ui') break;
     }
-    record('not-confirmed', selected.action);
+    record('not-confirmed', selected.action, null, hierarchyReads);
     return { ready: false, diagnostic: selected.action === 'close-app' ? 'android-close-app-unconfirmed' : 'android-recovery-unconfirmed' };
   }
   return { events, query, recover };

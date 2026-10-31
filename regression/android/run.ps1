@@ -79,6 +79,8 @@ $env:E2E_BACKEND_ENV = 'production'
 $env:E2E_BACKEND_HOST = 'nzpnfrutomyuvrprkrwi.supabase.co'
 $env:E2E_BUILD_BACKEND_CONFIRMED = 'yes'
 $env:E2E_ALLOW_PRODUCTION_LOGIN = 'yes'
+Write-Host 'Allowing Android System UI 30 seconds to stabilize.'
+Start-Sleep -Seconds 30
 Write-Host 'Running login against production on the dedicated test emulator.'
 $reportPath = 'tests/e2e/results/TC-001-latest.html'
 $previousWrite = if (Test-Path -LiteralPath $reportPath) { (Get-Item -LiteralPath $reportPath).LastWriteTimeUtc } else { [DateTime]::MinValue }
